@@ -13,7 +13,7 @@ import yaml
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim
+from utils.loss_utils import l1_loss, ssim, LapLoss
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -32,6 +32,7 @@ except ImportError:
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
+    laploss = LapLoss(device="cuda")
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
@@ -95,6 +96,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         gt_image = viewpoint_cam.original_image.cuda()
         Ll1 = l1_loss(image, gt_image)
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        if hasattr(opt, 'lambda_lap') and opt.lambda_lap > 0.0:
+            loss += opt.lambda_lap * laploss(image[None, :, :, :], gt_image[None, :, :, :])
         loss.backward()
         end = time.time()
         ema_time_loss = 0.4 * (end - start) + 0.6 * ema_time_loss
