@@ -12,7 +12,7 @@
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
-from math import exp
+from math import exp, pi
 
 def l1_loss(network_output, gt):
     return torch.abs((network_output - gt)).mean()
@@ -112,3 +112,25 @@ class LapLoss(torch.nn.Module):
         pyr_input  = laplacian_pyramid(img=input, kernel=self.gauss_kernel, max_levels=self.max_levels)
         pyr_target = laplacian_pyramid(img=target, kernel=self.gauss_kernel, max_levels=self.max_levels)
         return sum(torch.nn.functional.l1_loss(a, b) for a, b in zip(pyr_input, pyr_target))
+    
+class PELoss(torch.nn.Module):
+    def __init__(self, max_levels=2, weights=None, device=torch.device('cpu')):
+        super(PELoss, self).__init__()
+        self.max_levels = max_levels
+        if weights is None:
+            weights = torch.pow(2.0, -torch.arange(0, max_levels, device=device))
+        self.weights = weights.float()
+        self.freqs = torch.pow(2, torch.arange(0, max_levels, device=device)) * pi
+        
+    def forward(self, network_output, gt):
+        output_phase = network_output[:, None, :, :] * self.freqs[None, :, None, None]
+        output_pe = (torch.stack([torch.cos(output_phase), torch.sin(output_phase)], dim=2) + 1.0) / 2
+        output_pe = output_pe * self.weights[None, :, None, None, None]
+        output_pe = output_pe.reshape(-1, network_output.shape[1], network_output.shape[2])
+
+        gt_phase = gt[:, None, :, :] * self.freqs[None, :, None, None]
+        gt_pe = (torch.stack([torch.cos(gt_phase), torch.sin(gt_phase)], dim=2) + 1.0) / 2
+        gt_pe = gt_pe * self.weights[None, :, None, None, None]
+        gt_pe = gt_pe.reshape(-1, gt.shape[1], gt.shape[2])
+
+        return l1_loss(output_pe, gt_pe)
