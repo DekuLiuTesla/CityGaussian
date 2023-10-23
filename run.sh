@@ -1,4 +1,4 @@
-CONFIG="pe_0.2_tandt_train"
+CONFIG="org_ssim_0.8_tandt_train"
 
 python train_time.py --config config/$CONFIG.yaml
 python render.py -m output/$CONFIG
