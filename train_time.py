@@ -13,7 +13,7 @@ import yaml
 import os
 import torch
 from random import randint
-from utils.loss_utils import l1_loss, ssim, LapLoss, PELoss
+from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
 from gaussian_renderer import render, network_gui
 import sys
 from scene import Scene, GaussianModel
@@ -103,6 +103,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss += opt.lambda_lap * laploss(image[None, :, :, :], gt_image[None, :, :, :])
         if hasattr(opt, 'lambda_pe') and opt.lambda_pe > 0.0:
             loss += opt.lambda_pe * peloss(image, gt_image)
+        if hasattr(opt, 'lambda_opacity') and opt.lambda_opacity > 0.0:
+            loss += opt.lambda_opacity * opacity_loss(gaussians)
         loss.backward()
         end = time.time()
         ema_time_loss = 0.4 * (end - start) + 0.6 * ema_time_loss
@@ -137,10 +139,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, scene.cameras_extent, size_threshold)
                     end = time.time()
                     ema_time_densify = 0.4 * (end - start) + 0.6 * ema_time_densify
-                    # print("Gaussian Num: {}".format(gaussians.get_xyz.shape[0]))
-                    # print("Render time: {}".format(ema_time_render))
-                    # print("Loss Backward time: {}".format(ema_time_loss))
-                    # print("Densification time: {}".format(ema_time_densify))
 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
