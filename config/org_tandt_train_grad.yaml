@@ -1,6 +1,6 @@
 # Model Parameters
 model_params: {
-    name: "GaussianModel",
+    name: "GaussianModelGrad",
     sh_degree: 3,
     source_path: "data/tandt/train",
     model_path: "",
