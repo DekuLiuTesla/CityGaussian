@@ -16,7 +16,7 @@ from random import randint
 from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
 from gaussian_renderer import render, network_gui
 import sys
-from scene import Scene, GaussianModel
+from scene import Scene
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
@@ -36,7 +36,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         laploss = LapLoss(device="cuda")
     if hasattr(opt, 'lambda_pe') and opt.lambda_pe > 0.0:
         peloss = PELoss(max_levels=opt.level_pe, device="cuda")
-    gaussians = GaussianModel(dataset.sh_degree)
+
+    modules = __import__('scene')
+    model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
+    gaussians = getattr(modules, model_name)(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
