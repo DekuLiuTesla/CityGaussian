@@ -19,5 +19,7 @@ dependencies:
     - submodules/diff-gaussian-rasterization
     - submodules/simple-knn
 
+# pip install ipykernel prettytable matplotlib
 # pip install kaolin==0.13.0 -f https://nvidia-kaolin.s3.us-east-2.amazonaws.com/torch-1.13.1_cu117.html
 # pip install tornado --upgrade
+# seems pytorch needs to be installed by conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.6 -c pytorch -c conda-forge
