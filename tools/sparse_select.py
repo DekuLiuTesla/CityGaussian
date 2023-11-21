@@ -9,21 +9,20 @@ from argparse import ArgumentParser
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Convert transforms.json from UE to 3DGS acceptable format")
-    parser.add_argument("--dense_data_path", type=str, required=True)
-    parser.add_argument("--dense_json_path", type=str, required=True)
+    parser.add_argument("--dense_path", type=str, required=True)
     parser.add_argument("--interval", type=int, default=5)
     args = parser.parse_args(sys.argv[1:])
 
     interval = args.interval
-    dense_data_path = args.dense_data_path
-    dense_json_path = args.dense_json_path
-    sparse_data_path = os.path.join(os.path.dirname(args.dense_data_path), 'train_sparse')
-    transforms_path_out = os.path.join(os.path.dirname(args.dense_data_path), 'transforms_train_sparse.json')
+    dense_data_path = os.path.join(args.dense_path, 'input')
+    dense_json_path = os.path.join(args.dense_path, 'transforms_train.json')
+    sparse_path = os.path.join(os.path.dirname(args.dense_path), 'train')
+    transforms_path_out = os.path.join(sparse_path, 'transforms_train.json')
     out_contents = {}
 
-    if not os.path.exists(sparse_data_path):
-        os.mkdir(sparse_data_path)
-        os.mkdir(os.path.join(sparse_data_path, 'input'))
+    if not os.path.exists(sparse_path):
+        os.mkdir(sparse_path)
+        os.mkdir(os.path.join(sparse_path, 'input'))
     # TODO: add directory cleaning
 
     with open(dense_json_path) as json_file:
@@ -38,9 +37,9 @@ if __name__ == "__main__":
 
     for idx, frame in enumerate(contents['frames']):
         if (idx // 6) % interval == 0:
-            source_path = os.path.join(dense_data_path, 'input', os.path.basename(frame['file_path']))
-            target_path = os.path.join(sparse_data_path, 'input', os.path.basename(frame['file_path']))
-            out_contents['frames'].append({'file_path': target_path, 
+            source_path = os.path.join(dense_data_path, os.path.basename(frame['file_path'])+'.png')
+            target_path = os.path.join(sparse_path, 'input', os.path.basename(frame['file_path'])+'.png')
+            out_contents['frames'].append({'file_path': frame['file_path'], 
                                            'transform_matrix': frame['transform_matrix']})
             
             shutil.copy(source_path, target_path)
