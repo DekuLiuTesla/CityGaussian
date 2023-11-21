@@ -43,7 +43,7 @@ if __name__ == "__main__":
             out_contents['frames'].append({'file_path': target_path, 
                                            'transform_matrix': frame['transform_matrix']})
             
-            shutil.move(source_path, target_path)
+            shutil.copy(source_path, target_path)
 
     with open(transforms_path_out, 'w') as json_file:
         json.dump(out_contents, json_file, indent=4)
