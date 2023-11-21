@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     transforms_path_ref = args.ref_path
     source_path = args.source_path
-    transforms_path = os.path.join(source_path, 'transforms.json')
+    transforms_path = os.path.join(source_path, 'input', 'transforms.json')
     json_name = 'transforms_train.json' if args.train else 'transforms_test.json'
     transforms_path_out = os.path.join(os.path.dirname(args.source_path), json_name)
     out_contents = {}
@@ -57,7 +57,8 @@ if __name__ == "__main__":
         c2w_gs[:3, 0] = c2w[:3, 1]
         c2w_gs[:3, 1] = c2w[:3, 2]
         c2w_gs[:3, 2] = -c2w[:3, 0]
-        file_path = os.path.join(os.path.split(args.source_path)[-1], os.path.split(frame['file_path'])[-1])
+        file_path = os.path.join(os.path.split(args.source_path)[-1], 'input', os.path.split(frame['file_path'])[-1])
+        file_path = file_path.replace('jpg', 'png')
         out_contents['frames'].append({'file_path': file_path, 'transform_matrix': c2w_gs.tolist()})
 
     with open(transforms_path_out, 'w') as json_file:
