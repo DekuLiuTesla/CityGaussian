@@ -10,13 +10,14 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Convert transforms.json from UE to 3DGS acceptable format")
     parser.add_argument("--dense_path", type=str, required=True)
+    parser.add_argument("--sparse_path", type=str, required=True)
     parser.add_argument("--interval", type=int, default=5)
     args = parser.parse_args(sys.argv[1:])
 
     interval = args.interval
     dense_data_path = os.path.join(args.dense_path, 'input')
     dense_json_path = os.path.join(args.dense_path, 'transforms_train.json')
-    sparse_path = os.path.join(os.path.dirname(args.dense_path), 'train')
+    sparse_path = args.sparse_path
     transforms_path_out = os.path.join(sparse_path, 'transforms_train.json')
     out_contents = {}
 
@@ -37,9 +38,14 @@ if __name__ == "__main__":
 
     for idx, frame in enumerate(contents['frames']):
         if (idx // 6) % interval == 0:
+            if idx % 6 == 1 or idx % 6 == 2:
+                continue
+            i, j = idx // 6, idx % 6
             source_path = os.path.join(dense_data_path, os.path.basename(frame['file_path'])+'.png')
-            target_path = os.path.join(sparse_path, 'input', os.path.basename(frame['file_path'])+'.png')
-            out_contents['frames'].append({'file_path': frame['file_path'], 
+            target_file_name = os.path.join('input', f'D_{j}P_{i}')
+            target_path = os.path.join(sparse_path, target_file_name+'.png')
+            
+            out_contents['frames'].append({'file_path': target_file_name, 
                                            'transform_matrix': frame['transform_matrix']})
             
             shutil.copy(source_path, target_path)
