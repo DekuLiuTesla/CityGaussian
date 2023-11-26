@@ -54,10 +54,15 @@ if __name__ == "__main__":
         c2w[:3, 3] = c2w[:3, 3] / 100  # cm to m
 
         c2w_gs = np.zeros((4, 4))
+        # exchange x and y axis, so as to transform 
+        # coordinate system from left-hand to right-hand
+        c2w = c2w[[1, 0, 2, 3], :]
+
+        # change the axis orientation under camera coordinate system
         c2w_gs[:, 3] = c2w[:, 3]
         c2w_gs[:3, 0] = c2w[:3, 1]
-        c2w_gs[:3, 1] = c2w[:3, 2]
-        c2w_gs[:3, 2] = -c2w[:3, 0]
+        c2w_gs[:3, 1] = -c2w[:3, 2]
+        c2w_gs[:3, 2] = c2w[:3, 0]
         file_path = file_path.replace('.jpg', '')
         out_contents['frames'].append({'file_path': file_path, 'transform_matrix': c2w_gs.tolist()})
 
