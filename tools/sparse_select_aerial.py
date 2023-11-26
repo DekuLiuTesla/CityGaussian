@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser.add_argument("--dense_path", type=str, required=True)
     parser.add_argument("--sparse_path", type=str, required=True)
     parser.add_argument("--interval", type=int, default=5)
+    parser.add_argument("--skip_image", action="store_true", help="Skip images or not.")
     args = parser.parse_args(sys.argv[1:])
 
     interval = args.interval
@@ -43,8 +44,8 @@ if __name__ == "__main__":
             
             out_contents['frames'].append({'file_path': frame['file_path'], 
                                            'transform_matrix': frame['transform_matrix']})
-            
-            shutil.copy(source_path, target_path)
+            if not args.skip_image:
+                shutil.copy(source_path, target_path)
 
     with open(transforms_path_out, 'w') as json_file:
         json.dump(out_contents, json_file, indent=4)
