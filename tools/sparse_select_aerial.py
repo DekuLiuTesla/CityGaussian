@@ -24,6 +24,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(sparse_path):
         os.mkdir(sparse_path)
+    if not os.path.exists(os.path.join(sparse_path, 'input')):
         os.mkdir(os.path.join(sparse_path, 'input'))
     # TODO: add directory cleaning
 

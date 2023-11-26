@@ -13,6 +13,8 @@ if __name__ == "__main__":
 
     source_path = args.source_path
     sparse_path = os.path.join(source_path, 'sparse')
+    if not os.path.exists(sparse_path):
+        os.mkdir(sparse_path)
     transforms_path = os.path.join(source_path, 'transforms_train.json')
     with open(transforms_path) as json_file:
         contents = json.load(json_file)
