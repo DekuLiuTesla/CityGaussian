@@ -35,8 +35,8 @@ if __name__ == "__main__":
         f.write('#   POINTS2D[] as (X, Y, POINT3D_ID)\n')
         f.write('# Number of images: {}\n'.format(len(contents['frames'])))
         for idx, frame in enumerate(contents['frames']):
-            file_path = os.path.join('input', os.path.split(frame['file_path'])[-1]+'.jpg')
-            if not os.path.exists(os.path.join(source_path, file_path)):
+            file_path = os.path.split(frame['file_path'])[-1]+'.jpg'
+            if not os.path.exists(os.path.join(source_path, 'input', file_path)):
                 continue
             c2w = frame['transform_matrix']
             w2c = np.linalg.inv(c2w)
