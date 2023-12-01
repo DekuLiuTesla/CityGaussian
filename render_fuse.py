@@ -37,6 +37,7 @@ def render_set(model_path, name, subset_idx, iteration, views, gaussians, pipeli
         torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:03d}_{1:05d}'.format(subset_idx, idx) + ".png"))
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool):
+    # key parameters of dataset: sh_degree, model_path, iteration, sub_paths, 
     with torch.no_grad():
         gaussians_fuse = GaussianModel(dataset.sh_degree)
         gaussians_fuse.load_ply(os.path.join(dataset.model_path,
