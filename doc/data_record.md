@@ -1,7 +1,7 @@
 # Prepare UE-collected data
 1. download data, unzip and put them into `path/to/scene/block_i/input` folder, for instance, the images of block_i can be put into `data/UE-collected/aerial/block_i` folder
 
-2. download the `transforms_train.json` that describing the camera parameters of all blocks to folder to `path/to/scene/transforms_train.json`, for instance `data/UE-collected/aerial/transforms_train.json`
+2. download the `transforms_train.json` that describing the camera parameters of all blocks, then rename it as `transforms_raw.json` and save it to folder as `path/to/scene/block_i/transforms_raw.json`, for instance `data/UE-collected/aerial/block_1/transforms_raw.json`
 
 3. generate acceptable transforms_train.json required by 3DGS using
 ```bash
