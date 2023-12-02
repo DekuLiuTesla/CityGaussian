@@ -2,7 +2,7 @@
 model_params: {
     name: "GaussianModel",
     sh_degree: 3,
-    source_path: "",
+    source_path: "data/UE-collected/aerial/blockF_test20_1f2",
     model_path: "",
     sub_paths: ["config/org_ue_aerial_20_block1cam.yaml", 
                 "config/org_ue_aerial_20_block2cam.yaml"],
