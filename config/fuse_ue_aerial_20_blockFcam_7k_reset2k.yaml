@@ -2,7 +2,7 @@
 model_params: {
     name: "GaussianModel",
     sh_degree: 3,
-    source_path: "",
+    source_path: "data/UE-collected/aerial/blockF_test20_1f2",
     model_path: "",
     sub_paths: ["config/org_ue_aerial_20_block1cam.yaml", 
                 "config/org_ue_aerial_20_block2cam.yaml"],
@@ -37,7 +37,7 @@ optim_params: {
     densification_interval: 100,
     opacity_reset_interval: 2000,
     densify_from_iter: 500,
-    densify_until_iter: 15_000,
+    densify_until_iter: 5_000,
     densify_grad_threshold: 0.0002
 }
 
