@@ -99,6 +99,6 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--model_paths', '-m', required=True, nargs="+", type=str, default=[])
-    parser.add_argument('--test-sets', '-t', required=False, nargs="+", type=str, default="test")
+    parser.add_argument('--test_sets', '-t', required=False, nargs="+", type=str, default=["test"])
     args = parser.parse_args()
     evaluate(args.model_paths, args.test_sets)
