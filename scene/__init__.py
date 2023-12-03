@@ -98,7 +98,7 @@ class Scene:
 
 
 class FusedScene(Scene):
-    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0]):
+    def __init__(self, args : ModelParams, pipe : ModelParams,  gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0]):
         """b
         :param path: Path to colmap scene main folder.
         """
@@ -170,6 +170,37 @@ class FusedScene(Scene):
                 json_cams.append(camera_to_JSON(id, cam))
             with open(os.path.join(self.model_path, "cameras.json"), 'w') as file:
                 json.dump(json_cams, file)
+        
+        prune_data = args.prune_data if hasattr(args, "prune_data") else False
+        if prune_data:
+            from gaussian_renderer import render
+            from utils.loss_utils import ssim
+
+            with torch.no_grad():
+                print("Pruning Training Cameras")
+                loss_list = []
+                bg_color = [1,1,1] if args.white_background else [0, 0, 0]
+                background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+                views = cameraList_from_camInfos(train_cameras_fuse, 1.0, args)
+
+                for i in range(len(train_cameras_fuse)):
+                    view = views[i]
+                    render_pkg_fused = render(view, self.gaussians, pipe, background)
+                    image_fused, _, _, _, _ = render_pkg_fused["render"], render_pkg_fused["viewspace_points"], render_pkg_fused["visibility_filter"], render_pkg_fused["radii"], render_pkg_fused["geometry"]
+                    image_fused = image_fused
+                    gt_image = view.original_image.to("cuda")
+
+                    loss = ssim(image_fused, gt_image)
+                    loss_list.append(loss)
+                
+                loss_list = torch.stack(loss_list, dim=0)
+                loss_mean = torch.mean(loss_list, dim=0)
+                loss_std = torch.std(loss_list, dim=0)
+
+                mask = [i for i in range(loss_list.shape[0]) if loss_list[i] < loss_mean + loss_std]
+                train_cameras_fuse = [train_cameras_fuse[i] for i in mask]
+
+            print(f"Left {len(train_cameras_fuse)} Training Cameras")
 
         if shuffle:
             random.shuffle(train_cameras_fuse)  # Multi-res consistent random shuffling

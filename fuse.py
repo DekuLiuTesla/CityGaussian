@@ -40,7 +40,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     modules = __import__('scene')
     model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
     gaussians = getattr(modules, model_name)(dataset.sh_degree)
-    scene = FusedScene(dataset, gaussians)
+    scene = FusedScene(dataset, pipe, gaussians)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
