@@ -6,12 +6,13 @@ model_params: {
     model_path: "",
     test_source: "data/UE-collected/aerial/blockF_test20_1f2",
     sub_paths: ["config/org_ue_aerial_20_block1cam.yaml", 
-                "config/org_ue_aerial_20_block2cam.yaml"],
+                "config/org_ue_aerial_20_block2cam.yaml", 
+                "config/org_ue_street_5_block2cam.yaml"],
     images: "images",
     resolution: -1,
     white_background: False,
     data_device: "cuda",
-    eval: True
+    eval: True,
 }
 
 # Pipeline Parameters
@@ -24,11 +25,11 @@ pipeline_params: {
 
 # Optimization Parameters
 optim_params: {
-    iterations: 30_000,
+    iterations: 7_000,
     position_lr_init: 0.00016,
     position_lr_final: 0.0000016,
     position_lr_delay_mult: 0.01,
-    position_lr_max_steps: 30_000,
+    position_lr_max_steps: 7_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
     scaling_lr: 0.005,

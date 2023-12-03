@@ -36,7 +36,7 @@ def render_set(model_path, name, subset_idx, iteration, views, gaussians, pipeli
         torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:03d}_{1:05d}'.format(subset_idx, idx) + ".png"))
         torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:03d}_{1:05d}'.format(subset_idx, idx) + ".png"))
 
-def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, source_test : bool):
+def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, skip_train : bool, skip_test : bool, custom_test : bool):
     # key parameters of dataset: sh_degree, model_path, iteration, sub_paths, 
     with torch.no_grad():
         gaussians_fuse = GaussianModel(dataset.sh_degree)
@@ -45,7 +45,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                                             "iteration_" + str(iteration),
                                             "point_cloud.ply"))
         
-        if not source_test:
+        if not custom_test:
             sub_paths = dataset.sub_paths
             for i, sub_path in enumerate(sub_paths):
                 with open(sub_path) as f:
@@ -67,15 +67,22 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 if not skip_test:
                     render_set(dataset.model_path, "test", i, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
         else:
+            dataset.source_path = dataset.test_source
+            filename = os.path.basename(dataset.source_path)
             scene = Scene(dataset, gaussians_fuse, load_iteration=iteration, shuffle=False)
             bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
             background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
-            views = scene.getTrainCameras() + scene.getTestCameras()
-
-            if skip_test or skip_train:
-                print("Warning: skip_train and skip_test are ignored when source_test is set to True")
             
-            render_set(dataset.model_path, "test_src", 0, scene.loaded_iter, views, gaussians_fuse, pipeline, background)
+            if skip_test and skip_train:
+                views = scene.getTrainCameras() + scene.getTestCameras()
+                render_set(dataset.model_path, filename, 0, scene.loaded_iter, views, gaussians_fuse, pipeline, background)
+                print("Skip both train and test, render all views")
+            
+            if not skip_train:
+                render_set(dataset.model_path, f"train_{filename}", 0, scene.loaded_iter, scene.getTrainCameras(), gaussians_fuse, pipeline, background)
+            
+            if not skip_test:
+                render_set(dataset.model_path, f"test_{filename}", 0, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
 
 
 def parse_cfg(cfg):
@@ -100,7 +107,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--config_fuse', type=str, help='train config file path of fused model')
     parser.add_argument('--model_path', type=str, help='model path of fused model')
-    parser.add_argument("--source_test", action="store_true", help="if test on data appointed by source_path")
+    parser.add_argument("--custom_test", action="store_true", help="if test on data appointed by source_path")
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
@@ -119,4 +126,4 @@ if __name__ == "__main__":
         if lp.model_path == '':
             lp.model_path = args.model_path
 
-    render_sets(lp, op.iterations, pp, args.skip_train, args.skip_test, args.source_test)
+    render_sets(lp, op.iterations, pp, args.skip_train, args.skip_test, args.custom_test)
