@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     transforms_path_ref = args.ref_path
     source_path = args.source_path
-    transforms_path = os.path.join(args.source_path, 'input', 'transforms_train.json')
+    transforms_path = os.path.join(args.source_path, 'transforms_raw.json')
     json_name = 'transforms_train.json' if args.train else 'transforms_test.json'
     transforms_path_out = os.path.join(args.source_path, json_name)
     out_contents = {}
@@ -23,10 +23,13 @@ if __name__ == "__main__":
         ref_contents = json.load(json_file)
     with open(transforms_path, 'r', encoding='utf-16') as json_file:
         contents = json.load(json_file)
-        contents['Sensor_Width'] = 23.76  # mm
-        contents['Sensor_Height'] = 13.365  # mm
-        contents['Current_Focal_Length'] = 11.8  # mm
-        contents['camera_angle_x'] = 90.387123 * np.pi / 180  # degree to rad
+        # set default values
+        if contents['Current_Focal_Length'] == 0:
+            contents['Current_Focal_Length'] = 9  # mm
+        if contents['Sensor_Width'] == 0:
+            contents['Sensor_Width'] = 23.76  # mm
+        if contents['Sensor_Height'] == 0:
+            contents['Sensor_Height'] = 13.365  # mm
 
     # initialize out_contents with the same keys as ref_contents
     for key in ref_contents.keys():
@@ -40,14 +43,13 @@ if __name__ == "__main__":
     out_contents['cy'] = contents['cy']
     out_contents['w'] = contents['w']
     out_contents['h'] = contents['h']
-    out_contents['fl_x'] = contents['w'] / contents['Sensor_Width'] * contents['Current_Focal_Length']
-    out_contents['fl_y'] = contents['h'] / contents['Sensor_Height'] * contents['Current_Focal_Length']
-    camera_angle_x = np.arctan(0.5 * contents['Sensor_Width'] / contents['Current_Focal_Length']) * 2
+    out_contents['fl_x'] = contents['w'] / (2 * np.tan(contents['camera_angle_x'] / 2))
+    out_contents['fl_y'] = out_contents['fl_x']  # assume square pixels
 
     frames = contents["Frames"]
     for idx, frame in enumerate(frames):
         file_path = os.path.join('input', os.path.split(frame['file_path'])[-1])
-        if not os.path.exists(os.path.join(source_path, file_path).replace('.jpg', '.png')):
+        if not os.path.exists(os.path.join(source_path, file_path)):
             continue
 
         c2w = frame['transform_matrix']
