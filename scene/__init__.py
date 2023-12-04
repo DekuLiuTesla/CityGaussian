@@ -103,6 +103,7 @@ class FusedScene(Scene):
         :param path: Path to colmap scene main folder.
         """
         self.model_path = args.model_path
+        self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
         self.loaded_iter = None
         self.gaussians = gaussians
 
@@ -121,6 +122,8 @@ class FusedScene(Scene):
         xyz = []
         rgb = []
 
+        # scene info is constructed using that from individual blocks
+        # if not loaded_iter, the initial gaussians are constructed by fusing individual gaussians
         for sub_path in args.sub_paths:
             with open(sub_path) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -144,7 +147,7 @@ class FusedScene(Scene):
             xyz.append(positions)
             rgb.append(colors)
 
-            if not self.loaded_iter:
+            if not self.loaded_iter and not self.pretrain_path:
                 config_name = os.path.splitext(os.path.basename(sub_path))[0]
                 lp.model_path = os.path.join(os.path.dirname(self.model_path), config_name)
                 gaussian_block = GaussianModel(lp.sh_degree)
@@ -217,6 +220,8 @@ class FusedScene(Scene):
                                                 "point_cloud",
                                                 "iteration_" + str(self.loaded_iter),
                                                 "point_cloud.ply"))
+        elif self.pretrain_path:
+            self.gaussians.load_ply(os.path.join(self.pretrain_path, "point_cloud.ply"))
         else:
             self.gaussians.save_ply(os.path.join(self.model_path,
                                                 "point_cloud",
@@ -271,7 +276,7 @@ class RefinedScene(Scene):
         :param path: Path to colmap scene main folder.
         """
         self.model_path = args.model_path
-        self.pretrain_path = args.pretrain_path
+        self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
         self.loaded_iter = None
         self.gaussians = gaussians
 

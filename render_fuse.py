@@ -19,6 +19,7 @@ from tqdm import tqdm
 from os import makedirs
 from gaussian_renderer import render
 from utils.general_utils import safe_state
+from utils.system_utils import searchForMaxIteration
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, GroupParams, get_combined_args
 from gaussian_renderer import GaussianModel
@@ -40,6 +41,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
     # key parameters of dataset: sh_degree, model_path, iteration, sub_paths, 
     with torch.no_grad():
         gaussians_fuse = GaussianModel(dataset.sh_degree)
+        if iteration == -1:
+            iteration = searchForMaxIteration(os.path.join(dataset.model_path, "point_cloud"))
         gaussians_fuse.load_ply(os.path.join(dataset.model_path,
                                             "point_cloud",
                                             "iteration_" + str(iteration),
