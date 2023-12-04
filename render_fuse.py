@@ -126,4 +126,4 @@ if __name__ == "__main__":
         if lp.model_path == '':
             lp.model_path = args.model_path
 
-    render_sets(lp, op.iterations, pp, args.skip_train, args.skip_test, args.custom_test)
+    render_sets(lp, args.iteration, pp, args.skip_train, args.skip_test, args.custom_test)
