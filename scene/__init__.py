@@ -17,10 +17,11 @@ import torch
 import numpy as np
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
-from scene.gaussian_model import GaussianModel, GaussianModelGrad
+from scene.gaussian_model import GaussianModel
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
+from sklearn.utils.class_weight import compute_class_weight 
 
 class Scene:
 
@@ -105,6 +106,8 @@ class FusedScene(Scene):
         self.model_path = args.model_path
         self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
         self.loaded_iter = None
+        self.train_weights = None
+        self.class_weight = None
         self.gaussians = gaussians
 
         if load_iteration:
@@ -113,10 +116,15 @@ class FusedScene(Scene):
             else:
                 self.loaded_iter = load_iteration
             print("Loading trained model at iteration {}".format(self.loaded_iter))
+        
+        if hasattr(args, "balance") and args.balance:
+            self.class_weight = 'balanced'
+            print("Using balanced class weights")
 
         self.train_cameras = {}
         self.test_cameras = {}
         self.cameras_extent = 0.0
+        train_label_fuse = []
         train_cameras_fuse = []
         test_cameras_fuse = []
         xyz = []
@@ -124,7 +132,7 @@ class FusedScene(Scene):
 
         # scene info is constructed using that from individual blocks
         # if not loaded_iter, the initial gaussians are constructed by fusing individual gaussians
-        for sub_path in args.sub_paths:
+        for idx, sub_path in enumerate(args.sub_paths):
             with open(sub_path) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
             lp, op, pp = self.parse_cfg(cfg)
@@ -137,6 +145,7 @@ class FusedScene(Scene):
             else:
                 assert False, f"Could not recognize block scene type of {sub_path}!"
             
+            train_label_fuse += [idx] * len(scene_info_block.train_cameras)
             train_cameras_fuse += scene_info_block.train_cameras
             test_cameras_fuse += scene_info_block.test_cameras
             self.cameras_extent = max(self.cameras_extent, scene_info_block.nerf_normalization["radius"])
@@ -156,6 +165,12 @@ class FusedScene(Scene):
                                                     "iteration_" + str(op.iterations),
                                                     "point_cloud.ply"))
                 self.update_gaussians(gaussian_block)
+        
+        # add class balance weights to train_cameras_fuse
+        train_label_fuse = np.array(train_label_fuse)
+        train_classes = np.unique(train_label_fuse)
+        train_class_weights = compute_class_weight(class_weight=self.class_weight, classes=train_classes, y=train_label_fuse)
+        train_weights = train_class_weights[train_label_fuse].tolist()
                     
         if not self.loaded_iter:
             # fuse ply data and store in appointed path
@@ -206,8 +221,12 @@ class FusedScene(Scene):
             print(f"Left {len(train_cameras_fuse)} Training Cameras")
 
         if shuffle:
-            random.shuffle(train_cameras_fuse)  # Multi-res consistent random shuffling
+            pack = list(zip(train_cameras_fuse, train_weights))  
+            random.shuffle(pack)  # Multi-res consistent random shuffling
+            train_cameras_fuse[:], train_weights[:] = zip(*pack)
             random.shuffle(test_cameras_fuse)  # Multi-res consistent random shuffling
+        
+        self.train_weights = train_weights
 
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
@@ -267,6 +286,9 @@ class FusedScene(Scene):
             self.gaussians._opacity = torch.cat([self.gaussians._opacity, new_gaussians._opacity], dim=0)
             self.gaussians.max_radii2D = torch.cat([self.gaussians.max_radii2D, new_gaussians.max_radii2D], dim=0)
 
+    def getTrainWeights(self):
+        return self.train_weights
+    
 class RefinedScene(Scene):
 
     gaussians : GaussianModel
