@@ -15,7 +15,7 @@ import json
 import yaml
 import torch
 import numpy as np
-from imblearn.under_sampling import RandomUnderSampler
+import imblearn
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
 from scene.gaussian_model import GaussianModel
@@ -117,10 +117,16 @@ class FusedScene(Scene):
                 self.loaded_iter = load_iteration
             print("Loading trained model at iteration {}".format(self.loaded_iter))
         
-        if hasattr(args, "balance") and args.balance:
-            self.balance = True
-            self.rus = RandomUnderSampler(random_state=42)
-            print("Use class balancing")
+        if hasattr(args, "balance"):
+            self.balance = args.balance
+            if self.balance == "undersample":
+                self.rus = imblearn.under_sampling.RandomUnderSampler(random_state=42)
+                print("Use RandomUnderSampler for class balance")
+            elif self.balance == "oversample":
+                self.rus = imblearn.over_sampling.RandomOverSampler(random_state=42)
+                print("Use RandomOverSampler for class balance")
+            else:
+                assert False, "Unknown class balance method!"
 
         self.train_cameras = {}
         self.test_cameras = {}

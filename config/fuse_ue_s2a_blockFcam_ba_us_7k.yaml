@@ -12,7 +12,7 @@ model_params: {
     resolution: -1,
     white_background: False,
     data_device: "cuda",
-    balance: "undersample",  # ["undersample", "oversample"]
+    balance: "oversample",  # ["undersample", "oversample"]
     eval: True,
 }
 
