@@ -15,13 +15,13 @@ import json
 import yaml
 import torch
 import numpy as np
+from imblearn.under_sampling import RandomUnderSampler
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
 from scene.gaussian_model import GaussianModel
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
-from sklearn.utils.class_weight import compute_class_weight 
 
 class Scene:
 
@@ -105,8 +105,8 @@ class FusedScene(Scene):
         """
         self.model_path = args.model_path
         self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
+        self.balance = False
         self.loaded_iter = None
-        self.train_weights = None
         self.class_weight = None
         self.gaussians = gaussians
 
@@ -118,8 +118,9 @@ class FusedScene(Scene):
             print("Loading trained model at iteration {}".format(self.loaded_iter))
         
         if hasattr(args, "balance") and args.balance:
-            self.class_weight = 'balanced'
-            print("Using balanced class weights")
+            self.balance = True
+            self.rus = RandomUnderSampler(random_state=42)
+            print("Use class balancing")
 
         self.train_cameras = {}
         self.test_cameras = {}
@@ -168,9 +169,6 @@ class FusedScene(Scene):
         
         # add class balance weights to train_cameras_fuse
         train_label_fuse = np.array(train_label_fuse)
-        train_classes = np.unique(train_label_fuse)
-        train_class_weights = compute_class_weight(class_weight=self.class_weight, classes=train_classes, y=train_label_fuse)
-        train_weights = train_class_weights[train_label_fuse].tolist()
                     
         if not self.loaded_iter:
             # fuse ply data and store in appointed path
@@ -221,12 +219,12 @@ class FusedScene(Scene):
             print(f"Left {len(train_cameras_fuse)} Training Cameras")
 
         if shuffle:
-            pack = list(zip(train_cameras_fuse, train_weights))  
+            pack = list(zip(train_cameras_fuse, train_label_fuse))  
             random.shuffle(pack)  # Multi-res consistent random shuffling
-            train_cameras_fuse[:], train_weights[:] = zip(*pack)
+            train_cameras_fuse[:], train_label_fuse[:] = zip(*pack)
             random.shuffle(test_cameras_fuse)  # Multi-res consistent random shuffling
         
-        self.train_weights = train_weights
+        self.train_label_fuse = train_label_fuse
 
         for resolution_scale in resolution_scales:
             print("Loading Training Cameras")
@@ -286,8 +284,15 @@ class FusedScene(Scene):
             self.gaussians._opacity = torch.cat([self.gaussians._opacity, new_gaussians._opacity], dim=0)
             self.gaussians.max_radii2D = torch.cat([self.gaussians.max_radii2D, new_gaussians.max_radii2D], dim=0)
 
-    def getTrainWeights(self):
-        return self.train_weights
+    def getTrainCameras(self, scale=1.0):
+        if self.balance:
+            train_idx = np.arange(len(self.train_label_fuse))[:, None]
+            train_label = self.train_label_fuse.copy()
+            train_idx, train_label = self.rus.fit_resample(train_idx, train_label)
+            sample_mask = train_idx[:, 0].tolist()
+            return [self.train_cameras[scale][idx] for idx in sample_mask]
+        else:
+            return self.train_cameras[scale]
     
 class RefinedScene(Scene):
 

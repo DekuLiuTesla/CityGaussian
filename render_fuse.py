@@ -87,7 +87,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 render_set(dataset.model_path, f"train_{filename}", 0, scene.loaded_iter, scene.getTrainCameras(), gaussians_fuse, pipeline, background)
             
             if not skip_test:
-                render_set(dataset.model_path, f"test_{filename}", 0, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
+                render_set(dataset.model_path, f"{filename}", 0, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
 
 
 def parse_cfg(cfg):

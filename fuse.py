@@ -86,10 +86,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
-            weight_stack = scene.getTrainWeights().copy()
-        rand_idx = randint(0, len(viewpoint_stack)-1)
-        viewpoint_cam = viewpoint_stack.pop(rand_idx)
-        weight = weight_stack.pop(rand_idx)
+        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
         # Render
         start = time.time()
@@ -111,7 +108,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             loss += opt.lambda_pe * peloss(image, gt_image)
         if hasattr(opt, 'lambda_opacity') and opt.lambda_opacity > 0.0:
             loss += opt.lambda_opacity * opacity_loss(gaussians)
-        loss = loss * weight
         loss.backward()
         end = time.time()
         ema_time_loss = 0.4 * (end - start) + 0.6 * ema_time_loss
