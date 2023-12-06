@@ -49,6 +49,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                                             "point_cloud.ply"))
         
         if not custom_test:
+            print("Render data from all subsets")
             sub_paths = dataset.sub_paths
             for i, sub_path in enumerate(sub_paths):
                 with open(sub_path) as f:
@@ -70,7 +71,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 if not skip_test:
                     render_set(dataset.model_path, "test", i, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
         else:
-            dataset.source_path = dataset.test_source
+            print(f"Render data from appointed dataset {custom_test}")
+            dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
             scene = Scene(dataset, gaussians_fuse, load_iteration=iteration, shuffle=False)
             bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
@@ -110,7 +112,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--config_fuse', type=str, help='train config file path of fused model')
     parser.add_argument('--model_path', type=str, help='model path of fused model')
-    parser.add_argument("--custom_test", action="store_true", help="if test on data appointed by source_path")
+    parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
