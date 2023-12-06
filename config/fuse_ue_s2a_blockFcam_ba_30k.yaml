@@ -5,7 +5,6 @@ model_params: {
     source_path: "",
     model_path: "",
     pretrain_path: "output/fuse_ue_aerial_20_blockFcam_7k/point_cloud/iteration_7000",
-    test_source: "data/UE-collected/aerial/blockF_test20_1f2",
     sub_paths: ["config/org_ue_aerial_20_block1cam.yaml", 
                 "config/org_ue_aerial_20_block2cam.yaml", 
                 "config/org_ue_street_5_block2cam.yaml"],

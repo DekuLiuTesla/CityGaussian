@@ -5,7 +5,6 @@ model_params: {
     source_path: "data/UE-collected/street/block2_5_cam",
     model_path: "",
     pretrain_path: "output/fuse_ue_aerial_20_blockFcam_7k/point_cloud/iteration_7000",
-    test_source: "data/UE-collected/aerial/blockF_test20_1f2",
     sub_paths: "",
     images: "images",
     resolution: -1,
