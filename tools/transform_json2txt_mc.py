@@ -44,11 +44,12 @@ if __name__ == "__main__":
             file_path = '{:0>4d}'.format(frame['frame_index']) +'.png'
             if not os.path.exists(os.path.join(source_path, 'input', file_path)):
                 continue
+            # NeRF 'rot_mat' is a camera-to-world transform
             c2w = np.array(frame['rot_mat'])
             c2w[:3,:3] *= 100
-            c2w[:3,1] *= -1
-            c2w[:3,2] *= -1
             c2w[:3,3] /= 100
+            # change from OpenGL/Blender camera axes (Y up, Z back) to COLMAP (Y down, Z forward)
+            c2w[:3, 1:3] *= -1
             w2c = np.linalg.inv(c2w)
             qw, qx, qy, qz = mat2quat(w2c[:3, :3])
             tx, ty, tz = w2c[:3, 3]
