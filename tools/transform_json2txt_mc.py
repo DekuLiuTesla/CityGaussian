@@ -46,6 +46,8 @@ if __name__ == "__main__":
                 continue
             c2w = np.array(frame['rot_mat'])
             c2w[:3,:3] *= 100
+            c2w[:3,1] *= -1
+            c2w[:3,2] *= -1
             c2w[:3,3] /= 100
             w2c = np.linalg.inv(c2w)
             qw, qx, qy, qz = mat2quat(w2c[:3, :3])
