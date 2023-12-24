@@ -17,6 +17,8 @@ from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
 from gaussian_renderer import render, render_v2, network_gui
 import sys
 from scene import LargeScene
+from scene.datasets import GSDataset
+from utils.camera_utils import loadCam
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
@@ -42,6 +44,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
     gaussians = getattr(modules, model_name)(dataset.sh_degree)
     scene = LargeScene(dataset, gaussians)
+    gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -62,7 +65,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     first_iter += 1
     iteration = first_iter
     while iteration <= opt.iterations:    
-        data_loader = DataLoader(scene.getTrainCameras(), batch_size=1, shuffle=True, num_workers=0)
+        data_loader = DataLoader(gs_dataset, batch_size=1, shuffle=True, num_workers=0)
         for dataset_index, (cam_info, gt_image) in enumerate(data_loader):    
             if network_gui.conn == None:
                 network_gui.try_connect()
@@ -123,7 +126,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     progress_bar.close()
 
                 # Log and save
-                training_report(tb_writer, iteration, Ll1, loss, l1_loss, ema_time_render, ema_time_loss, ema_time_densify,
+                training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, ema_time_render, ema_time_loss, ema_time_densify,
                                 iter_start.elapsed_time(iter_end), testing_iterations, scene, render_v2, (pipe, background))
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -175,7 +178,7 @@ def prepare_output_and_logger(args):
         print("Tensorboard not available: not logging progress")
     return tb_writer
 
-def training_report(tb_writer, iteration, Ll1, loss, l1_loss, t_render, t_loss, t_densify, elapsed, testing_iterations, scene : LargeScene, renderFunc, renderArgs):
+def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, t_render, t_loss, t_densify, elapsed, testing_iterations, scene : LargeScene, renderFunc, renderArgs):
     if tb_writer:
         tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
         tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
@@ -195,7 +198,19 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, t_render, t_loss, 
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0
                 psnr_test = 0.0
-                for idx, (viewpoint, org_img) in enumerate(config['cameras']):
+                for idx, camera in enumerate(config['cameras']):
+                    viewpoint_cam = loadCam(dataset, id, camera, 1)
+                    viewpoint = {
+                        "FoVx": viewpoint_cam.FoVx,
+                        "FoVy": viewpoint_cam.FoVy,
+                        "image_name": viewpoint_cam.image_name,
+                        "image_height": viewpoint_cam.image_height,
+                        "image_width": viewpoint_cam.image_width,
+                        "camera_center": viewpoint_cam.camera_center,
+                        "world_view_transform": viewpoint_cam.world_view_transform,
+                        "full_proj_transform": viewpoint_cam.full_proj_transform,
+                    }
+                    org_img = viewpoint_cam.original_image
                     image = torch.clamp(renderFunc(viewpoint, scene.gaussians, *renderArgs)["render"], 0.0, 1.0)
                     gt_image = torch.clamp(org_img.to("cuda"), 0.0, 1.0)
                     if tb_writer and (idx < 5):
