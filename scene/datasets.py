@@ -80,7 +80,7 @@ class GSDataset(Dataset):
             aabb = args.aabb
         else:
             assert False, "Unknown aabb format!"
-        self.aabb = torch.tensor(aabb, dtype=torch.float32, device="cuda")
+        self.aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
         xyz_contracted = self.contract_to_unisphere(xyz_org, self.aabb, ord=torch.inf)
 
         block_id_z = args.block_id // (args.block_dim[0] * args.block_dim[1])
@@ -111,7 +111,7 @@ class GSDataset(Dataset):
         with torch.no_grad():
             for idx in tqdm(range(len(self.cameras))):
                 bg_color = [1,1,1] if args.white_background else [0, 0, 0]
-                background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
+                background = torch.tensor(bg_color, dtype=torch.float32, device=xyz_org.device)
                 c = self.cameras[idx]
                 viewpoint_cam = loadCam(self.args, id, c, self.scale)
                 render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)

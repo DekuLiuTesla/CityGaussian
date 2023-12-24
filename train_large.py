@@ -42,7 +42,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     modules = __import__('scene')
     model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
-    gaussians = getattr(modules, model_name)(dataset.sh_degree)
+    gaussians = getattr(modules, model_name)(dataset.sh_degree, dataset.data_device)
     scene = LargeScene(dataset, gaussians)
     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
     gaussians.training_setup(opt)
@@ -130,7 +130,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                 iter_start.elapsed_time(iter_end), testing_iterations, scene, render_v2, (pipe, background))
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
-                    scene.save(iteration)
+                    scene.save(iteration, dataset)
 
                 # Densification
                 if iteration < opt.densify_until_iter:
