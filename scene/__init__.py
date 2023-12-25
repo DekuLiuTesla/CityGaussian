@@ -434,7 +434,15 @@ class LargeScene(Scene):
 
         if hasattr(args, 'block_id') and args.block_id >= 0:
             xyz_org = self.gaussians.get_xyz
-            xyz_contracted = self.contract_to_unisphere(xyz_org, self.aabb, ord=torch.inf)
+            if len(args.aabb) == 4:
+                aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
+                        args.aabb[2], args.aabb[3], xyz_org[:, -1].max()]
+            elif len(args.aabb) == 6:
+                aabb = args.aabb
+            else:
+                assert False, "Unknown aabb format!"
+            aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
+            xyz_contracted = self.contract_to_unisphere(xyz_org, aabb, ord=torch.inf)
             block_id_z = args.block_id // (args.block_dim[0] * args.block_dim[1])
             block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[1]
             block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[1]
@@ -457,7 +465,7 @@ class LargeScene(Scene):
             masked_gaussians._opacity = self.gaussians._opacity[block_mask]
             masked_gaussians.max_radii2D = self.gaussians.max_radii2D[block_mask]
 
-            block_point_cloud_path = os.path.join(self.model_path, "point_cloud/{}/iteration_{}".format(args.block_id, iteration))
+            block_point_cloud_path = os.path.join(self.model_path, "point_cloud/blocks/{}/iteration_{}".format(args.block_id, iteration))
             masked_gaussians.save_ply(os.path.join(block_point_cloud_path, "point_cloud.ply"))
     
     def getTrainCameras(self):

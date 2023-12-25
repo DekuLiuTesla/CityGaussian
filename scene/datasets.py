@@ -8,7 +8,7 @@ from utils.camera_utils import loadCam
 
 class GSDataset(Dataset):
     def __init__(self, cameras, scene, args, pipe=None, scale=1):
-        self.pre_load = pipe.pre_load
+        self.pre_load = pipe.pre_load if hasattr(pipe, 'pre_load') else False
         self.cameras = cameras
         self.scale = scale
         self.args = args
@@ -16,6 +16,8 @@ class GSDataset(Dataset):
         if hasattr(args, 'block_id') and args.block_id >= 0:
             self.block_filtering(scene.gaussians, args, pipe)
             print(f"Filtered Cameras: {len(self.cameras)}")
+            if len(self.cameras) > 250:
+                self.pre_load = False
         
         if self.pre_load:
             camera_list = []
