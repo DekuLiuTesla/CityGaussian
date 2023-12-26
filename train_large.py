@@ -64,7 +64,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
     iteration = first_iter
-    while iteration <= opt.iterations:    
+    while iteration <= opt.iterations:
+        if len(gs_dataset) == 0:
+            print("No training data found")
+            print("\n[ITER {}] Saving Gaussians".format(iteration))
+            scene.save(iteration, dataset)
+            break    
         data_loader = DataLoader(gs_dataset, batch_size=1, shuffle=True, num_workers=0)
         for dataset_index, (cam_info, gt_image) in enumerate(data_loader):    
             if network_gui.conn == None:

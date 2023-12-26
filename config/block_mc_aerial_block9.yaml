@@ -7,7 +7,6 @@ model_params: {
     pretrain_path: "output/org_mc_aerial_block9/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
-    block_id: 0,  # -1 for all
     block_dim: [4, 4, 1],
     aabb: [-5, 0, 5, 4],
     opacity_threshold: 4000,
@@ -28,7 +27,7 @@ pipeline_params: {
 
 # Optimization Parameters
 optim_params: {
-    iterations: 30_000,
+    iterations: 7_000,
     position_lr_init: 0.00016,
     position_lr_final: 0.0000016,
     position_lr_delay_mult: 0.01,
