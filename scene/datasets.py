@@ -1,5 +1,6 @@
 import os
 import torch
+import torchvision.transforms.functional as F
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from gaussian_renderer import render
@@ -16,6 +17,11 @@ class GSDataset(Dataset):
         if hasattr(args, 'block_id') and args.block_id >= 0:
             self.block_filtering(scene.gaussians, args, pipe)
             print(f"Filtered Cameras: {len(self.cameras)}")
+        
+        if hasattr(pipe, 'blur_level') and pipe.blur_level >= 0:
+            self.blur_level = pipe.blur_level
+        else:
+            self.blur_level = 0
             
         if len(self.cameras) > 250:
             self.pre_load = False
@@ -46,6 +52,9 @@ class GSDataset(Dataset):
             "full_proj_transform": viewpoint_cam.full_proj_transform,
         }
         y = viewpoint_cam.original_image
+
+        if self.blur_level > 0:
+            y = F.gaussian_blur(y, self.blur_level * 30 +1)
         
         return x, y
     
