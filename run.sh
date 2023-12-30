@@ -1,4 +1,4 @@
-CONFIG="block_mc_aerial_block9"
+CONFIG="org_mc_aerial_block9_60K"
 
 # train coarse global GS
 CUDA_VISIBLE_DEVICES=1 python train_large.py --config config/$CONFIG.yaml
