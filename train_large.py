@@ -12,10 +12,15 @@ import time
 import yaml
 import os
 import torch
+import torchvision
 from random import randint
 from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
 from gaussian_renderer import render, render_v2, network_gui
 import sys
+from lightning.pytorch.loggers import (
+    TensorBoardLogger,
+    WandbLogger,
+)
 from scene import LargeScene
 from scene.datasets import GSDataset
 from utils.camera_utils import loadCam
@@ -23,22 +28,14 @@ from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
+from utils.log_utils import tensorboard_log_image, wandb_log_image
 from torch.utils.data import DataLoader
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams, GroupParams
-try:
-    from torch.utils.tensorboard import SummaryWriter
-    TENSORBOARD_FOUND = True
-except ImportError:
-    TENSORBOARD_FOUND = False
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
-    tb_writer = prepare_output_and_logger(dataset)
-    if hasattr(opt, 'lambda_lap') and opt.lambda_lap > 0.0:
-        laploss = LapLoss(device="cuda")
-    if hasattr(opt, 'lambda_pe') and opt.lambda_pe > 0.0:
-        peloss = PELoss(max_levels=opt.level_pe, device="cuda")
+    log_writer, image_logger = prepare_output_and_logger(dataset)
 
     modules = __import__('scene')
     model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
@@ -109,12 +106,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             gt_image = gt_image.cuda()
             Ll1 = l1_loss(image, gt_image)
             loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
-            if hasattr(opt, 'lambda_lap') and opt.lambda_lap > 0.0:
-                loss += opt.lambda_lap * laploss(image[None, :, :, :], gt_image[None, :, :, :])
-            if hasattr(opt, 'lambda_pe') and opt.lambda_pe > 0.0:
-                loss += opt.lambda_pe * peloss(image, gt_image)
-            if hasattr(opt, 'lambda_opacity') and opt.lambda_opacity > 0.0:
-                loss += opt.lambda_opacity * opacity_loss(gaussians)
             loss.backward()
             end = time.time()
             ema_time_loss = 0.4 * (end - start) + 0.6 * ema_time_loss
@@ -129,9 +120,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     progress_bar.update(10)
                 if iteration == opt.iterations:
                     progress_bar.close()
+                
+                ema_time = {
+                    "render": ema_time_render,
+                    "loss": ema_time_loss,
+                    "densify": ema_time_densify,
+                }
+
+                lr = {}
+                for param_group in gaussians.optimizer.param_groups:
+                    lr[param_group['name']] = param_group['lr']
 
                 # Log and save
-                training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, ema_time_render, ema_time_loss, ema_time_densify,
+                training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_loss, ema_time, lr,
                                 iter_start.elapsed_time(iter_end), testing_iterations, scene, render_v2, (pipe, background))
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -174,24 +175,40 @@ def prepare_output_and_logger(args):
     os.makedirs(args.model_path, exist_ok = True)
     with open(os.path.join(args.model_path, "cfg_args"), 'w') as cfg_log_f:
         cfg_log_f.write(str(Namespace(**vars(args))))
-
-    # Create Tensorboard writer
-    tb_writer = None
-    if TENSORBOARD_FOUND:
-        tb_writer = SummaryWriter(args.model_path)
+    
+    # build logger
+    log_writer = None
+    image_logger = None
+    logger_args = {
+        "save_dir": args.model_path
+    }
+    if not hasattr(args, "logger_config") or args.logger_config['logger'] == "tensorboard":
+        log_writer = TensorBoardLogger(**logger_args)
+        image_logger = tensorboard_log_image
+    elif args.logger_config['logger'] == "wandb":
+        logger_args.update(name=args.logger_config['name'])
+        logger_args.update(project=args.logger_config['project'])
+        log_writer = WandbLogger(**logger_args)
+        image_logger = wandb_log_image
     else:
-        print("Tensorboard not available: not logging progress")
-    return tb_writer
+        raise ValueError("Unknown logger: {}".format(args.logger_config['logger']))
+    
+    return log_writer, image_logger
 
-def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, t_render, t_loss, t_densify, elapsed, testing_iterations, scene : LargeScene, renderFunc, renderArgs):
-    if tb_writer:
-        tb_writer.add_scalar('train_loss_patches/l1_loss', Ll1.item(), iteration)
-        tb_writer.add_scalar('train_loss_patches/total_loss', loss.item(), iteration)
-        tb_writer.add_scalar('train_time/render', t_render, iteration)
-        tb_writer.add_scalar('train_time/loss', t_loss, iteration)
-        tb_writer.add_scalar('train_time/densify', t_densify, iteration)
-        tb_writer.add_scalar('train_time/num_points', scene.gaussians.get_xyz.shape[0], iteration)
-        tb_writer.add_scalar('iter_time', elapsed, iteration)
+def training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_loss, ema_time, lr, elapsed, testing_iterations, scene : LargeScene, renderFunc, renderArgs):
+    if log_writer:
+        metrics_to_log = {
+            "train_loss_patches/l1_loss": Ll1.item(),
+            "train_loss_patches/total_loss": loss.item(),
+            "train_time/render": ema_time["render"],
+            "train_time/loss": ema_time["loss"],
+            "train_time/densify": ema_time["densify"],
+            "train_time/num_points": scene.gaussians.get_xyz.shape[0],
+            "iter_time": elapsed,
+        }
+        for key, value in lr.items():
+            metrics_to_log["trainer/" + key] = value
+        log_writer.log_metrics(metrics_to_log, iteration)
 
     # Report test and samples of training set
     if iteration in testing_iterations:
@@ -218,22 +235,26 @@ def training_report(dataset, tb_writer, iteration, Ll1, loss, l1_loss, t_render,
                     org_img = viewpoint_cam.original_image
                     image = torch.clamp(renderFunc(viewpoint, scene.gaussians, *renderArgs)["render"], 0.0, 1.0)
                     gt_image = torch.clamp(org_img.to("cuda"), 0.0, 1.0)
-                    if tb_writer and (idx < 5):
-                        tb_writer.add_images(config['name'] + "_view_{}/render".format(viewpoint["image_name"]), image[None], global_step=iteration)
-                        if iteration == testing_iterations[0]:
-                            tb_writer.add_images(config['name'] + "_view_{}/ground_truth".format(viewpoint["image_name"]), gt_image[None], global_step=iteration)
+                    if log_writer and (idx < 5):
+                        grid = torchvision.utils.make_grid(torch.concat([image, gt_image], dim=-1))
+                        image_logger(
+                            log_writer=log_writer,
+                            tag=config['name'] + "_view_{}".format(viewpoint["image_name"]),
+                            image_tensor=grid,
+                            step=iteration,
+                        )
                     l1_test += l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])          
                 print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
-                if tb_writer:
-                    tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
-                    tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
+                if log_writer:
+                    metrics_to_log = {
+                        config['name'] + '/loss_viewpoint/l1_loss': l1_test,
+                        config['name'] + '/loss_viewpoint/psnr': psnr_test,
+                    }
+                    log_writer.log_metrics(metrics_to_log, iteration)
 
-        if tb_writer:
-            tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
-            tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
 
 def parse_cfg(cfg):

@@ -8,13 +8,19 @@ model_params: {
     resolution: -1,
     white_background: False,
     data_device: "cuda",
-    eval: False
+    eval: False,
+    logger_config: {
+        logger: "wandb",
+        name: "org_mc_aerial_block3",
+        project: "LargeGS"
+    }
 }
 
 # Pipeline Parameters
 pipeline_params: {
     convert_SHs_python:  False,
     compute_cov3D_python:  False,
+    pre_load: True,
     debug:  False
 }
 

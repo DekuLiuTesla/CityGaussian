@@ -1,5 +1,7 @@
 # 3DGS
 a. pip install transforms3d
+b. pip install lightning
+c. pip install wandb
 
 # COLMAP
 a. sudo dpkg -i cuda-keyring_1.0-1_all.deb
