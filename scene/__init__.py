@@ -19,7 +19,7 @@ import numpy as np
 import imblearn
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
-from scene.gaussian_model import GaussianModel
+from scene.gaussian_model import GaussianModel, GaussianModelLoD
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON

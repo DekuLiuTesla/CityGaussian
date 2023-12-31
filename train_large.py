@@ -38,8 +38,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     log_writer, image_logger = prepare_output_and_logger(dataset)
 
     modules = __import__('scene')
-    model_name = dataset.name if hasattr(dataset, 'name') else 'GaussianModel'
-    gaussians = getattr(modules, model_name)(dataset.sh_degree, dataset.data_device)
+    model_config = dataset.model_config
+    gaussians = getattr(modules, model_config['name'])(dataset.sh_degree, **model_config['kwargs'])
     scene = LargeScene(dataset, gaussians)
     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
     gaussians.training_setup(opt)
@@ -61,7 +61,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
     iteration = first_iter
-    while iteration <= opt.iterations:
+    while iteration < opt.iterations:
         if len(gs_dataset) == 0:
             print("No training data found")
             print("\n[ITER {}] Saving Gaussians".format(iteration))
