@@ -61,7 +61,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
     iteration = first_iter
-    while iteration < opt.iterations:
+    while iteration <= opt.iterations:
         if len(gs_dataset) == 0:
             print("No training data found")
             print("\n[ITER {}] Saving Gaussians".format(iteration))
@@ -162,7 +162,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if (iteration in checkpoint_iterations):
                     print("\n[ITER {}] Saving Checkpoint".format(iteration))
                     torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+            
             iteration += 1
+            if iteration > opt.iterations:
+                break
 
 def prepare_output_and_logger(args):    
     if not args.model_path:

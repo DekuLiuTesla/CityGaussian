@@ -498,10 +498,15 @@ class GaussianModelGrad(GaussianModel):
         self.active_sh_degree = self.max_sh_degree
 
 class GaussianModelLoD(GaussianModel):
-    def __init__(self, sh_degree : int, xyz_range: list, voxel_size=[0.01, 0.01, 0.01], apply_voxelize=False):
+    def __init__(self, sh_degree : int, 
+                 xyz_range: list, 
+                 voxel_size=[0.01, 0.01, 0.01], 
+                 mode='gmm',
+                 apply_voxelize=False):
         super().__init__(sh_degree)
         self.xyz_range =  torch.tensor(np.asarray(xyz_range)).float().cuda()
         self.voxel_size = torch.tensor(np.asarray(voxel_size)).float().cuda()
+        self.mode = mode
         self.apply_voxelize = apply_voxelize
         self.xyz_activation = torch.sigmoid
         self.inverse_xyz_activation = inverse_sigmoid
@@ -617,7 +622,7 @@ class GaussianModelLoD(GaussianModel):
             voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[None, :], rounding_mode='floor')
             voxel_coords = voxel_index * self.voxel_size[None, :] + self.xyz_range[None, :3] + self.voxel_size[None, :] / 2
 
-            new_coors, unq_inv = self.scatter_gs(voxel_coords)
+            new_coors, unq_inv = self.scatter_gs(voxel_coords, mode=self.mode)
     
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
@@ -733,8 +738,7 @@ class GaussianModelLoD(GaussianModel):
             self._xyz = nn.Parameter(new_feat[:, :3].requires_grad_(requires_grad))
             self._scaling = nn.Parameter(new_feat[:, 3:6].requires_grad_(requires_grad))
             self._rotation = nn.Parameter(new_feat[:, 6:10].requires_grad_(requires_grad))
-            self._opacity = nn.Parameter(new_feat[:, -2].requires_grad_(requires_grad))
-            self.max_radii2D = new_feat[:, -1]
+            self._opacity = nn.Parameter(new_feat[:, [-2]].requires_grad_(requires_grad))
 
             vox_sh_features = new_feat[:, 10:-2].reshape(-1, 16, 3)
             self._features_dc = nn.Parameter(vox_sh_features[:, [0], :].requires_grad_(requires_grad))
