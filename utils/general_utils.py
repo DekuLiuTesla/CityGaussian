@@ -75,6 +75,21 @@ def strip_lowerdiag(L):
 def strip_symmetric(sym):
     return strip_lowerdiag(sym)
 
+def build_symmetric(uncertainty):
+    L = torch.zeros((uncertainty.shape[0], 3, 3), dtype=torch.float, device="cuda")
+
+    L[:, 0, 0] = uncertainty[:, 0]
+    L[:, 0, 1] = uncertainty[:, 1]
+    L[:, 0, 2] = uncertainty[:, 2]
+    L[:, 1, 1] = uncertainty[:, 3]
+    L[:, 1, 2] = uncertainty[:, 4]
+    L[:, 2, 2] = uncertainty[:, 5]
+
+    L[:, 1, 0] = L[:, 0, 1]
+    L[:, 2, 0] = L[:, 0, 2]
+    L[:, 2, 1] = L[:, 1, 2]
+    return L
+
 def build_rotation(r):
     norm = torch.sqrt(r[:,0]*r[:,0] + r[:,1]*r[:,1] + r[:,2]*r[:,2] + r[:,3]*r[:,3])
 
