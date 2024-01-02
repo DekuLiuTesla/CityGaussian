@@ -10,6 +10,8 @@
 #
 
 import torch
+import torch_scatter
+import traceback
 import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
 from torch import nn
@@ -18,8 +20,9 @@ from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH
 from simple_knn._C import distCUDA2
+from pytorch3d.transforms import matrix_to_quaternion
 from utils.graphics_utils import BasicPointCloud
-from utils.general_utils import strip_symmetric, build_scaling_rotation
+from utils.general_utils import strip_symmetric, build_scaling_rotation, build_symmetric
 
 class GaussianModel:
 
@@ -495,9 +498,11 @@ class GaussianModelGrad(GaussianModel):
         self.active_sh_degree = self.max_sh_degree
 
 class GaussianModelLoD(GaussianModel):
-    def __init__(self, sh_degree : int, xyz_range: list):
+    def __init__(self, sh_degree : int, xyz_range: list, voxel_size=[0.01, 0.01, 0.01], apply_voxelize=False):
         super().__init__(sh_degree)
         self.xyz_range =  torch.tensor(np.asarray(xyz_range)).float().cuda()
+        self.voxel_size = torch.tensor(np.asarray(voxel_size)).float().cuda()
+        self.apply_voxelize = apply_voxelize
         self.xyz_activation = torch.sigmoid
         self.inverse_xyz_activation = inverse_sigmoid
     
@@ -523,7 +528,7 @@ class GaussianModelLoD(GaussianModel):
 
         mask = torch.logical_and(fused_point_cloud >= self.xyz_range[:3],
                                  fused_point_cloud <= self.xyz_range[3:]).all(dim=1)
-        if sum(mask) == 0:
+        if mask.sum() == 0:
             raise ValueError("Point cloud does not fit in the specified range")
         fused_point_cloud = (fused_point_cloud[mask] - self.xyz_range[:3]) / (self.xyz_range[3:] - self.xyz_range[:3])
         xyz = self.inverse_xyz_activation(fused_point_cloud)
@@ -590,13 +595,14 @@ class GaussianModelLoD(GaussianModel):
         for idx, attr_name in enumerate(rot_names):
             rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
-        mask = torch.logical_and(xyz >= self.xyz_range[:3],
-                                 xyz <= self.xyz_range[3:]).all(dim=1)
-        if sum(mask) == 0:
+        xyz_range = self.xyz_range.cpu().numpy()
+        mask = np.logical_and(xyz >= xyz_range[:3],
+                              xyz <= xyz_range[3:]).all(axis=1)
+        if mask.sum() == 0:
             raise ValueError("Point cloud does not fit in the specified range")
-        xyz = self.inverse_sigmoid((xyz[mask] - self.xyz_range[:3]) / (self.xyz_range[3:] - self.xyz_range[:3]))
+        xyz = (xyz[mask] - xyz_range[:3]) / (xyz_range[3:] - xyz_range[:3])
 
-        self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device="cuda").requires_grad_(True))
+        self._xyz = nn.Parameter(self.inverse_xyz_activation(torch.tensor(xyz, dtype=torch.float, device="cuda")).requires_grad_(True))
         self._features_dc = nn.Parameter(torch.tensor(features_dc[mask], dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
         self._features_rest = nn.Parameter(torch.tensor(features_extra[mask], dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
         self._opacity = nn.Parameter(torch.tensor(opacities[mask], dtype=torch.float, device="cuda").requires_grad_(True))
@@ -605,6 +611,13 @@ class GaussianModelLoD(GaussianModel):
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
         self.active_sh_degree = self.max_sh_degree
+
+        if self.apply_voxelize:
+            points = self.get_xyz
+            voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[None, :], rounding_mode='floor')
+            voxel_coords = voxel_index * self.voxel_size[None, :] + self.xyz_range[None, :3] + self.voxel_size[None, :] / 2
+
+            new_coors, unq_inv = self.scatter_gs(voxel_coords)
     
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
@@ -633,3 +646,102 @@ class GaussianModelLoD(GaussianModel):
 
         prune_filter = torch.cat((selected_pts_mask, torch.zeros(range_mask.sum(), device="cuda", dtype=bool)))
         self.prune_points(prune_filter)
+    
+    def scatter_gs(self, coors, mode="gmm", return_inv=True, min_points=0, unq_inv=None, new_coors=None):
+        assert self.get_xyz.size(0) == coors.size(0)
+        requires_grad = self.get_xyz.requires_grad
+        if mode == 'avg':
+            mode = 'mean'
+
+        if unq_inv is None and min_points > 0:
+            new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+        elif unq_inv is None:
+            new_coors, unq_inv = torch.unique(coors, return_inverse=True, return_counts=False, dim=0)
+        else:
+            assert new_coors is not None, 'please pass new_coors for interface consistency, caller: {}'.format(traceback.extract_stack()[-2][2])
+        
+        if mode == "gmm":
+            # get mean and cov of GMM within each voxel
+            points = self.get_xyz  # [M, 3]
+            opacity = self.get_opacity  # [M, 1]
+            features = self.get_features  # [M, 16, 3]
+            cov3D = build_symmetric(self.get_covariance())  # [M, 3, 3]
+
+            if min_points > 0:
+                cnt_per_point = unq_cnt[unq_inv]
+                valid_mask = cnt_per_point >= min_points
+                points = points[valid_mask]
+                opacity = opacity[valid_mask]
+                features = features[valid_mask]
+                cov3D = cov3D[valid_mask]
+                coors = coors[valid_mask]
+                new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+
+            norm_opacity = opacity / torch_scatter.scatter(opacity, unq_inv, dim=0, reduce='sum')[unq_inv]  # [M, 1]
+            sub_means = norm_opacity * points  # [M, 3]
+            gmm_means = torch_scatter.scatter(sub_means, unq_inv, dim=0, reduce='sum')  # [N, 3]
+
+            deviation = points - gmm_means[unq_inv]  # [M, 3]
+            sub_covs = norm_opacity[..., None] * (torch.bmm((deviation).unsqueeze(-1), 
+                                                            (deviation).unsqueeze(-2)) + cov3D)  # [M, 3, 3]
+            gmm_covs = torch_scatter.scatter(sub_covs, unq_inv, dim=0, reduce='sum')  # [N, 3, 3]
+            
+            # transform cov to scaling and rotation
+            U, S, _ = torch.svd(gmm_covs)  # bound to be symmetric, thus U and V are the same
+            q = matrix_to_quaternion(U)  # [N, 4]
+            # s = torch.sqrt(S) * torch.norm(q, dim=-1, keepdim=True)
+            s = torch.sqrt(S)
+
+            # use probability as feature weights
+            inv_gmm_covs = U @ torch.diag_embed(1 / S) @ U.transpose(-1, -2)  # [N, 3, 3]
+            weights = opacity * torch.exp(-0.5 * torch.bmm(deviation.unsqueeze(-2), torch.bmm(inv_gmm_covs[unq_inv], deviation.unsqueeze(-1))).squeeze(-1))  # [M, 1]
+            weights /= torch_scatter.scatter(weights, unq_inv, dim=0, reduce='sum')[unq_inv]  # [M, 1]
+
+            new_feat = torch_scatter.scatter(features * weights[..., None], unq_inv, dim=0, reduce='sum')  # [N, 16, 3]
+            new_opacity = torch_scatter.scatter(opacity * weights, unq_inv, dim=0, reduce='sum')  # [N, 1]
+            
+            xyz_org = (gmm_means - self.xyz_range[:3]) / (self.xyz_range[3:] - self.xyz_range[:3])
+            xyz = self.inverse_xyz_activation(xyz_org)
+
+            self._xyz = nn.Parameter(xyz.requires_grad_(requires_grad))
+            self._rotation = nn.Parameter(q.requires_grad_(requires_grad))  # [M, 4]
+            self._scaling = nn.Parameter(self.scaling_inverse_activation(s).requires_grad_(requires_grad)) # [M, 3]
+            self._opacity = nn.Parameter(self.inverse_opacity_activation(new_opacity).requires_grad_(requires_grad))  # [M, 1]
+            self._features_dc = nn.Parameter(new_feat[:, [0]].requires_grad_(requires_grad))
+            self._features_rest = nn.Parameter(new_feat[:, 1:].requires_grad_(requires_grad))
+            self.max_radii2D = torch.zeros((gmm_means.shape[0]), device="cuda")
+        
+        else:
+            sh_features = self.get_features.reshape(self.get_xyz.shape[0], -1)
+            feat = torch.cat([self._xyz, self._scaling, self._rotation, sh_features, 
+                            self._opacity, self.max_radii2D[:, None]], dim=-1)
+            
+            if min_points > 0:
+                cnt_per_point = unq_cnt[unq_inv]
+                valid_mask = cnt_per_point >= min_points
+                feat = feat[valid_mask]
+                coors = coors[valid_mask]
+                new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+            
+            if mode == 'max':
+                new_feat, argmax = torch_scatter.scatter_max(feat, unq_inv, dim=0)
+            elif mode in ('mean', 'sum'):
+                new_feat = torch_scatter.scatter(feat, unq_inv, dim=0, reduce=mode)
+            else:
+                raise NotImplementedError
+
+            self._xyz = nn.Parameter(new_feat[:, :3].requires_grad_(requires_grad))
+            self._scaling = nn.Parameter(new_feat[:, 3:6].requires_grad_(requires_grad))
+            self._rotation = nn.Parameter(new_feat[:, 6:10].requires_grad_(requires_grad))
+            self._opacity = nn.Parameter(new_feat[:, -2].requires_grad_(requires_grad))
+            self.max_radii2D = new_feat[:, -1]
+
+            vox_sh_features = new_feat[:, 10:-2].reshape(-1, 16, 3)
+            self._features_dc = nn.Parameter(vox_sh_features[:, [0], :].requires_grad_(requires_grad))
+            self._features_rest = nn.Parameter(vox_sh_features[:, 1:, :].requires_grad_(requires_grad))
+            self.max_radii2D = torch.zeros((self._xyz.shape[0]), device="cuda")
+
+        if not return_inv:
+            return new_coors
+        else:
+            return new_coors, unq_inv

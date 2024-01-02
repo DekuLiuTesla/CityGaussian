@@ -1,7 +1,11 @@
 # 3DGS
-a. pip install transforms3d
-b. pip install lightning
-c. pip install wandb
+```bash
+pip install transforms3d
+pip install lightning
+pip install wandb
+pip install torch-scatter==2.1.0+pt112cu116
+conda install pytorch3d -c pytorch3d
+```
 
 # COLMAP
 a. sudo dpkg -i cuda-keyring_1.0-1_all.deb
