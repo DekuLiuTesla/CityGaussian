@@ -1,7 +1,7 @@
 # Model Parameters
 model_params: {
     model_config: {
-        name: "GaussianModelLoD",
+        name: "GaussianModelVox",
         kwargs: {
             xyz_range: [-4.5, -8.5, 0, 4.5, -2.5, 3],
             voxel_size: [0.02, 0.02, 0.02],
