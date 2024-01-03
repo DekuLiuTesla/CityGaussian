@@ -20,7 +20,7 @@ model_params: {
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "lod_mc_aerial_block3_vox1_avg",
+        name: "lod_mc_aerial_block3_vox2_avg",
         project: "LargeGS"
     }
 }
