@@ -767,6 +767,9 @@ class GaussianModelLoD(GaussianModel):
         self.lod_inds = [0]
         self.xyz_activation = torch.sigmoid
         self.inverse_xyz_activation = inverse_sigmoid
+
+        self.num_fine_pts = None
+        self.level_lookup = None
     
     @property
     def get_xyz(self):
@@ -820,6 +823,9 @@ class GaussianModelLoD(GaussianModel):
 
         elements = np.empty(xyz.shape[0], dtype=dtype_full)
         attributes = np.concatenate((xyz, normals, f_dc, f_rest, opacities, scale, rotation), axis=1)
+        if self.apply_lod:
+            level_lookup = self.level_lookup.cpu().numpy()
+            attributes = np.concatenate((attributes, level_lookup), axis=1)
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
@@ -878,16 +884,29 @@ class GaussianModelLoD(GaussianModel):
         self.lod_inds.append(xyz.shape[0])
 
         if self.apply_lod:
-            points = self.get_xyz
-            self.unq_inv_list = []
+            try: 
+                level_lookup = np.stack((np.asarray(plydata.elements[0]["lookup_0"]),
+                                         np.asarray(plydata.elements[0]["lookup_1"])), axis=1)
+                self.level_lookup = torch.tensor(level_lookup, dtype=torch.long, device="cuda")
+                print("Loaded coarse level GS from file.")
+            except:
+                points = self.get_xyz
+                num_extra_pts = 0
+                num_levels = len(self.lod_threshold)-1
+                self.num_fine_pts = points.shape[0]
+                self.level_lookup = torch.zeros((self._xyz.shape[0], num_levels), dtype=torch.long, device="cuda")
 
-            for level in range(self.voxel_size.shape[0]):
-                voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[level, :], rounding_mode='floor')
-                voxel_coords = voxel_index * self.voxel_size[level, :] + self.xyz_range[None, :3] + self.voxel_size[level, :] / 2
+                for level in range(num_levels):
+                    voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[level, :], rounding_mode='floor')
+                    voxel_coords = voxel_index * self.voxel_size[level, :] + self.xyz_range[None, :3] + self.voxel_size[level, :] / 2
 
-                new_coors, unq_inv = self.scatter_gs(voxel_coords, mode=self.vox_mode)
-                self.unq_inv_list.append(unq_inv)
-    
+                    new_coors, unq_inv = self.scatter_gs(voxel_coords, mode=self.vox_mode)
+                    num_extra_pts += new_coors.shape[0]
+                    self.level_lookup[:self.lod_inds[1], level] = unq_inv + self.lod_inds[level+1]
+                
+                self.level_lookup = torch.cat([self.level_lookup, torch.zeros((num_extra_pts, 2), dtype=torch.int32, device="cuda")], dim=0)
+                print("Generate coarse level GS from scratch.")
+        
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition
@@ -1015,3 +1034,20 @@ class GaussianModelLoD(GaussianModel):
             return new_coors
         else:
             return new_coors, unq_inv
+    
+    def construct_list_of_attributes(self):
+        l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
+        # All channels except the 3 DC
+        for i in range(self._features_dc.shape[1]*self._features_dc.shape[2]):
+            l.append('f_dc_{}'.format(i))
+        for i in range(self._features_rest.shape[1]*self._features_rest.shape[2]):
+            l.append('f_rest_{}'.format(i))
+        l.append('opacity')
+        for i in range(self._scaling.shape[1]):
+            l.append('scale_{}'.format(i))
+        for i in range(self._rotation.shape[1]):
+            l.append('rot_{}'.format(i))
+        if self.apply_lod:
+            for i in range(self.level_lookup.shape[1]):
+                l.append('lookup_{}'.format(i))
+        return l

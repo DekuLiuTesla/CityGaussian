@@ -130,24 +130,19 @@ def render_v2(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, scali
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
     if pc.apply_lod:
-        torch.autograd.set_detect_anomaly(True)  # TODO: remove this
-        
         # obtain mask with no grad
         with torch.no_grad():
-            assert len(pc.unq_inv_list) == (len(pc.lod_threshold) - 1)
+            assert len(pc.lod_threshold) == (pc.level_lookup.shape[1] + 1)
 
             pc_xyz = pc.get_xyz
             mask = torch.zeros(pc_xyz.shape[0], dtype=torch.bool, device="cuda")
-            level_inds = torch.zeros(pc_xyz.shape[0], dtype=torch.int64, device="cuda") + 0
-            for i in range(len(pc.lod_inds)-1):
-                level_inds[pc.lod_inds[i]:pc.lod_inds[i+1]] = i
             
             distance3D = torch.norm(pc_xyz - cam_info["camera_center"], dim=1)
-            mask |= (distance3D <= pc.lod_threshold[0]) & (level_inds==0)
+            mask[:pc.num_fine_pts] |= (distance3D <= pc.lod_threshold[0])[:pc.num_fine_pts]
             for i in range(len(pc.lod_threshold) - 1):
-                mask_fine = (distance3D > pc.lod_threshold[i]) & (distance3D <= pc.lod_threshold[i+1]) & (level_inds==0)
-                inds_coarse = pc.unq_inv_list[i][mask_fine[:len(pc.unq_inv_list[i])]]
-                inds_coarse = torch.unique(inds_coarse) + pc.lod_inds[i+1]
+                mask_fine = (distance3D > pc.lod_threshold[i])[:pc.num_fine_pts] & (distance3D <= pc.lod_threshold[i+1])[:pc.num_fine_pts]
+                inds_coarse = pc.level_lookup[:pc.num_fine_pts, i][mask_fine]
+                inds_coarse = torch.unique(inds_coarse)
                 mask[inds_coarse] = True
 
         screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0

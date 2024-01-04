@@ -31,7 +31,7 @@ from utils.image_utils import psnr
 from utils.log_utils import tensorboard_log_image, wandb_log_image
 from torch.utils.data import DataLoader
 from argparse import ArgumentParser, Namespace
-from arguments import ModelParams, PipelineParams, OptimizationParams, GroupParams
+from arguments import GroupParams
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
