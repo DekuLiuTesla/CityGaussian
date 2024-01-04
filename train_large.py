@@ -125,6 +125,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     "render": ema_time_render,
                     "loss": ema_time_loss,
                     "densify": ema_time_densify,
+                    "num_points": radii.shape[0],
                 }
 
                 lr = {}
@@ -206,7 +207,7 @@ def training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_
             "train_time/render": ema_time["render"],
             "train_time/loss": ema_time["loss"],
             "train_time/densify": ema_time["densify"],
-            "train_time/num_points": scene.gaussians.get_xyz.shape[0],
+            "train_time/num_points": ema_time["num_points"],
             "iter_time": elapsed,
         }
         for key, value in lr.items():
