@@ -129,7 +129,7 @@ def render_v2(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, scali
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
-    if pc.apply_lod:
+    if hasattr(pc, "apply_lod") and pc.apply_lod:
         # obtain mask with no grad
         with torch.no_grad():
             assert len(pc.lod_threshold) == (pc.level_lookup.shape[1] + 1)
