@@ -757,11 +757,13 @@ class GaussianModelLoD(GaussianModel):
                  voxel_size=[[0.01, 0.01, 0.01]], 
                  vox_mode='gmm',
                  apply_lod=False,
-                 lod_threshold=[0.2]):
+                 lod_threshold=[0.2],
+                 device='cuda'):
         super().__init__(sh_degree)
-        self.xyz_range =  torch.tensor(xyz_range).float().cuda()
-        self.voxel_size = torch.tensor(voxel_size).float().cuda()
-        self.lod_threshold = torch.tensor(lod_threshold+[torch.inf]).float().cuda()
+        self.device = device
+        self.xyz_range =  torch.tensor(xyz_range, device=self.device).float()
+        self.voxel_size = torch.tensor(voxel_size, device=self.device).float()
+        self.lod_threshold = torch.tensor(lod_threshold+[torch.inf], device=self.device).float()
         self.vox_mode = vox_mode
         self.apply_lod = apply_lod
         self.lod_inds = [0]
@@ -779,18 +781,18 @@ class GaussianModelLoD(GaussianModel):
     
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float):
         self.spatial_lr_scale = spatial_lr_scale
-        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
-        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
-        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points), device=self.device).float()
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors), device=self.device)).float()
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2), device=self.device).float()
         features[:, :3, 0 ] = fused_color
         features[:, 3:, 1:] = 0.0
 
-        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points), device=self.device).float()), 0.0000001)
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
-        rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
+        rots = torch.zeros((fused_point_cloud.shape[0], 4), device=self.device)
         rots[:, 0] = 1
 
-        opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
+        opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device=self.device))
 
         mask = torch.logical_and(fused_point_cloud >= self.xyz_range[:3],
                                  fused_point_cloud <= self.xyz_range[3:]).all(dim=1)
@@ -806,7 +808,7 @@ class GaussianModelLoD(GaussianModel):
         self._scaling = nn.Parameter(scales[mask].requires_grad_(True))
         self._rotation = nn.Parameter(rots[mask].requires_grad_(True))
         self._opacity = nn.Parameter(opacities[mask].requires_grad_(True))
-        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=self.device)
         self.lod_inds.append(xyz.shape[0])
     
     def save_ply(self, path):
@@ -873,13 +875,13 @@ class GaussianModelLoD(GaussianModel):
         xyz = (xyz[mask] - xyz_range[:3]) / (xyz_range[3:] - xyz_range[:3])
         
         
-        self._xyz = nn.Parameter(self.inverse_xyz_activation(torch.tensor(xyz, dtype=torch.float, device="cuda")).requires_grad_(True))
-        self._features_dc = nn.Parameter(torch.tensor(features_dc[mask], dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
-        self._features_rest = nn.Parameter(torch.tensor(features_extra[mask], dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
-        self._opacity = nn.Parameter(torch.tensor(opacities[mask], dtype=torch.float, device="cuda").requires_grad_(True))
-        self._scaling = nn.Parameter(torch.tensor(scales[mask], dtype=torch.float, device="cuda").requires_grad_(True))
-        self._rotation = nn.Parameter(torch.tensor(rots[mask], dtype=torch.float, device="cuda").requires_grad_(True))
-        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
+        self._xyz = nn.Parameter(self.inverse_xyz_activation(torch.tensor(xyz, dtype=torch.float, device=self.device)).requires_grad_(True))
+        self._features_dc = nn.Parameter(torch.tensor(features_dc[mask], dtype=torch.float, device=self.device).transpose(1, 2).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(torch.tensor(features_extra[mask], dtype=torch.float, device=self.device).transpose(1, 2).contiguous().requires_grad_(True))
+        self._opacity = nn.Parameter(torch.tensor(opacities[mask], dtype=torch.float, device=self.device).requires_grad_(True))
+        self._scaling = nn.Parameter(torch.tensor(scales[mask], dtype=torch.float, device=self.device).requires_grad_(True))
+        self._rotation = nn.Parameter(torch.tensor(rots[mask], dtype=torch.float, device=self.device).requires_grad_(True))
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=self.device)
 
         self.active_sh_degree = self.max_sh_degree
 
@@ -887,7 +889,7 @@ class GaussianModelLoD(GaussianModel):
             try: 
                 level_lookup = np.stack((np.asarray(plydata.elements[0]["lookup_0"]),
                                          np.asarray(plydata.elements[0]["lookup_1"])), axis=1)
-                self.level_lookup = torch.tensor(level_lookup, dtype=torch.long, device="cuda")
+                self.level_lookup = torch.tensor(level_lookup, dtype=torch.long, device=self.device)
                 self.num_fine_pts = (level_lookup[:, 0] >= len(self.voxel_size)).sum()
                 self.lod_inds.append(self.num_fine_pts)
                 for level in range(len(self.voxel_size)):
@@ -898,7 +900,7 @@ class GaussianModelLoD(GaussianModel):
                 points = self.get_xyz
                 num_levels = len(self.lod_threshold)-1
                 
-                self.level_lookup = torch.zeros((self._xyz.shape[0], num_levels), dtype=torch.long, device="cuda")
+                self.level_lookup = torch.zeros((self._xyz.shape[0], num_levels), dtype=torch.long, device=self.device)
                 self.num_fine_pts = points.shape[0]
                 self.lod_inds.append(xyz.shape[0])
                 lookup_pad_list = []
@@ -908,24 +910,44 @@ class GaussianModelLoD(GaussianModel):
                     new_coors, unq_inv = self.scatter_gs(voxel_coords, mode=self.vox_mode)
                     self.level_lookup[:self.lod_inds[1], level] = unq_inv + self.lod_inds[level+1]
                     self.lod_inds.append(self.lod_inds[-1] + new_coors.shape[0])
-                    lookup_pad_list.append(torch.ones((new_coors.shape[0], 2), dtype=torch.long, device="cuda") * level)
+                    lookup_pad_list.append(torch.ones((new_coors.shape[0], 2), dtype=torch.long, device=self.device) * level)
 
                 self.level_lookup = torch.cat([self.level_lookup]+lookup_pad_list, dim=0)
                 print("Generate coarse level GS from scratch.")
         else:
             self.lod_inds.append(xyz.shape[0])
-        
+    
+    def densification_postfix(self, new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation):
+        d = {"xyz": new_xyz,
+        "f_dc": new_features_dc,
+        "f_rest": new_features_rest,
+        "opacity": new_opacities,
+        "scaling" : new_scaling,
+        "rotation" : new_rotation}
+
+        optimizable_tensors = self.cat_tensors_to_optimizer(d)
+        self._xyz = optimizable_tensors["xyz"]
+        self._features_dc = optimizable_tensors["f_dc"]
+        self._features_rest = optimizable_tensors["f_rest"]
+        self._opacity = optimizable_tensors["opacity"]
+        self._scaling = optimizable_tensors["scaling"]
+        self._rotation = optimizable_tensors["rotation"]
+
+        self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device=self.device)
+        self.denom = torch.zeros((self.get_xyz.shape[0], 1), device=self.device)
+        self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=self.device)
+
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition
-        padded_grad = torch.zeros((n_init_points), device="cuda")
+        padded_grad = torch.zeros((n_init_points), device=self.device)
         padded_grad[:grads.shape[0]] = grads.squeeze()
         selected_pts_mask = torch.where(padded_grad >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling, dim=1).values > self.percent_dense*scene_extent)
 
         stds = self.get_scaling[selected_pts_mask].repeat(N,1)
-        means =torch.zeros((stds.size(0), 3),device="cuda")
+        means =torch.zeros((stds.size(0), 3),device=self.device)
         samples = torch.normal(mean=means, std=stds)
         rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N,1,1)
         new_xyz = torch.bmm(rots, samples.unsqueeze(-1)).squeeze(-1) + self.get_xyz[selected_pts_mask].repeat(N, 1)
@@ -940,7 +962,7 @@ class GaussianModelLoD(GaussianModel):
 
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacity, new_scaling, new_rotation)
 
-        prune_filter = torch.cat((selected_pts_mask, torch.zeros(range_mask.sum(), device="cuda", dtype=bool)))
+        prune_filter = torch.cat((selected_pts_mask, torch.zeros(range_mask.sum(), device=self.device, dtype=bool)))
         self.prune_points(prune_filter)
 
     def scatter_gs(self, coors, mode="gmm", return_inv=True, min_points=0, unq_inv=None, new_coors=None):
@@ -1004,7 +1026,7 @@ class GaussianModelLoD(GaussianModel):
             self._opacity = nn.Parameter(torch.cat([self._opacity, self.inverse_opacity_activation(new_opacity).requires_grad_(True)], dim=0))  # [M, 1]
             self._features_dc = nn.Parameter(torch.cat([self._features_dc, new_feat[:, [0]].requires_grad_(True)], dim=0))
             self._features_rest = nn.Parameter(torch.cat([self._features_rest, new_feat[:, 1:].requires_grad_(True)], dim=0))
-            self.max_radii2D = torch.zeros((self._xyz.shape[0]), device="cuda")
+            self.max_radii2D = torch.zeros((self._xyz.shape[0]), device=self.device)
         
         else:
             sh_features = self.get_features.reshape(self.get_xyz.shape[0], -1)
@@ -1034,7 +1056,7 @@ class GaussianModelLoD(GaussianModel):
             vox_sh_features = new_feat[:, 10:-2].reshape(-1, 16, 3)
             self._features_dc = nn.Parameter(torch.cat([self._features_dc, vox_sh_features[:, [0], :].requires_grad_(True)], dim=0))
             self._features_rest = nn.Parameter(torch.cat([self._features_rest, vox_sh_features[:, 1:, :].requires_grad_(True)], dim=0))
-            self.max_radii2D = torch.zeros((self._xyz.shape[0]), device="cuda")
+            self.max_radii2D = torch.zeros((self._xyz.shape[0]), device=self.device)
 
         self.lod_inds.append(self._xyz.shape[0])
 
