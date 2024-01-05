@@ -138,12 +138,17 @@ def render_v2(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, scali
             mask = torch.zeros(pc_xyz.shape[0], dtype=torch.bool, device="cuda")
             
             distance3D = torch.norm(pc_xyz - cam_info["camera_center"], dim=1)
-            mask[:pc.num_fine_pts] |= (distance3D <= pc.lod_threshold[0])[:pc.num_fine_pts]
+            if pc.lod_threshold[0] > 0:
+                mask[:pc.num_fine_pts] |= (distance3D <= pc.lod_threshold[0])[:pc.num_fine_pts]
             for i in range(len(pc.lod_threshold) - 1):
+                if pc.lod_threshold[i] >= pc.lod_threshold[i+1] or pc.lod_threshold[i] > pc.max_distance:
+                    continue
                 mask_fine = (distance3D > pc.lod_threshold[i])[:pc.num_fine_pts] & (distance3D <= pc.lod_threshold[i+1])[:pc.num_fine_pts]
                 inds_coarse = pc.level_lookup[:pc.num_fine_pts, i][mask_fine]
                 inds_coarse = torch.unique(inds_coarse)
                 mask[inds_coarse] = True
+            
+            assert mask.sum() > 0, "No points were visible in the scene. Please check your LoD parameters."
 
         screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
         try:

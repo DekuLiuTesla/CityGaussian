@@ -768,6 +768,7 @@ class GaussianModelLoD(GaussianModel):
         self.xyz_activation = torch.sigmoid
         self.inverse_xyz_activation = inverse_sigmoid
 
+        self.max_distance = torch.norm(self.xyz_range[3:] - self.xyz_range[:3])
         self.num_fine_pts = None
         self.level_lookup = None
     
@@ -888,23 +889,25 @@ class GaussianModelLoD(GaussianModel):
                 level_lookup = np.stack((np.asarray(plydata.elements[0]["lookup_0"]),
                                          np.asarray(plydata.elements[0]["lookup_1"])), axis=1)
                 self.level_lookup = torch.tensor(level_lookup, dtype=torch.long, device="cuda")
+                for level in range(len(self.voxel_size)):
+                    self.lod_inds.append(self.lod_inds[-1] + (self.level_lookup[:, 0] == level).sum())
                 print("Loaded coarse level GS from file.")
             except:
                 points = self.get_xyz
-                num_extra_pts = 0
                 num_levels = len(self.lod_threshold)-1
                 self.num_fine_pts = points.shape[0]
                 self.level_lookup = torch.zeros((self._xyz.shape[0], num_levels), dtype=torch.long, device="cuda")
 
+                lookup_pad_list = []
                 for level in range(num_levels):
                     voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[level, :], rounding_mode='floor')
                     voxel_coords = voxel_index * self.voxel_size[level, :] + self.xyz_range[None, :3] + self.voxel_size[level, :] / 2
-
                     new_coors, unq_inv = self.scatter_gs(voxel_coords, mode=self.vox_mode)
-                    num_extra_pts += new_coors.shape[0]
                     self.level_lookup[:self.lod_inds[1], level] = unq_inv + self.lod_inds[level+1]
-                
-                self.level_lookup = torch.cat([self.level_lookup, torch.zeros((num_extra_pts, 2), dtype=torch.int32, device="cuda")], dim=0)
+                    self.lod_inds.append(self.lod_inds[-1] + new_coors.shape[0])
+                    lookup_pad_list.append(torch.ones((new_coors.shape[0], 2), dtype=torch.long, device="cuda") * level)
+
+                self.level_lookup = torch.cat([self.level_lookup]+lookup_pad_list, dim=0)
                 print("Generate coarse level GS from scratch.")
         
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):

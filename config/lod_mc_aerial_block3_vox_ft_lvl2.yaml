@@ -1,0 +1,59 @@
+# Model Parameters
+model_params: {
+    model_config: {
+        name: "GaussianModelLoD",
+        kwargs: {
+            xyz_range: [-4.5, -8.5, 0, 4.5, -2.5, 3],
+            voxel_size: [[0.01, 0.01, 0.01], [0.02, 0.02, 0.02]],
+            vox_mode: "gmm",
+            apply_lod: True,
+            lod_threshold: [0, 0]  # can be used to select specific level
+        }
+    },
+    sh_degree: 3,
+    source_path: "data/matrix_city/aerial/train/block_3",
+    pretrain_path: "output/lod_mc_aerial_block3_vox_ft_lvl1/point_cloud/iteration_7000",
+    model_path: "",
+    images: "images",
+    data_device: "cuda",
+    resolution: -1,
+    white_background: False,
+    eval: False,
+    logger_config: {
+        logger: "wandb",
+        name: "lod_mc_aerial_block3_vox_ft_lvl2",
+        project: "LargeGS"
+    }
+}
+
+# Pipeline Parameters
+pipeline_params: {
+    convert_SHs_python:  False,
+    compute_cov3D_python:  False,
+    pre_load: True,
+    blur_level: 0,
+    debug:  False
+}
+
+
+# Optimization Parameters
+optim_params: {
+    iterations: 7_000,
+    position_lr_init: 0.00004,
+    position_lr_final: 0.0000016,
+    position_lr_delay_mult: 0.01,
+    position_lr_max_steps: 7_000,
+    feature_lr: 0.0025,
+    opacity_lr: 0.05,
+    scaling_lr: 0.005,
+    rotation_lr: 0.001,
+    percent_dense: 0.01,
+    lambda_dssim: 0.2,
+    densification_interval: 100,
+    opacity_reset_interval: 3000,
+    densify_from_iter: 0,
+    densify_until_iter: 0,
+    densify_grad_threshold: 0.0002
+}
+
+
