@@ -15,3 +15,5 @@ Compact-3DGS-main
 config/org_ue_aerial_20_block1cam_range.yaml
 refine.py
 
+run_gpu2.sh
+config/lod_mc_aerial_block3_vox_23.yaml
