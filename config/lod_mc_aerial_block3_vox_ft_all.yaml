@@ -7,7 +7,7 @@ model_params: {
             voxel_size: [[0.01, 0.01, 0.01], [0.02, 0.02, 0.02]],
             vox_mode: "gmm",
             apply_lod: True,
-            lod_threshold: [2, 3]
+            lod_threshold: [2.5, 3.5]
         }
     },
     sh_degree: 3,
@@ -39,7 +39,7 @@ pipeline_params: {
 # Optimization Parameters
 optim_params: {
     iterations: 7_000,
-    position_lr_init: 0.00002,
+    position_lr_init: 0.00001,
     position_lr_final: 0.0000016,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 7_000,

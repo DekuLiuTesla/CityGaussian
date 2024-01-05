@@ -882,22 +882,25 @@ class GaussianModelLoD(GaussianModel):
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
         self.active_sh_degree = self.max_sh_degree
-        self.lod_inds.append(xyz.shape[0])
 
         if self.apply_lod:
             try: 
                 level_lookup = np.stack((np.asarray(plydata.elements[0]["lookup_0"]),
                                          np.asarray(plydata.elements[0]["lookup_1"])), axis=1)
                 self.level_lookup = torch.tensor(level_lookup, dtype=torch.long, device="cuda")
+                self.num_fine_pts = (level_lookup[:, 0] >= len(self.voxel_size)).sum()
+                self.lod_inds.append(self.num_fine_pts)
                 for level in range(len(self.voxel_size)):
                     self.lod_inds.append(self.lod_inds[-1] + (self.level_lookup[:, 0] == level).sum())
+                
                 print("Loaded coarse level GS from file.")
             except:
                 points = self.get_xyz
                 num_levels = len(self.lod_threshold)-1
-                self.num_fine_pts = points.shape[0]
+                
                 self.level_lookup = torch.zeros((self._xyz.shape[0], num_levels), dtype=torch.long, device="cuda")
-
+                self.num_fine_pts = points.shape[0]
+                self.lod_inds.append(xyz.shape[0])
                 lookup_pad_list = []
                 for level in range(num_levels):
                     voxel_index = torch.div(points[:, :3] - self.xyz_range[None, :3], self.voxel_size[level, :], rounding_mode='floor')
@@ -909,6 +912,8 @@ class GaussianModelLoD(GaussianModel):
 
                 self.level_lookup = torch.cat([self.level_lookup]+lookup_pad_list, dim=0)
                 print("Generate coarse level GS from scratch.")
+        else:
+            self.lod_inds.append(xyz.shape[0])
         
     def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
         n_init_points = self.get_xyz.shape[0]
