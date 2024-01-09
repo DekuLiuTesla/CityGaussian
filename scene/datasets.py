@@ -119,7 +119,7 @@ class GSDataset(Dataset):
         masked_gaussians.max_radii2D = gaussians.max_radii2D[block_mask]
 
         filtered_cameras = []
-        print(f"Getting Train Data of Block {args.block_id} / {block_num}")
+        print(f"Getting Data of Block {args.block_id} / {block_num}")
         with torch.no_grad():
             for idx in tqdm(range(len(self.cameras))):
                 bg_color = [1,1,1] if args.white_background else [0, 0, 0]
