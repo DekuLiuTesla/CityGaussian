@@ -17,3 +17,5 @@ refine.py
 
 run_gpu2.sh
 config/lod_mc_aerial_block3_vox_23.yaml
+run_gpu3.sh
+config/org_mc_aerial_block9_cell9.yaml

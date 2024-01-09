@@ -5,6 +5,7 @@ model_params: {
         kwargs: {}
     },
     sh_degree: 3,
+    block_id: 9,
     source_path: "data/matrix_city/aerial/train/block_9",
     pretrain_path: "output/org_mc_aerial_block9/point_cloud/iteration_30000",
     model_path: "",
@@ -15,7 +16,12 @@ model_params: {
     resolution: -1,
     white_background: False,
     data_device: "cuda",
-    eval: False
+    eval: False,
+    logger_config: {
+        logger: "wandb",
+        name: "block_mc_aerial_block9_cell9",
+        project: "LargeGS"
+    }
 }
 
 # Pipeline Parameters
@@ -29,11 +35,11 @@ pipeline_params: {
 
 # Optimization Parameters
 optim_params: {
-    iterations: 7_000,
-    position_lr_init: 0.00016,
-    position_lr_final: 0.0000016,
+    iterations: 30_000,
+    position_lr_init: 0.00008,
+    position_lr_final: 0.0000008,
     position_lr_delay_mult: 0.01,
-    position_lr_max_steps: 7_000,
+    position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
     scaling_lr: 0.005,

@@ -11,7 +11,12 @@ model_params: {
     resolution: -1,
     white_background: False,
     data_device: "cuda",
-    eval: False
+    eval: False,
+    logger_config: {
+        logger: "wandb",
+        name: "org_mc_aerial_block9",
+        project: "LargeGS"
+    }
 }
 
 # Pipeline Parameters
