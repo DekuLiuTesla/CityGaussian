@@ -121,11 +121,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if iteration == opt.iterations:
                     progress_bar.close()
                 
+                grads = gaussians.xyz_gradient_accum / gaussians.denom
+                grads[grads.isnan()] = 0.0
                 ema_time = {
                     "render": ema_time_render,
                     "loss": ema_time_loss,
                     "densify": ema_time_densify,
                     "num_points": radii.shape[0],
+                    "mean_grad": grads.mean().item(),
                 }
 
                 lr = {}
@@ -208,6 +211,7 @@ def training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_
             "train_time/loss": ema_time["loss"],
             "train_time/densify": ema_time["densify"],
             "train_time/num_points": ema_time["num_points"],
+            "train_time/mean_grad": ema_time["mean_grad"],
             "iter_time": elapsed,
         }
         for key, value in lr.items():
