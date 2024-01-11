@@ -23,7 +23,7 @@ class GSDataset(Dataset):
         else:
             self.blur_level = 0
             
-        if len(self.cameras) > 250:
+        if len(self.cameras) > 300:
             self.pre_load = False
         
         if self.pre_load:
