@@ -14,11 +14,11 @@ model_params: {
     resolution: -1,
     white_background: False,
     eval: False,
-    # logger_config: {
-    #     logger: "wandb",
-    #     name: "lod_mc_aerial_block9",
-    #     project: "LargeGS"
-    # }
+    logger_config: {
+        logger: "wandb",
+        name: "lod_mc_aerial_block9",
+        project: "LargeGS"
+    }
 }
 
 # Pipeline Parameters
@@ -34,13 +34,13 @@ pipeline_params: {
 # Optimization Parameters
 optim_params: {
     iterations: 30_000,
-    position_lr_init: 0.00016,
-    position_lr_final: 0.0000016,
+    position_lr_init: 0.000064,
+    position_lr_final: 0.00000064,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
-    scaling_lr: 0.005,
+    scaling_lr: 0.002,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,
