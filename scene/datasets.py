@@ -93,24 +93,32 @@ class GSDataset(Dataset):
         else:
             assert False, "Unknown aabb format!"
         self.aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
-        xyz_contracted = self.contract_to_unisphere(xyz_org, self.aabb, ord=torch.inf)
-
         block_id_z = args.block_id // (args.block_dim[0] * args.block_dim[1])
-        block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[1]
-        block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[1]
+        block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[0]
+        block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[0]
 
-        min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
-        min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
-        min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
+        if hasattr(args, 'xyz_limited') and args.xyz_limited:
+            xyz = xyz_org
+            min_x = self.aabb[0] + (self.aabb[3] - self.aabb[0]) * float(block_id_x) / args.block_dim[0]
+            max_x = self.aabb[0] + (self.aabb[3] - self.aabb[0]) * float(block_id_x + 1) / args.block_dim[0]
+            min_y = self.aabb[1] + (self.aabb[4] - self.aabb[1]) * float(block_id_y) / args.block_dim[1]
+            max_y = self.aabb[1] + (self.aabb[4] - self.aabb[1]) * float(block_id_y + 1) / args.block_dim[1]
+            min_z = self.aabb[2] + (self.aabb[5] - self.aabb[2]) * float(block_id_z) / args.block_dim[2]
+            max_z = self.aabb[2] + (self.aabb[5] - self.aabb[2]) * float(block_id_z + 1) / args.block_dim[2]
+        else:
+            xyz = self.contract_to_unisphere(xyz_org, self.aabb, ord=torch.inf)
+            min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
+            min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
+            min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
 
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
-        block_mask = (xyz_contracted[:, 0] >= min_x) & (xyz_contracted[:, 0] < max_x)  \
-                    & (xyz_contracted[:, 1] >= min_y) & (xyz_contracted[:, 1] < max_y) \
-                    & (xyz_contracted[:, 2] >= min_z) & (xyz_contracted[:, 2] < max_z)
+        block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
+                    & (xyz[:, 1] >= min_y) & (xyz[:, 1] < max_y) \
+                    & (xyz[:, 2] >= min_z) & (xyz[:, 2] < max_z)
         
         sh_degree = gaussians.max_sh_degree
         masked_gaussians = GaussianModel(sh_degree)
-        masked_gaussians._xyz = gaussians._xyz[block_mask]
+        masked_gaussians._xyz = xyz_org[block_mask]
         masked_gaussians._scaling = gaussians._scaling[block_mask]
         masked_gaussians._rotation = gaussians._rotation[block_mask]
         masked_gaussians._features_dc = gaussians._features_dc[block_mask]
