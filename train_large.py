@@ -176,6 +176,9 @@ def prepare_output_and_logger(args):
         config_name = os.path.splitext(os.path.basename(args.config_path))[0]
         # time_stamp = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
         args.model_path = os.path.join("./output/", config_name)
+        if args.block_id >= 0:
+            args.model_path = f"{args.model_path}_cell{args.block_id}"
+            args.logger_config['name'] = f"{args.logger_config['name']}_cell{args.block_id}"
         
     # Set up output folder
     print("Output folder: {}".format(args.model_path))

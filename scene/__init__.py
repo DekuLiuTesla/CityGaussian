@@ -445,8 +445,8 @@ class LargeScene(Scene):
             aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
             xyz_contracted = self.contract_to_unisphere(xyz_org, aabb, ord=torch.inf)
             block_id_z = args.block_id // (args.block_dim[0] * args.block_dim[1])
-            block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[1]
-            block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[1]
+            block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[0]
+            block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[0]
 
             min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
             min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
@@ -458,7 +458,7 @@ class LargeScene(Scene):
             
             sh_degree = self.gaussians.max_sh_degree
             masked_gaussians = GaussianModel(sh_degree)
-            masked_gaussians._xyz = self.gaussians._xyz[block_mask]
+            masked_gaussians._xyz = self.gaussians.get_xyz[block_mask]
             masked_gaussians._scaling = self.gaussians._scaling[block_mask]
             masked_gaussians._rotation = self.gaussians._rotation[block_mask]
             masked_gaussians._features_dc = self.gaussians._features_dc[block_mask]
