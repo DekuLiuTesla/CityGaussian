@@ -140,4 +140,5 @@ class GSDataset(Dataset):
         
                 if total_opacity > args.opacity_threshold:
                     filtered_cameras.append(c)
-        self.cameras = filtered_cameras
+        # TODO: Add threshold control
+        self.cameras = filtered_cameras if len(filtered_cameras) > 25 else []
