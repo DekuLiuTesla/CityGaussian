@@ -78,17 +78,17 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
             background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
             
-            if skip_test and skip_train:
+            if custom_test:
                 views = scene.getTrainCameras() + scene.getTestCameras()
                 render_set(dataset.model_path, filename, 0, scene.loaded_iter, views, gaussians_fuse, pipeline, background)
                 print("Skip both train and test, render all views")
             
-            if not skip_train:
-                render_set(dataset.model_path, f"train_{filename}", 0, scene.loaded_iter, scene.getTrainCameras(), gaussians_fuse, pipeline, background)
-            
-            if not skip_test:
-                render_set(dataset.model_path, f"{filename}", 0, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
-
+            else:
+                if not skip_train:
+                    render_set(dataset.model_path, f"train_{filename}", 0, scene.loaded_iter, scene.getTrainCameras(), gaussians_fuse, pipeline, background)
+                
+                if not skip_test:
+                    render_set(dataset.model_path, f"test_{filename}", 0, scene.loaded_iter, scene.getTestCameras(), gaussians_fuse, pipeline, background)
 
 def parse_cfg(cfg):
     lp = GroupParams()

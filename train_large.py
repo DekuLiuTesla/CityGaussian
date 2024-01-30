@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser, Namespace
 from arguments import GroupParams
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
     log_writer, image_logger = prepare_output_and_logger(dataset)
 
@@ -141,6 +141,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
                     scene.save(iteration, dataset)
+                if (iteration in refilter_iterations):
+                    print("\n[ITER {}] Refiltering Training Data".format(iteration))
+                    gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
 
                 # Densification
                 if iteration < opt.densify_until_iter:
@@ -168,7 +171,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
             
             iteration += 1
-            if iteration > opt.iterations:
+            if iteration >= opt.iterations:
                 break
 
 def prepare_output_and_logger(args):    
@@ -177,8 +180,12 @@ def prepare_output_and_logger(args):
         # time_stamp = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
         args.model_path = os.path.join("./output/", config_name)
         if args.block_id >= 0:
-            args.model_path = f"{args.model_path}_cell{args.block_id}"
-            args.logger_config['name'] = f"{args.logger_config['name']}_cell{args.block_id}"
+            if args.block_id < args.block_dim[0] * args.block_dim[1] * args.block_dim[2]:
+                args.model_path = f"{args.model_path}_cell{args.block_id}"
+                if hasattr(args, "logger_config"):
+                    args.logger_config['name'] = f"{args.logger_config['name']}_cell{args.block_id}"
+            else:
+                raise ValueError("Invalid block_id: {}".format(args.block_id))
         
     # Set up output folder
     print("Output folder: {}".format(args.model_path))
@@ -295,6 +302,7 @@ if __name__ == "__main__":
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
     parser.add_argument("--test_iterations", nargs="+", type=int, default=[7_000, 30_000])
     parser.add_argument("--save_iterations", nargs="+", type=int, default=[7_000, 30_000])
+    parser.add_argument("--refilter_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
@@ -314,7 +322,7 @@ if __name__ == "__main__":
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
-    training(lp, op, pp, args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    training(lp, op, pp, args.test_iterations, args.save_iterations, args.refilter_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
 
     # All done
     print("\nTraining complete.")
