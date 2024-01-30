@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 from gaussian_renderer import render
 from scene.gaussian_model import GaussianModel
 from utils.camera_utils import loadCam
+from utils.loss_utils import l1_loss, ssim
 
 class GSDataset(Dataset):
     def __init__(self, cameras, scene, args, pipe=None, scale=1):
@@ -40,7 +41,7 @@ class GSDataset(Dataset):
             viewpoint_cam = self.cameras[idx]
         else:
             c = self.cameras[idx]
-            viewpoint_cam = loadCam(self.args, id, c, self.scale)
+            viewpoint_cam = loadCam(self.args, idx, c, self.scale)
         x = {
             "FoVx": viewpoint_cam.FoVx,
             "FoVy": viewpoint_cam.FoVy,
@@ -58,7 +59,8 @@ class GSDataset(Dataset):
         
         return x, y
     
-    def contract_to_unisphere(self,
+    def contract_to_unisphere(
+        self,
         x: torch.Tensor,
         aabb: torch.Tensor,
         ord: float = 2,
@@ -84,6 +86,11 @@ class GSDataset(Dataset):
             return x
     
     def block_filtering(self, gaussians, args, pp):
+        if not hasattr(args, 'filter_mode'):
+            args.filter_mode = 'opacity'
+        else:
+            assert args.filter_mode in ['opacity', 'loss'], "Unknown filter mode!"
+
         xyz_org = gaussians.get_xyz
         if len(args.aabb) == 4:
             aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
@@ -112,10 +119,19 @@ class GSDataset(Dataset):
             min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
 
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
-        block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
-                    & (xyz[:, 1] >= min_y) & (xyz[:, 1] < max_y) \
-                    & (xyz[:, 2] >= min_z) & (xyz[:, 2] < max_z)
+        num_gs, org_min_x, org_max_x, org_min_y, org_max_y = 0, min_x, max_x, min_y, max_y
+        while num_gs < 25000:
+            # TODO: select better threshold
+            block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
+                        & (xyz[:, 1] >= min_y) & (xyz[:, 1] < max_y) \
+                        & (xyz[:, 2] >= min_z) & (xyz[:, 2] < max_z)
+            num_gs = block_mask.sum()
+            min_x -= 0.01
+            max_x += 0.01
+            min_y -= 0.01
+            max_y += 0.01
         
+        block_mask = ~block_mask
         sh_degree = gaussians.max_sh_degree
         masked_gaussians = GaussianModel(sh_degree)
         masked_gaussians._xyz = xyz_org[block_mask]
@@ -133,12 +149,27 @@ class GSDataset(Dataset):
                 bg_color = [1,1,1] if args.white_background else [0, 0, 0]
                 background = torch.tensor(bg_color, dtype=torch.float32, device=xyz_org.device)
                 c = self.cameras[idx]
-                viewpoint_cam = loadCam(self.args, id, c, self.scale)
-                render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)
-                visibility_filter = render_pkg_block["visibility_filter"]
-                total_opacity = render_pkg_block["geometry"][visibility_filter, 6].sum()
-        
-                if total_opacity > args.opacity_threshold:
+                viewpoint_cam = loadCam(self.args, idx, c, self.scale)
+                contract_cam_center = self.contract_to_unisphere(viewpoint_cam.camera_center, self.aabb, ord=torch.inf)
+                if contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
+                    and contract_cam_center[1] > org_min_y and contract_cam_center[1] < org_max_y \
+                    and contract_cam_center[2] > min_z and contract_cam_center[2] < max_z:
                     filtered_cameras.append(c)
-        # TODO: Add threshold control
-        self.cameras = filtered_cameras if len(filtered_cameras) > 25 else []
+                    continue
+
+                render_pkg_block = render(viewpoint_cam, gaussians, pp, background)
+
+                if args.filter_mode == 'opacity':
+                    visibility_filter = render_pkg_block["visibility_filter"] & (~block_mask)
+                    total_opacity = render_pkg_block["geometry"][visibility_filter, 6].sum()
+                    if total_opacity > args.opacity_threshold:
+                        filtered_cameras.append(c)
+                elif args.filter_mode == 'loss':
+                    org_image_block = render_pkg_block["render"]
+                    render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)
+                    image_block = render_pkg_block["render"]
+                    loss = 1.0 - ssim(image_block, org_image_block)
+                    if loss > args.opacity_threshold:
+                        filtered_cameras.append(c)
+                    
+        self.cameras = filtered_cameras if len(filtered_cameras) > 75 else []
