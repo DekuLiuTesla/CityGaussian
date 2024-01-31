@@ -262,7 +262,7 @@ class LargeScene(Scene):
             masked_gaussians._opacity = self.gaussians._opacity[block_mask]
             masked_gaussians.max_radii2D = self.gaussians.max_radii2D[block_mask]
 
-            block_point_cloud_path = os.path.join(self.model_path, "point_cloud_blocks/{}/iteration_{}".format(args.block_id, iteration))
+            block_point_cloud_path = os.path.join(self.model_path, "point_cloud_blocks/scale_1.0/iteration_{}".format(iteration))
             masked_gaussians.save_ply(os.path.join(block_point_cloud_path, "point_cloud.ply"))
     
     def getTrainCameras(self):
