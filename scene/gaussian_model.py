@@ -538,6 +538,8 @@ class GaussianModelFusion(GaussianModel):
         self._opacity = self._opacity[valid_points_mask]
         self._scaling = self._scaling[valid_points_mask]
         self._rotation = self._rotation[valid_points_mask]
+        self._features_dc = self._features_dc[valid_points_mask]
+        self._features_rest = self._features_rest[valid_points_mask]
         
         self.max_radii2D = self.max_radii2D[valid_points_mask]
     
@@ -548,7 +550,8 @@ class GaussianModelFusion(GaussianModel):
         # self.densify_and_clone(grads, max_grad, extent)
         # self.densify_and_split(grads, max_grad, extent)
 
-        prune_mask = torch.logical_or((torch.sigmoid(self._mask) <= 0.01).squeeze(),(self.get_opacity < min_opacity).squeeze())
+        # prune_mask = torch.logical_or((torch.sigmoid(self._mask) <= 0.01).squeeze(),(self.get_opacity < min_opacity).squeeze())
+        prune_mask = (torch.sigmoid(self._mask) <= 0.01).squeeze()
         if max_screen_size:
             big_points_vs = self.max_radii2D > max_screen_size
             big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
