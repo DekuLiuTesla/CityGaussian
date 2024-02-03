@@ -1,0 +1,58 @@
+# Model Parameters
+model_params: {
+    model_config: {
+        name: "GaussianModelFusion",
+        kwargs: {
+            source_dir: "output/block_mc_aerial_block_all_lr_c36_loss_5",
+            block_dim: [6, 6, 1],
+            aabb: [-3.5, -4, 4.5, 2],
+            scale: 1.0,
+        }
+    },
+    sh_degree: 3,
+    source_path: "data/matrix_city/aerial/test/block_all_test",  # TODO: adjust to train
+    model_path: "",
+    images: "images",
+    resolution: -1,
+    white_background: False,
+    data_device: "cuda",
+    eval: False,
+    logger_config: {
+        logger: "wandb",
+        name: "fuse_mc_aerial_block_all_lr_c36_loss_5_1",
+        project: "LargeGS"
+    }
+}
+
+# Pipeline Parameters
+pipeline_params: {
+    convert_SHs_python:  False,
+    compute_cov3D_python:  False,
+    pre_load: False,
+    debug:  False
+}
+
+
+# Optimization Parameters
+optim_params: {
+    iterations: 15_000,
+    position_lr_init: 0.0,
+    position_lr_final: 0.0,
+    position_lr_delay_mult: 0.01,
+    position_lr_max_steps: 15_000,
+    feature_lr: 0.0,
+    opacity_lr: 0.0,
+    scaling_lr: 0.0,
+    rotation_lr: 0.0,
+    mask_lr: 0.1,
+    percent_dense: 0.01,
+    lambda_dssim: 0.5,
+    lambda_mask: 0.005,
+    densification_interval: 15_000,  # 1500
+    opacity_reset_interval: 0,
+    densify_from_iter: 100,  # 1500
+    densify_until_iter: 15_000,
+    densify_grad_threshold: 0.0
+}
+
+
