@@ -102,7 +102,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
             ema_time_render = 0.4 * (end - start) + 0.6 * ema_time_render
             
             # Loss
-            torch.cuda.empty_cache()
             start = time.time()
             gt_image = gt_image.cuda()
             Ll1 = l1_loss(image, gt_image)
@@ -110,7 +109,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
             loss.backward()
             end = time.time()
             ema_time_loss = 0.4 * (end - start) + 0.6 * ema_time_loss
-            torch.cuda.empty_cache()
 
             iter_end.record()
 
