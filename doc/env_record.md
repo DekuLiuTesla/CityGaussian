@@ -5,6 +5,7 @@ pip install lightning
 pip install wandb
 pip install imblearn
 pip install torch-scatter==2.1.0+pt112cu116
+pip install opencv-python
 conda install pytorch3d -c pytorch3d
 ```
 
