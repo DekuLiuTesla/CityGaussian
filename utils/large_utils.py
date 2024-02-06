@@ -35,12 +35,13 @@ def block_filtering(block_id, xyz_org, aabb, block_dim, scale=1.0, mask_only=Tru
     else:
         assert False, "Unknown aabb format!"
 
-    aabb = torch.tensor(aabb, dtype=torch.float32)
+    xyz_tensor = torch.tensor(xyz_org)
+    aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_tensor.device)
     block_id_z = block_id // (block_dim[0] * block_dim[1]);
     block_id_y = (block_id % (block_dim[0] * block_dim[1])) // block_dim[0];
     block_id_x = (block_id % (block_dim[0] * block_dim[1])) % block_dim[0];
 
-    xyz = contract_to_unisphere(torch.tensor(xyz_org), aabb, ord=torch.inf)
+    xyz = contract_to_unisphere(xyz_tensor, aabb, ord=torch.inf)
     min_x, max_x = float(block_id_x) / block_dim[0], float(block_id_x + 1) / block_dim[0]
     min_y, max_y = float(block_id_y) / block_dim[1], float(block_id_y + 1) / block_dim[1]
     min_z, max_z = float(block_id_z) / block_dim[2], float(block_id_z + 1) / block_dim[2]
