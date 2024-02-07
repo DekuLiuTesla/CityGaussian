@@ -21,23 +21,28 @@ rm -rf data/urban_scene_3d/campus-pixsfm/train/sparse
 rm -rf data/urban_scene_3d/campus-pixsfm/val/sparse
 python tools/transform_pt2txt.py --source_path data/urban_scene_3d/campus-pixsfm
 python convert_cam.py -s data/urban_scene_3d/campus-pixsfm/train
+python convert_cam.py -s data/urban_scene_3d/campus-pixsfm/val
 
 rm -rf data/urban_scene_3d/residence-pixsfm/train/sparse
 rm -rf data/urban_scene_3d/residence-pixsfm/val/sparse
 python tools/transform_pt2txt.py --source_path data/urban_scene_3d/residence-pixsfm
 python convert_cam.py -s data/urban_scene_3d/residence-pixsfm/train
+python convert_cam.py -s data/urban_scene_3d/residence-pixsfm/val
 
 rm -rf data/urban_scene_3d/sci-art-pixsfm/train/sparse
 rm -rf data/urban_scene_3d/sci-art-pixsfm/val/sparse
 python tools/transform_pt2txt.py --source_path data/urban_scene_3d/sci-art-pixsfm
 python convert_cam.py -s data/urban_scene_3d/sci-art-pixsfm/train
+python convert_cam.py -s data/urban_scene_3d/sci-art-pixsfm/val
 
 rm -rf data/mill19/building-pixsfm/train/sparse
 rm -rf data/mill19/building-pixsfm/val/sparse
 python tools/transform_pt2txt.py --source_path data/mill19/building-pixsfm
 python convert_cam.py -s data/mill19/building-pixsfm/train
+python convert_cam.py -s data/mill19/building-pixsfm/val
 
 rm -rf data/mill19/rubble-pixsfm/train/sparse
 rm -rf data/mill19/rubble-pixsfm/val/sparse
 python tools/transform_pt2txt.py --source_path data/mill19/rubble-pixsfm
 python convert_cam.py -s data/mill19/rubble-pixsfm/train
+python convert_cam.py -s data/mill19/rubble-pixsfm/val
