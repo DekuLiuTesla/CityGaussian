@@ -70,6 +70,7 @@ if __name__ == "__main__":
             with open(sparse_path / 'images.txt', 'a') as f:
                 # change from MegaNeRF camera axes (Y right, Z back) to COLMAP (Y down, Z forward)
                 c2w_4x4 = torch.eye(4)
+                c2w = torch.cat([-c2w[:, 1:2], c2w[:, 0:1], c2w[:, 2:4]], -1)
                 c2w_4x4[:3, :3] = torch.inverse(RDF_TO_DRB) @ c2w[:3, :3] @ RDF_TO_DRB
                 c2w_4x4[:3, 3:] = torch.inverse(RDF_TO_DRB) @ c2w[:3, 3:]
 
