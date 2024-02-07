@@ -1,6 +1,9 @@
 # Model Parameters
 model_params: {
-    name: "GaussianModel",
+    model_config: {
+        name: "GaussianModel",
+        kwargs: {}
+    },
     sh_degree: 3,
     source_path: "data/matrix_city/aerial/train/block_3",
     model_path: "",
