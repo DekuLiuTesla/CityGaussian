@@ -432,7 +432,7 @@ class GaussianModelFusion(GaussianModel):
                 self.update_ply(idx, 1)
         
         print("Number of points at initialisation : ", self.get_xyz.shape[0])
-        self._mask = nn.Parameter(torch.ones((self.get_xyz.shape[0], 1), device="cuda").requires_grad_(True))
+        self._mask = nn.Parameter((torch.ones((self.get_xyz.shape[0], 1), device="cuda") * 5.0).requires_grad_(True))
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
         self.active_sh_degree = self.max_sh_degree
     
