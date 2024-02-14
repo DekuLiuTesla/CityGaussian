@@ -12,6 +12,7 @@ GaussianViewTest
 debug
 .history
 Compact-3DGS-main
+plug_in
 refine.py
 run_gpu1.sh
 run_gpu2.sh
@@ -21,3 +22,7 @@ config/org_ue_aerial_20_block1cam_range.yaml
 config/lod_mc_aerial_block3_vox_23.yaml
 config/org_mc_aerial_block9_cell9.yaml
 config/lod_mc_aerial_block9_v*
+config/block_mc_aerial_block_all_lr_c36_loss_5_66.yaml
+config/org_mc_aerial_block3_66.yaml
+config/org_mc_aerial_block3_prune_distill.yaml
+config/org_mc_aerial_block3_prune.yaml
