@@ -64,3 +64,26 @@ def block_filtering(block_id, xyz_org, aabb, block_dim, scale=1.0, mask_only=Tru
         return block_mask
     else:
         return mask_only, xyz, [min_x, max_x, min_y, max_y, min_z, max_z]
+
+def which_block(xyz_org, aabb, block_dim):
+
+    if len(aabb) == 4:
+        aabb = [aabb[0], aabb[1], xyz_org[:, -1].min(), 
+                aabb[2], aabb[3], xyz_org[:, -1].max()]
+    elif len(aabb) == 6:
+        aabb = aabb
+    else:
+        assert False, "Unknown aabb format!"
+
+    xyz_tensor = torch.tensor(xyz_org)
+    aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_tensor.device)
+
+    xyz = contract_to_unisphere(xyz_tensor, aabb, ord=torch.inf)
+    block_id = torch.zeros(xyz.shape[0], dtype=torch.int32, device=xyz.device)
+    block_id_x = torch.floor(xyz[:, 0] * block_dim[0]).clamp(0, block_dim[0] - 1).int()
+    block_id_y = torch.floor(xyz[:, 1] * block_dim[1]).clamp(0, block_dim[1] - 1).int()
+    block_id_z = torch.floor(xyz[:, 2] * block_dim[2]).clamp(0, block_dim[2] - 1).int()
+
+    block_id = block_id_z * block_dim[0] * block_dim[1] + block_id_y * block_dim[0] + block_id_x
+
+    return block_id
