@@ -119,7 +119,7 @@ class GSDataset(Dataset):
             min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
 
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
-        num_gs, org_min_x, org_max_x, org_min_y, org_max_y = 0, min_x, max_x, min_y, max_y
+        num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
         while num_gs < 25000:
             # TODO: select better threshold
             block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
@@ -130,6 +130,8 @@ class GSDataset(Dataset):
             max_x += 0.01
             min_y -= 0.01
             max_y += 0.01
+            min_z -= 0.01
+            max_z += 0.01
         
         block_mask = ~block_mask
         sh_degree = gaussians.max_sh_degree
@@ -153,7 +155,7 @@ class GSDataset(Dataset):
                 contract_cam_center = self.contract_to_unisphere(viewpoint_cam.camera_center, self.aabb, ord=torch.inf)
                 if contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
                     and contract_cam_center[1] > org_min_y and contract_cam_center[1] < org_max_y \
-                    and contract_cam_center[2] > min_z and contract_cam_center[2] < max_z:
+                    and contract_cam_center[2] > org_min_z and contract_cam_center[2] < org_max_z:
                     filtered_cameras.append(c)
                     continue
 
