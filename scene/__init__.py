@@ -18,7 +18,7 @@ import torch
 import numpy as np
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
-from scene.gaussian_model import GaussianModel, GaussianModelVox, GaussianModelVoxV2, GaussianModelLoD, GaussianModelFusion
+from scene.gaussian_model import GaussianModel, GaussianModelVox, GaussianModelVoxV2, GaussianModelLOD, GaussianModelFusion
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
@@ -165,12 +165,13 @@ class RefinedScene(Scene):
             self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
 
 class LargeScene(Scene):
-    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, shuffle=True, resolution_scales=[1.0]):
+    def __init__(self, args : ModelParams, gaussians : GaussianModel, load_iteration=None, load_vq=False, shuffle=True, resolution_scales=[1.0]):
         """b
         :param path: Path to colmap scene main folder.
         """
         self.model_path = args.model_path
         self.loaded_iter = None
+        self.load_vq = load_vq
         self.gaussians = gaussians
         self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
 
@@ -219,6 +220,8 @@ class LargeScene(Scene):
                                                 "point_cloud",
                                                 "iteration_" + str(self.loaded_iter),
                                                 "point_cloud.ply"))
+        elif self.load_vq:
+            self.gaussians.load_vq(self.model_path)
         elif self.pretrain_path:
             self.gaussians.load_ply(os.path.join(self.pretrain_path, "point_cloud.ply"))
             self.gaussians.spatial_lr_scale = self.cameras_extent

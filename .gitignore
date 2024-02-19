@@ -14,9 +14,7 @@ debug
 Compact-3DGS-main
 plug_in
 refine.py
-run_gpu1.sh
-run_gpu2.sh
-run_gpu3.sh
+run_gpu*
 
 config/org_ue_aerial_20_block1cam_range.yaml
 config/lod_mc_aerial_block3_vox_23.yaml
@@ -26,3 +24,4 @@ config/block_mc_aerial_block_all_lr_c36_loss_5_66.yaml
 config/org_mc_aerial_block3_66.yaml
 config/org_mc_aerial_block3_prune_distill.yaml
 config/org_mc_aerial_block3_prune.yaml
+config/dump
