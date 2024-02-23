@@ -15,9 +15,9 @@ class GSDataset(Dataset):
         self.scale = scale
         self.args = args
         
-        if hasattr(args, 'block_id') and args.block_id >= 0:
-            self.block_filtering(scene.gaussians, args, pipe)
-            print(f"Filtered Cameras: {len(self.cameras)}")
+        # if hasattr(args, 'block_id') and args.block_id >= 0:
+        #     self.block_filtering(scene.gaussians, args, pipe)
+        #     print(f"Filtered Cameras: {len(self.cameras)}")
         
         if hasattr(pipe, 'blur_level') and pipe.blur_level > 0:
             self.blur_level = pipe.blur_level

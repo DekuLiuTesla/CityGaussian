@@ -17,7 +17,7 @@ import yaml
 import torch
 import numpy as np
 from utils.system_utils import searchForMaxIteration
-from scene.dataset_readers import sceneLoadTypeCallbacks, storePly
+from scene.dataset_readers import sceneLoadTypeCallbacks, storePly, SceneInfo
 from scene.gaussian_model import GaussianModel, GaussianModelVox, GaussianModelVoxV2, GaussianModelLOD, GaussianModelFusion
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
@@ -206,6 +206,22 @@ class LargeScene(Scene):
                 json_cams.append(camera_to_JSON(id, cam))
             with open(os.path.join(self.model_path, "cameras.json"), 'w') as file:
                 json.dump(json_cams, file)
+        
+        if hasattr(args, 'block_id') and args.block_id >= 0:
+            from pathlib import Path
+            config_name = os.path.splitext(os.path.basename(args.config_path))[0]
+            partition = np.load(os.path.join(args.source_path, "data_partitions", f"{config_name}.npy"))
+            filtered_train_cameras = []
+            for i in range(partition.shape[0]):
+                if partition[i, args.block_id]:
+                    filtered_train_cameras.append(scene_info.train_cameras[i])
+            filtered_train_cameras = filtered_train_cameras if len(filtered_train_cameras) > 50 else []
+            print(f"Filtered Cameras: {len(filtered_train_cameras)}")
+            scene_info = SceneInfo(point_cloud=scene_info.point_cloud,
+                                   train_cameras=filtered_train_cameras,
+                                   test_cameras=scene_info.test_cameras,
+                                   nerf_normalization=scene_info.nerf_normalization,
+                                   ply_path=scene_info.ply_path)
 
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffcameras_extentling
