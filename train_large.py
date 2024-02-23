@@ -24,7 +24,7 @@ from lightning.pytorch.loggers import (
 from scene import LargeScene
 from scene.datasets import GSDataset
 from utils.camera_utils import loadCam
-from utils.general_utils import safe_state
+from utils.general_utils import safe_state, parse_cfg
 import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
@@ -274,22 +274,6 @@ def training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_
                     log_writer.log_metrics(metrics_to_log, iteration)
 
         torch.cuda.empty_cache()
-
-def parse_cfg(cfg):
-    lp = GroupParams()
-    op = GroupParams()
-    pp = GroupParams()
-
-    for arg in cfg['model_params'].items():
-        setattr(lp, arg[0], arg[1])
-    
-    for arg in cfg['optim_params'].items():
-        setattr(op, arg[0], arg[1]) 
-
-    for arg in cfg['pipeline_params'].items():
-        setattr(pp, arg[0], arg[1])
-    
-    return lp, op, pp
 
 if __name__ == "__main__":
     # Set up command line argument parser

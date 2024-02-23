@@ -146,3 +146,20 @@ def safe_state(silent):
     np.random.seed(0)
     torch.manual_seed(0)
     torch.cuda.set_device(torch.device("cuda:0"))
+
+def parse_cfg(cfg):
+    lp = GroupParams()
+    op = GroupParams()
+    pp = GroupParams()
+
+    for arg in cfg['model_params'].items():
+        setattr(lp, arg[0], arg[1])
+    
+    for arg in cfg['optim_params'].items():
+        setattr(op, arg[0], arg[1]) 
+
+    for arg in cfg['pipeline_params'].items():
+        setattr(pp, arg[0], arg[1])
+    
+    return lp, op, pp
+
