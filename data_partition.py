@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 from pathlib import Path
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from transforms3d.quaternions import mat2quat
 from scene import LargeScene
 from scene.gaussian_model import GaussianModel
@@ -133,10 +133,15 @@ if __name__ == "__main__":
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
-    config_name = os.path.splitext(os.path.basename(args.config_path))[0]
-    if not args.model_path:
+    config_name = os.path.splitext(os.path.basename(lp.config_path))[0]
+    if not lp.model_path:
         # time_stamp = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
-        args.model_path = os.path.join("./output/", config_name)
+        lp.model_path = os.path.join("./output/", config_name)
+    
+    print("Output folder: {}".format(lp.model_path))
+    os.makedirs(lp.model_path, exist_ok = True)
+    with open(os.path.join(lp.model_path, "cfg_args"), 'w') as cfg_log_f:
+        cfg_log_f.write(str(Namespace(**vars(lp))))
 
     modules = __import__('scene')
     model_config = lp.model_config
