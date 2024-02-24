@@ -18,11 +18,11 @@ model_params: {
     white_background: False,
     data_device: "cuda",
     eval: False,
-    # logger_config: {
-    #     logger: "wandb",
-    #     name: "block_campus_all_c36_loss_10",
-    #     project: "LargeGS"
-    # }
+    logger_config: {
+        logger: "wandb",
+        name: "block_campus_all_c36_loss_10_lr4",
+        project: "LargeGS"
+    }
 }
 
 # Pipeline Parameters
@@ -37,13 +37,13 @@ pipeline_params: {
 # Optimization Parameters
 optim_params: {
     iterations: 30_000,
-    position_lr_init: 0.000064,
-    position_lr_final: 0.00000064,
+    position_lr_init: 0.000016,
+    position_lr_final: 0.00000016,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
-    scaling_lr: 0.004,
+    scaling_lr: 0.001,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,

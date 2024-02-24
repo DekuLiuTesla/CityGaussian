@@ -209,8 +209,7 @@ class LargeScene(Scene):
         
         if hasattr(args, 'block_id') and args.block_id >= 0:
             from pathlib import Path
-            config_name = os.path.splitext(os.path.basename(args.config_path))[0]
-            partition = np.load(os.path.join(args.source_path, "data_partitions", f"{config_name}.npy"))
+            partition = np.load(os.path.join(args.source_path, "data_partitions", f"{args.partition_name}.npy"))
             filtered_train_cameras = []
             for i in range(partition.shape[0]):
                 if partition[i, args.block_id]:

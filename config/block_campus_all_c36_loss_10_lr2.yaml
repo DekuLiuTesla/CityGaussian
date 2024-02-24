@@ -6,6 +6,7 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/urban_scene_3d/campus-pixsfm/train",
+    partition_name: "block_campus_all_c36_loss_10",
     pretrain_path: "output/org_campus_all_lr4/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
