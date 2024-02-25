@@ -20,7 +20,7 @@ model_params: {
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "block_campus_all_c36_loss_10_lr2",
+        name: "block_campus_all_c36_loss_10_lr",
         project: "LargeGS"
     }
 }
@@ -41,8 +41,8 @@ optim_params: {
     position_lr_final: 0.00000032,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
-    feature_lr: 0.0025,
-    opacity_lr: 0.05,
+    feature_lr: 0.002,
+    opacity_lr: 0.04,
     scaling_lr: 0.001,
     rotation_lr: 0.001,
     percent_dense: 0.01,

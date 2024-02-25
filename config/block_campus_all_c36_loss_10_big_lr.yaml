@@ -20,7 +20,7 @@ model_params: {
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "block_campus_all_c36_loss_10_lr2",
+        name: "block_campus_all_c36_loss_10_big_lr",
         project: "LargeGS"
     }
 }
@@ -37,13 +37,13 @@ pipeline_params: {
 # Optimization Parameters
 optim_params: {
     iterations: 30_000,
-    position_lr_init: 0.000032,
-    position_lr_final: 0.00000032,
+    position_lr_init: 0.00004,
+    position_lr_final: 0.0000004,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
-    scaling_lr: 0.001,
+    scaling_lr: 0.00125,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,
