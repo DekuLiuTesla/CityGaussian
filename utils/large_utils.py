@@ -88,13 +88,14 @@ def which_block(xyz_org, aabb, block_dim):
 
     return block_id
 
-def in_frustum(cam_center, full_proj_transform, world_view_transform, cell_corners, aabb, block_dim):
+def in_frustum(viewpoint_cam, cell_corners, aabb, block_dim):
     num_cell = cell_corners.shape[0]
     device = cell_corners.device
 
     cell_corners = torch.cat([cell_corners, torch.ones_like(cell_corners[..., [0]])], dim=-1)
-    full_proj_transform = full_proj_transform.repeat(num_cell, 1, 1)
-    viewmatrix = world_view_transform.repeat(num_cell, 1, 1)
+    cam_center = viewpoint_cam.camera_center
+    full_proj_transform = viewpoint_cam.full_proj_transform.repeat(num_cell, 1, 1)
+    viewmatrix = viewpoint_cam.world_view_transform.repeat(num_cell, 1, 1)
     cell_corners_screen = cell_corners.bmm(full_proj_transform)
     cell_corners_screen = cell_corners_screen / cell_corners_screen[..., [-1]]
     cell_corners_screen = cell_corners_screen[..., :-1]

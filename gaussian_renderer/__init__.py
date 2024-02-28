@@ -472,13 +472,13 @@ def render_v4(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, scali
             "visibility_filter" : radii > 0,
             "radii": radii}
 
-def render_lod(cam_info, lod_list : list, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
         
         # sort cells by distance to camera
-        cam_center = cam_info["camera_center"][0]
-        in_frustum_mask = in_frustum(cam_center, cam_info["full_proj_transform"], cam_info["world_view_transform"], 
-                                     lod_list[-1].cell_corners, lod_list[-1].aabb, lod_list[-1].block_dim)
+
+        in_frustum_mask = in_frustum(viewpoint_cam, lod_list[-1].cell_corners, lod_list[-1].aabb, lod_list[-1].block_dim)
         in_frustum_indices = in_frustum_mask.nonzero().squeeze(0)
+        cam_center = viewpoint_cam.camera_center
         distance3D = torch.norm(lod_list[-1].cell_corners[in_frustum_mask, :, :2] - cam_center[:2], dim=2).min(dim=1).values
         in_frustum_indices = in_frustum_indices[torch.sort(distance3D)[1]]
         
@@ -522,7 +522,7 @@ def render_lod(cam_info, lod_list : list, pipe, bg_color : torch.Tensor, scaling
             features = feats[:, 4:feat_end_dim].reshape(-1, (max_sh_degree+1)**2, 3).float()
             if pipe.convert_SHs_python:
                 shs_view = features.transpose(1, 2).view(-1, 3, (max_sh_degree+1)**2)
-                dir_pp = (means3D - cam_info["camera_center"].repeat(features.shape[0], 1))
+                dir_pp = (means3D - viewpoint_cam.camera_center.repeat(features.shape[0], 1))
                 dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
                 sh2rgb = eval_sh(max_sh_degree, shs_view, dir_pp_normalized)
                 colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
@@ -532,20 +532,20 @@ def render_lod(cam_info, lod_list : list, pipe, bg_color : torch.Tensor, scaling
             colors_precomp = override_color  # check if requires masking
         
         # Set up rasterization configuration
-        tanfovx = math.tan(cam_info["FoVx"] * 0.5)
-        tanfovy = math.tan(cam_info["FoVy"] * 0.5)
+        tanfovx = math.tan(viewpoint_cam.FoVx * 0.5)
+        tanfovy = math.tan(viewpoint_cam.FoVy * 0.5)
 
         raster_settings = GaussianRasterizationSettings(
-            image_height=int(cam_info["image_height"]),
-            image_width=int(cam_info["image_width"]),
+            image_height=int(viewpoint_cam.image_height),
+            image_width=int(viewpoint_cam.image_width),
             tanfovx=tanfovx,
             tanfovy=tanfovy,
             bg=bg_color,
             scale_modifier=scaling_modifier,
-            viewmatrix=cam_info["world_view_transform"],
-            projmatrix=cam_info["full_proj_transform"],
+            viewmatrix=viewpoint_cam.world_view_transform,
+            projmatrix=viewpoint_cam.full_proj_transform,
             sh_degree=max_sh_degree,
-            campos=cam_info["camera_center"],
+            campos=viewpoint_cam.camera_center, 
             prefiltered=False,
             debug=pipe.debug
         )
