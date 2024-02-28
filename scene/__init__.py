@@ -230,13 +230,13 @@ class LargeScene(Scene):
         self.train_cameras = scene_info.train_cameras
         self.test_cameras = scene_info.test_cameras
 
-        if self.loaded_iter:
+        if self.load_vq:
+            self.gaussians.load_vq(self.model_path)
+        elif self.loaded_iter:
             self.gaussians.load_ply(os.path.join(self.model_path,
                                                 "point_cloud",
                                                 "iteration_" + str(self.loaded_iter),
                                                 "point_cloud.ply"))
-        elif self.load_vq:
-            self.gaussians.load_vq(self.model_path)
         elif self.pretrain_path:
             self.gaussians.load_ply(os.path.join(self.pretrain_path, "point_cloud.ply"))
             self.gaussians.spatial_lr_scale = self.cameras_extent
