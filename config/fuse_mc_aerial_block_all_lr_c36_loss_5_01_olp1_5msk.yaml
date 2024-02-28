@@ -19,7 +19,7 @@ model_params: {
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "fuse_mc_aerial_block_all_lr_c36_loss_5_01_olp1_100msk",
+        name: "fuse_mc_aerial_block_all_lr_c36_loss_5_01_olp1_5msk",
         project: "LargeGS"
     }
 }
@@ -47,7 +47,7 @@ optim_params: {
     mask_lr: 0.01,
     percent_dense: 0.01,
     lambda_dssim: 0.5,
-    lambda_mask: 0.05,
+    lambda_mask: 0.025,
     densification_interval: 15_000,  # 1500
     opacity_reset_interval: 0,
     densify_from_iter: 100,  # 1500
