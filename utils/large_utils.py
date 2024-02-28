@@ -87,3 +87,41 @@ def which_block(xyz_org, aabb, block_dim):
     block_id = block_id_z * block_dim[0] * block_dim[1] + block_id_y * block_dim[0] + block_id_x
 
     return block_id
+
+def in_frustum(cam_center, full_proj_transform, world_view_transform, cell_corners, aabb, block_dim):
+    num_cell = cell_corners.shape[0]
+    device = cell_corners.device
+
+    cell_corners = torch.cat([cell_corners, torch.ones_like(cell_corners[..., [0]])], dim=-1)
+    full_proj_transform = full_proj_transform.repeat(num_cell, 1, 1)
+    viewmatrix = world_view_transform.repeat(num_cell, 1, 1)
+    cell_corners_screen = cell_corners.bmm(full_proj_transform)
+    cell_corners_screen = cell_corners_screen / cell_corners_screen[..., [-1]]
+    cell_corners_screen = cell_corners_screen[..., :-1]
+
+    cell_corners_cam = cell_corners.bmm(viewmatrix)
+    mask = (cell_corners_cam[..., 2] > 0.2)
+
+    cell_corners_screen_min = torch.zeros((num_cell, 3), dtype=torch.float32, device=device)
+    cell_corners_screen_max = torch.zeros((num_cell, 3), dtype=torch.float32, device=device)
+
+    for i in range(num_cell):
+        if mask[i].sum() > 0:
+            cell_corners_screen_min[i] = cell_corners_screen[i][mask[i]].min(dim=0).values
+            cell_corners_screen_max[i] = cell_corners_screen[i][mask[i]].max(dim=0).values
+
+    box_a = torch.cat([cell_corners_screen_min[:, :2], cell_corners_screen_max[:, :2]], dim=1)
+    box_b = torch.tensor([[-1, -1, 1, 1]], dtype=torch.float32, device=device)
+    A = box_a.size(0)
+    B = box_b.size(0)
+    max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
+                    box_b[:, 2:].unsqueeze(0).expand(A, B, 2))
+    min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2),
+                    box_b[:, :2].unsqueeze(0).expand(A, B, 2))
+    inter = torch.clamp((max_xy - min_xy), min=0)
+    mask = (inter[:, 0, 0] * inter[:, 0, 1]) > 0
+
+    cam_center_id = which_block(cam_center[None, :], aabb, block_dim)[0]
+    mask[cam_center_id] = True
+
+    return mask

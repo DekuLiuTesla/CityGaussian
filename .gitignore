@@ -25,3 +25,4 @@ config/org_mc_aerial_block3_66.yaml
 config/org_mc_aerial_block3_prune_distill.yaml
 config/org_mc_aerial_block3_prune.yaml
 config/dump
+wandb

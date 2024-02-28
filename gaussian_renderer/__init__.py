@@ -15,6 +15,7 @@ import math
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from scene.gaussian_model import GaussianModel
 from utils.sh_utils import eval_sh
+from utils.large_utils import in_frustum
 
 def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
     """
@@ -470,3 +471,100 @@ def render_v4(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, scali
             "viewspace_points": screenspace_points,
             "visibility_filter" : radii > 0,
             "radii": radii}
+
+def render_lod(cam_info, lod_list : list, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+        
+        # sort cells by distance to camera
+        cam_center = cam_info["camera_center"][0]
+        in_frustum_mask = in_frustum(cam_center, cam_info["full_proj_transform"], cam_info["world_view_transform"], 
+                                     lod_list[-1].cell_corners, lod_list[-1].aabb, lod_list[-1].block_dim)
+        in_frustum_indices = in_frustum_mask.nonzero().squeeze(0)
+        distance3D = torch.norm(lod_list[-1].cell_corners[in_frustum_mask, :, :2] - cam_center[:2], dim=2).min(dim=1).values
+        in_frustum_indices = in_frustum_indices[torch.sort(distance3D)[1]]
+        
+        # used for BlockedGaussianV3
+        out_list = []
+        main_device = lod_list[-1].feats.device
+        max_sh_degree = lod_list[-1].max_sh_degree
+        feat_end_dim = 3 * (max_sh_degree + 1) ** 2 + 4
+        
+        for lod_gs in lod_list:
+            out_i = lod_gs.get_feats(in_frustum_indices)
+            if out_i.shape[0] == 0:
+                continue
+            if out_i.device != main_device:
+                out_i = torch.cat([out_i[:, :3].to(main_device), out_i[:, 3:].half().to(main_device)], dim=1)
+            out_list.append(out_i)
+
+        feats = torch.cat(out_list, dim=0)
+        # feats = lod_list[1].feats
+
+        means3D = feats[:, :3].float()
+        screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
+        means2D = screenspace_points
+        opacity = feats[:, 3].float()
+        # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
+        # scaling / rotation by the rasterizer.
+        scales = None
+        rotations = None
+        cov3D_precomp = None
+        if pipe.compute_cov3D_python:
+            cov3D_precomp = feats[:, feat_end_dim:].float()
+        else:
+            scales = feats[:, feat_end_dim:feat_end_dim+3].float()
+            rotations = feats[:, (feat_end_dim+3):].float()
+            
+        # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
+        # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
+        shs = None
+        colors_precomp = None
+        if override_color is None:
+            features = feats[:, 4:feat_end_dim].reshape(-1, (max_sh_degree+1)**2, 3).float()
+            if pipe.convert_SHs_python:
+                shs_view = features.transpose(1, 2).view(-1, 3, (max_sh_degree+1)**2)
+                dir_pp = (means3D - cam_info["camera_center"].repeat(features.shape[0], 1))
+                dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
+                sh2rgb = eval_sh(max_sh_degree, shs_view, dir_pp_normalized)
+                colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
+            else:
+                shs = features
+        else:
+            colors_precomp = override_color  # check if requires masking
+        
+        # Set up rasterization configuration
+        tanfovx = math.tan(cam_info["FoVx"] * 0.5)
+        tanfovy = math.tan(cam_info["FoVy"] * 0.5)
+
+        raster_settings = GaussianRasterizationSettings(
+            image_height=int(cam_info["image_height"]),
+            image_width=int(cam_info["image_width"]),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=bg_color,
+            scale_modifier=scaling_modifier,
+            viewmatrix=cam_info["world_view_transform"],
+            projmatrix=cam_info["full_proj_transform"],
+            sh_degree=max_sh_degree,
+            campos=cam_info["camera_center"],
+            prefiltered=False,
+            debug=pipe.debug
+        )
+
+        rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+
+        rendered_image, radii = rasterizer(
+            means3D = means3D,
+            means2D = means2D,
+            shs = shs,
+            colors_precomp = colors_precomp,
+            opacities = opacity,
+            scales = scales,
+            rotations = rotations,
+            cov3D_precomp = cov3D_precomp)
+        
+        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
+        # They will be excluded from value updates used in the splitting criteria.
+        return {"render": rendered_image,
+                "viewspace_points": screenspace_points,
+                "visibility_filter" : radii > 0,
+                "radii": radii}
