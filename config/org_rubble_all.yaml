@@ -8,13 +8,13 @@ model_params: {
     source_path: "data/mill19/rubble-pixsfm/train",
     model_path: "",
     images: "images",
-    resolution: -1,
+    resolution: 4,
     white_background: False,
     data_device: "cuda",
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "org_rubble_all",
+        name: "org_rubble_all_r4",
         project: "LargeGS"
     }
 }
