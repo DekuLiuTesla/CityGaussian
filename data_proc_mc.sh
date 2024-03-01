@@ -62,3 +62,7 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/test/block_all_test
 python convert_cam.py -s data/matrix_city/aerial/train/block_all
 python convert_cam.py -s data/matrix_city/aerial/test/block_all_test
+
+# transform to mega-nerf format
+python tools/colmap_to_mega_nerf.py --model_path data/matrix_city/aerial/train/block_all/sparse/0 --images_path data/matrix_city/aerial/train/block_all/images --output_path data/matrix_city/mega-nerf --split train --start_idx 0
+python tools/colmap_to_mega_nerf.py --model_path data/matrix_city/aerial/test/block_all_test/sparse/0 --images_path data/matrix_city/aerial/test/block_all_test/images --output_path data/matrix_city/mega-nerf --split val --start_idx 5620
