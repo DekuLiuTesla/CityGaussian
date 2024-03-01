@@ -479,17 +479,18 @@ def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, sc
         in_frustum_mask = in_frustum(viewpoint_cam, lod_list[-1].cell_corners, lod_list[-1].aabb, lod_list[-1].block_dim)
         in_frustum_indices = in_frustum_mask.nonzero().squeeze(0)
         cam_center = viewpoint_cam.camera_center
-        distance3D = torch.norm(lod_list[-1].cell_corners[in_frustum_mask, :, :2] - cam_center[:2], dim=2).min(dim=1).values
+        distance3D = torch.norm(lod_list[-1].cell_corners[in_frustum_mask, :, :3] - cam_center[:3], dim=2).min(dim=1).values
         in_frustum_indices = in_frustum_indices[torch.sort(distance3D)[1]]
+        distance3D = torch.sort(distance3D)[0]
         
-        # used for BlockedGaussianV3
+        # # used for BlockedGaussianV3
         out_list = []
         main_device = lod_list[-1].feats.device
         max_sh_degree = lod_list[-1].max_sh_degree
         feat_end_dim = 3 * (max_sh_degree + 1) ** 2 + 4
         
         for lod_gs in lod_list:
-            out_i = lod_gs.get_feats(in_frustum_indices)
+            out_i = lod_gs.get_feats(in_frustum_indices, distance3D)
             if out_i.shape[0] == 0:
                 continue
             if out_i.device != main_device:
@@ -497,7 +498,7 @@ def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, sc
             out_list.append(out_i)
 
         feats = torch.cat(out_list, dim=0)
-        # feats = lod_list[1].feats
+        # feats = lod_list[2].feats
 
         means3D = feats[:, :3].float()
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
