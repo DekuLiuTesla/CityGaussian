@@ -18,6 +18,7 @@ import wandb
 import time
 import inspect
 import numpy as np
+import pynvml
 from tqdm import tqdm
 from arguments import GroupParams
 from scene import LargeScene
@@ -30,7 +31,6 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 from torch.utils.data import DataLoader
-from gpu_mem_track import MemTracker
 from utils.camera_utils import loadCamV2
 
 class BlockedGaussian:
@@ -88,11 +88,11 @@ class BlockedGaussian:
                                        [xyz_max[0], xyz_max[1], xyz_max[2]]], device=xyz.device)
                 self.cell_corners.append(corners)
     
-    def get_feats(self, indices):
+    def get_feats(self, indices, distances):
         out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
-        if len(indices) > self.range[0]:
-            indice_end = min(len(indices), self.range[1])
-            self.mask = torch.isin(self.cell_ids, indices[self.range[0]:indice_end].to(self.device))
+        block_mask = (distances >= self.range[0]) & (distances < self.range[1])
+        if block_mask.sum() > 0:
+            self.mask = torch.isin(self.cell_ids, indices[block_mask].to(self.device))
             out = self.feats[self.mask]
         return out
 
@@ -115,42 +115,46 @@ def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, deivce='cu
     return gaussians, scene
 
 def render_set(model_path, name, iteration, views, gaussians, pipeline, background, pitch, height):
-    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
-    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
+    avg_render_time = 0
+    max_render_time = 0
+    avg_memory = 0
+    max_memory = 0
+
+    render_path = os.path.join(model_path, name, "ours_lod_{}".format(iteration), "renders")
+    gts_path = os.path.join(model_path, name, "ours_lod_{}".format(iteration), "gt")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
 
-    # wandb.login()
-    # run = wandb.init(
-    #     # Set the project where this run will be logged
-    #     project="LargeGS",
-    #     # Set name
-    #     name=f"render_{model_path}_{iteration}",
-    #     # Track hyperparameters and run metadata
-    #     config={
-    #         "model_path": model_path,
-    #         "name": name,
-    #     },
-    # )
+    pynvml.nvmlInit()
 
-    # frame = inspect.currentframe() 
-    # gpu_tracker = MemTracker(frame) 
     for idx in tqdm(range(len(views)), desc="Rendering progress"):
         
         viewpoint_cam = loadCamV2(lp, idx, views[idx], 1.0, pitch, height)
 
         # gpu_tracker.track() 
-        # start = time.time()
-        rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
-        # end = time.time()
-        # gpu_tracker.track()
         torch.cuda.empty_cache()
-        # wandb.log({"time": end - start})
-        
+        start = time.time()
+        rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
+        end = time.time()
+        avg_render_time += end-start
+        max_render_time = max(max_render_time, end-start)
+
+        handle = pynvml.nvmlDeviceGetHandleByIndex(6)
+        memory_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        avg_memory += memory_info.used / 1024 / 1024
+        max_memory = max(max_memory, memory_info.used / 1024 / 1024)
         # no data saving
         # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        # torchvision.utils.save_image(gt, os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        # if idx >= 50:
+        #     break
+    
+    print(f"Height: {height}")
+    print(f'Average FPS: {len(views)/avg_render_time:.4f}')
+    print(f'Min FPS: {1/max_render_time:.4f}')
+    print(f'Average Memory: {avg_memory/len(views):.4f} M')
+    print(f'Max Memory: {max_memory:.4f} M')
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool, pitch : float, height : float):
 
@@ -175,9 +179,9 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
 
         with torch.no_grad():
             torch.cuda.empty_cache()
-            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 1], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[1, 9], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[9, 36], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 1.5], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[1.5, 3], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[3, 100], compute_cov3D_python=pp.compute_cov3D_python)
             torch.cuda.empty_cache()
         
         if custom_test:
@@ -223,7 +227,7 @@ if __name__ == "__main__":
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
     parser.add_argument("--pitch", type=float, default=-180.0)
-    parser.add_argument("--height", type=float, default=15.0)
+    parser.add_argument("--height", type=float, default=None)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
