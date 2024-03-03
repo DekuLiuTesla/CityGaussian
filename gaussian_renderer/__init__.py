@@ -490,7 +490,7 @@ def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, sc
         feat_end_dim = 3 * (max_sh_degree + 1) ** 2 + 4
         
         for i, lod_gs in enumerate(lod_list):
-            if i == len(lod_list) - 1 and len(lod_list)  == 0:
+            if i == len(lod_list) - 1 and len(out_list) == 0:
                 out_i = lod_gs.feats
             else:
                 out_i = lod_gs.get_feats(in_frustum_indices, distance3D)
