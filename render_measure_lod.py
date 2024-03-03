@@ -134,8 +134,10 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
         # gpu_tracker.track() 
         torch.cuda.empty_cache()
+        torch.cuda.synchronize()
         start = time.time()
         rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
+        torch.cuda.synchronize()
         end = time.time()
         avg_render_time += end-start
         max_render_time = max(max_render_time, end-start)
@@ -175,13 +177,13 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         config_name_0 = os.path.splitext(os.path.basename(config_0))[0]
         with open(config_0) as f:
             cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lod_gs_0, _ = load_gaussians(cfg, config_name_0, iteration=None, load_vq=True, deivce='cuda:1')
+        lod_gs_0, _ = load_gaussians(cfg, config_name_0, iteration=None, load_vq=True)
 
         with torch.no_grad():
             torch.cuda.empty_cache()
-            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 1.5], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[1.5, 3], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[3, 100], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 2], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[2, 4], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[4, 100], compute_cov3D_python=pp.compute_cov3D_python)
             torch.cuda.empty_cache()
         
         if custom_test:

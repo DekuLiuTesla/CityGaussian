@@ -52,8 +52,10 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
         # gpu_tracker.track() 
         torch.cuda.empty_cache()
+        torch.cuda.synchronize()
         start = time.time()
         rendering = render(viewpoint_cam, gaussians, pipeline, background)["render"]
+        torch.cuda.synchronize()
         end = time.time()
         avg_render_time += end-start
         max_render_time = max(max_render_time, end-start)
