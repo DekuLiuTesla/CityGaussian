@@ -126,14 +126,12 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
 
-    pynvml.nvmlInit()
-
     for idx in tqdm(range(len(views)), desc="Rendering progress"):
         
         viewpoint_cam = loadCamV2(lp, idx, views[idx], 1.0, pitch, height)
 
         # gpu_tracker.track() 
-        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
         rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
@@ -142,10 +140,9 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         avg_render_time += end-start
         max_render_time = max(max_render_time, end-start)
 
-        handle = pynvml.nvmlDeviceGetHandleByIndex(6)
-        memory_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
-        avg_memory += memory_info.used / 1024 / 1024
-        max_memory = max(max_memory, memory_info.used / 1024 / 1024)
+        forward_max_memory_allocated = torch.cuda.max_memory_allocated() / (1024.0 ** 2)
+        avg_memory += forward_max_memory_allocated
+        max_memory = max(max_memory, forward_max_memory_allocated)
         # no data saving
         # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
         # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))

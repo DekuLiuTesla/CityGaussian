@@ -98,18 +98,21 @@ def in_frustum(viewpoint_cam, cell_corners, aabb, block_dim):
     viewmatrix = viewpoint_cam.world_view_transform.repeat(num_cell, 1, 1)
     cell_corners_screen = cell_corners.bmm(full_proj_transform)
     cell_corners_screen = cell_corners_screen / cell_corners_screen[..., [-1]]
-    cell_corners_screen = cell_corners_screen[..., :-1]
+    cell_corners_screen = cell_corners_screen[..., :-1].reshape(-1, 3)
 
     cell_corners_cam = cell_corners.bmm(viewmatrix)
     mask = (cell_corners_cam[..., 2] > 0.2)
 
-    cell_corners_screen_min = torch.zeros((num_cell, 3), dtype=torch.float32, device=device)
-    cell_corners_screen_max = torch.zeros((num_cell, 3), dtype=torch.float32, device=device)
+    mask_ = mask.reshape(-1)
+    cell_corners_screen_ = cell_corners_screen.clone().reshape(-1, 3)
+    cell_corners_screen_[~mask_] = torch.inf
+    cell_corners_screen_min = cell_corners_screen_.reshape(num_cell, -1, 3).min(dim=1).values
+    cell_corners_screen_min[cell_corners_screen_min==torch.inf] = 0.0
 
-    for i in range(num_cell):
-        if mask[i].sum() > 0:
-            cell_corners_screen_min[i] = cell_corners_screen[i][mask[i]].min(dim=0).values
-            cell_corners_screen_max[i] = cell_corners_screen[i][mask[i]].max(dim=0).values
+    cell_corners_screen_ = cell_corners_screen.clone().reshape(-1, 3)
+    cell_corners_screen_[~mask_] = -torch.inf
+    cell_corners_screen_max = cell_corners_screen_.reshape(num_cell, -1, 3).max(dim=1).values
+    cell_corners_screen_max[cell_corners_screen_max==-torch.inf] = 0.0
 
     box_a = torch.cat([cell_corners_screen_min[:, :2], cell_corners_screen_max[:, :2]], dim=1)
     box_b = torch.tensor([[-1, -1, 1, 1]], dtype=torch.float32, device=device)
