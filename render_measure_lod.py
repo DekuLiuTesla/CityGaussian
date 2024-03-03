@@ -120,8 +120,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     avg_memory = 0
     max_memory = 0
 
-    render_path = os.path.join(model_path, name, "ours_lod_{}".format(iteration), "renders")
-    gts_path = os.path.join(model_path, name, "ours_lod_{}".format(iteration), "gt")
+    render_path = os.path.join(model_path, name, "ours_lod_{}".format(height), "renders")
+    gts_path = os.path.join(model_path, name, "ours_lod_{}".format(height), "gt")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
