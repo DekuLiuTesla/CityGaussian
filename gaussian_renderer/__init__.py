@@ -491,15 +491,14 @@ def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, sc
         
         for i, lod_gs in enumerate(lod_list):
             if i == len(lod_list) - 1 and len(out_list) == 0:
-                out_i = lod_gs.feats
+                out_xyz_i, out_feats_i = lod_gs.xyz, lod_gs.feats
             else:
-                out_i = lod_gs.get_feats(in_frustum_indices, distance3D)
+                out_xyz_i, out_feats_i = lod_gs.get_feats(in_frustum_indices, distance3D)
             
-            if out_i.shape[0] == 0:
+            if out_xyz_i.shape[0] == 0:
                 continue
             
-            if out_i.device != main_device:
-                out_i = torch.cat([out_i[:, :3].to(main_device), out_i[:, 3:].half().to(main_device)], dim=1)
+            out_i = torch.cat([out_xyz_i.to(main_device), out_feats_i.to(main_device)], dim=1)
             out_list.append(out_i)
 
         feats = torch.cat(out_list, dim=0)

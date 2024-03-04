@@ -39,6 +39,7 @@ class BlockedGaussian:
 
     def __init__(self, gaussians, lp, range=[0, 1], scale=1.0, compute_cov3D_python=False):
         self.cell_corners = []
+        self.xyz = None
         self.feats = None
         self.max_sh_degree = lp.sh_degree
         self.device = gaussians.get_xyz.device
@@ -62,22 +63,21 @@ class BlockedGaussian:
             else:
                 geometry = torch.cat([gaussians.get_scaling,
                                       gaussians.get_rotation], dim=1)
-            self.feats = torch.cat([gaussians.get_xyz,
-                                    gaussians.get_opacity,  
+            self.xyz = gaussians.get_xyz
+            self.feats = torch.cat([gaussians.get_opacity,  
                                     gaussians.get_features.reshape(geometry.shape[0], -1),
-                                    geometry], dim=1)
-
-            xyz = gaussians.get_xyz
+                                    geometry], dim=1).half()
+            
             for cell_idx in range(self.num_cell):
-                cell_mask = block_filtering(cell_idx, self.feats[:, :3], self.aabb, self.block_dim, self.scale)
+                cell_mask = block_filtering(cell_idx, self.xyz, self.aabb, self.block_dim, self.scale)
                 self.cell_ids[cell_mask] = cell_idx
                 # MAD to eliminate influence of outsiders
-                xyz_median = torch.median(xyz[cell_mask], dim=0)[0]
-                delta_median = torch.median(torch.abs(xyz[cell_mask] - xyz_median), dim=0)[0]
+                xyz_median = torch.median(self.xyz[cell_mask], dim=0)[0]
+                delta_median = torch.median(torch.abs(self.xyz[cell_mask] - xyz_median), dim=0)[0]
                 xyz_min = xyz_median - n * delta_median
-                xyz_min = torch.max(xyz_min, torch.min(xyz[cell_mask], dim=0)[0])
+                xyz_min = torch.max(xyz_min, torch.min(self.xyz[cell_mask], dim=0)[0])
                 xyz_max = xyz_median + n * delta_median
-                xyz_max = torch.min(xyz_max, torch.max(xyz[cell_mask], dim=0)[0])
+                xyz_max = torch.min(xyz_max, torch.max(self.xyz[cell_mask], dim=0)[0])
                 corners = torch.tensor([[xyz_min[0], xyz_min[1], xyz_min[2]],
                                        [xyz_min[0], xyz_min[1], xyz_max[2]],
                                        [xyz_min[0], xyz_max[1], xyz_min[2]],
@@ -85,18 +85,20 @@ class BlockedGaussian:
                                        [xyz_max[0], xyz_min[1], xyz_min[2]],
                                        [xyz_max[0], xyz_min[1], xyz_max[2]],
                                        [xyz_max[0], xyz_max[1], xyz_min[2]],
-                                       [xyz_max[0], xyz_max[1], xyz_max[2]]], device=xyz.device)
+                                       [xyz_max[0], xyz_max[1], xyz_max[2]]], device=self.xyz.device)
                 self.cell_corners.append(corners)
     
     def get_feats(self, indices, distances):
-        out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
+        out_xyz = torch.tensor([], device=self.device, dtype=self.xyz.dtype)
+        out_feats = torch.tensor([], device=self.device, dtype=self.feats.dtype)
         block_mask = (distances >= self.range[0]) & (distances < self.range[1])
         if block_mask.sum() > 0:
             self.mask = torch.isin(self.cell_ids, indices[block_mask].to(self.device))
-            out = self.feats[self.mask]
-        return out
+            out_xyz = self.xyz[self.mask]
+            out_feats = self.feats[self.mask]
+        return out_xyz, out_feats
 
-def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, deivce='cuda', source_path='data/matrix_city/aerial/test/block_all_test'):
+def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cuda', source_path='data/matrix_city/aerial/test/block_all_test'):
     
     lp, op, pp = parse_cfg(cfg)
     setattr(lp, 'config_path', cfg)
@@ -108,7 +110,7 @@ def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, deivce='cu
     with torch.no_grad():
         if 'apply_voxelize' in lp.model_config['kwargs'].keys():
             lp.model_config['kwargs']['apply_voxelize'] = False
-        gaussians = getattr(modules, lp.model_config['name'])(lp.sh_degree, device=deivce, **lp.model_config['kwargs'])
+        gaussians = getattr(modules, lp.model_config['name'])(lp.sh_degree, device=device, **lp.model_config['kwargs'])
         scene = LargeScene(lp, gaussians, load_iteration=iteration, load_vq=load_vq, shuffle=False)
         print(f'Init {config_name} with {len(gaussians.get_opacity)} points\n')
 
