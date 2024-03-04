@@ -276,8 +276,8 @@ def read_cameras_text(path):
                 elems = line.split()
                 camera_id = int(elems[0])
                 model = elems[1]
-                width = int(elems[2])
-                height = int(elems[3])
+                width = int(float(elems[2]))
+                height = int(float(elems[3]))
                 params = np.array(tuple(map(float, elems[4:])))
                 cameras[camera_id] = Camera(id=camera_id, model=model,
                                             width=width, height=height,
@@ -323,21 +323,23 @@ def read_model(path, ext=""):
 def _get_opts() -> Namespace:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_path', type=str, required=True, help='Path to PixSFM/COLMAP model')
-    parser.add_argument('--images_path', type=str, required=True, help='Path to images')
+    parser.add_argument('--train_model_path', type=str, required=True, help='Path to PixSFM/COLMAP model')
+    parser.add_argument('--train_images_path', type=str, required=True, help='Path to images')
+    parser.add_argument('--val_model_path', type=str, required=True, help='Path to PixSFM/COLMAP model')
+    parser.add_argument('--val_images_path', type=str, required=True, help='Path to images')
     parser.add_argument('--output_path', type=str, required=True, help='Path to write converted dataset to')
-    parser.add_argument('--start_idx', type=int, required=True,
-                        help='For train, it is 0; else it is length of train set.')
-    parser.add_argument('--split', type=str, default="train", help='train or val')
 
     return parser.parse_args()
 
 
 def main(hparams: Namespace) -> None:
-    cameras, images, _ = read_model(hparams.model_path)
+    train_cameras, train_images, _ = read_model(hparams.train_model_path, ".txt")
+    val_cameras, val_images, _ = read_model(hparams.val_model_path, ".txt")
+    cameras = train_cameras  # assume same cameras for train and val
+    num_train_images = len(train_images)
 
-    c2ws = {}
-    for image in images.values():
+    train_c2ws = {}
+    for image in train_images.values():
         w2c = torch.eye(4)
         w2c[:3, :3] = torch.FloatTensor(qvec2rotmat(image.qvec))
         w2c[:3, 3] = torch.FloatTensor(image.tvec)
@@ -348,14 +350,29 @@ def main(hparams: Namespace) -> None:
             RDF_TO_DRB @ c2w[:3, 3:]
         ))
 
-        c2ws[image.id] = c2w
+        train_c2ws[image.id] = c2w
+    
+    val_c2ws = {}
+    for image in val_images.values():
+        w2c = torch.eye(4)
+        w2c[:3, :3] = torch.FloatTensor(qvec2rotmat(image.qvec))
+        w2c[:3, 3] = torch.FloatTensor(image.tvec)
+        c2w = torch.inverse(w2c)
 
-    positions = torch.cat([c2w[:3, 3].unsqueeze(0) for c2w in c2ws.values()])
+        c2w = torch.hstack((
+            RDF_TO_DRB @ c2w[:3, :3] @ torch.inverse(RDF_TO_DRB),
+            RDF_TO_DRB @ c2w[:3, 3:]
+        ))
+
+        val_c2ws[image.id] = c2w
+
+    positions = torch.cat([c2w[:3, 3].unsqueeze(0) for c2w in train_c2ws.values()] + 
+                          [c2w[:3, 3].unsqueeze(0) for c2w in val_c2ws.values()])
     print('{} images'.format(positions.shape[0]))
     max_values = positions.max(0)[0]
     min_values = positions.min(0)[0]
-    origin = ((max_values + min_values) * 0.0)
-    scale = 1.0
+    origin = ((max_values + min_values) * 0.5)
+    scale = ((max_values - min_values) * 0.5).norm(dim=-1).item()
     dist = (positions - origin).norm(dim=-1)
     diagonal = dist.max()
 
@@ -373,19 +390,12 @@ def main(hparams: Namespace) -> None:
     (output_path / 'train' / 'rgbs').mkdir(parents=True, exist_ok=True)
     (output_path / 'val' / 'rgbs').mkdir(parents=True, exist_ok=True)
 
-    images_path = Path(hparams.images_path)
+    with (output_path / 'mappings.txt').open('w') as f:
+        for i, image in enumerate(tqdm(sorted(train_images.values(), key=lambda x: x.name))):
 
-    if hparams.start_idx == 0:
-        txt_mode = 'w'
-    else:
-        txt_mode = 'a'
+            split_dir = output_path / 'train'
 
-    with (output_path / 'mappings.txt').open(txt_mode) as f:
-        for i, image in enumerate(tqdm(sorted(images.values(), key=lambda x: x.name))):
-
-            split_dir = output_path / hparams.split
-
-            distorted = cv2.imread(str(images_path / image.name))
+            distorted = cv2.imread(str(Path(hparams.train_images_path) / image.name))
 
             camera = cameras[image.camera_id]
 
@@ -398,14 +408,14 @@ def main(hparams: Namespace) -> None:
 
             distortion = np.array([0, 0, 0, 0])
             undistorted = cv2.undistort(distorted, camera_matrix, distortion)
-            cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(hparams.start_idx + i)), undistorted)
+            cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(i)), undistorted)
 
-            camera_in_drb = c2ws[image.id]
+            camera_in_drb = train_c2ws[image.id]
             camera_in_drb[:, 3] = (camera_in_drb[:, 3] - origin) / scale
 
-            # assert np.logical_and(camera_in_drb >= -1, camera_in_drb <= 1).all()
+            assert np.logical_and(camera_in_drb >= -1, camera_in_drb <= 1).all()
 
-            metadata_name = '{0:06d}.pt'.format(hparams.start_idx + i)
+            metadata_name = '{0:06d}.pt'.format(i)
             torch.save({
                 'H': distorted.shape[0],
                 'W': distorted.shape[1],
@@ -417,7 +427,46 @@ def main(hparams: Namespace) -> None:
                 'distortion': torch.FloatTensor(distortion)
             }, split_dir / 'metadata' / metadata_name)
 
-            f.write('{},{}\n'.format('{0:06d}.jpg'.format(hparams.start_idx + i), metadata_name))
+            f.write('{},{}\n'.format('{0:06d}.jpg'.format(i), metadata_name))
+        
+        for i, image in enumerate(tqdm(sorted(val_images.values(), key=lambda x: x.name))):
+
+            split_dir = output_path / 'val'
+
+            distorted = cv2.imread(str(Path(hparams.val_images_path) / image.name))
+
+            camera = cameras[image.camera_id]
+
+            # TODO: make camera model more flexible - should mainly involve changing the camera matrix accordingly
+            assert camera.model == 'PINHOLE', camera.model
+
+            camera_matrix = np.array([[camera.params[0], 0, camera.params[2]],
+                                      [0, camera.params[1], camera.params[3]],
+                                      [0, 0, 1]])
+
+            distortion = np.array([0, 0, 0, 0])
+            undistorted = cv2.undistort(distorted, camera_matrix, distortion)
+            cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(i + num_train_images)), undistorted)
+
+            camera_in_drb = train_c2ws[image.id]
+            camera_in_drb[:, 3] = (camera_in_drb[:, 3] - origin) / scale
+
+            assert np.logical_and(camera_in_drb >= -1, camera_in_drb <= 1).all()
+
+            metadata_name = '{0:06d}.pt'.format(i + num_train_images)
+            torch.save({
+                'H': distorted.shape[0],
+                'W': distorted.shape[1],
+                'c2w': torch.cat(
+                    [camera_in_drb[:, 1:2], -camera_in_drb[:, :1], camera_in_drb[:, 2:4]],
+                    -1),
+                'intrinsics': torch.FloatTensor(
+                    [camera_matrix[0][0], camera_matrix[1][1], camera_matrix[0][2], camera_matrix[1][2]]),
+                'distortion': torch.FloatTensor(distortion)
+            }, split_dir / 'metadata' / metadata_name)
+
+            f.write('{},{}\n'.format('{0:06d}.jpg'.format(i + num_train_images), metadata_name))
+
 
     torch.save(coordinates, output_path / 'coordinates.pt')
 
