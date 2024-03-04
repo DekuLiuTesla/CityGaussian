@@ -17,8 +17,9 @@ import torchvision.transforms.functional as tf
 from utils.loss_utils import ssim
 from lpipsPyTorch import lpips
 import json
+import numpy as np
 from tqdm import tqdm
-from utils.image_utils import psnr
+from utils.image_utils import psnr, color_correct
 from argparse import ArgumentParser
 
 def readImages(renders_dir, gt_dir):
@@ -33,7 +34,7 @@ def readImages(renders_dir, gt_dir):
         image_names.append(fname)
     return renders, gts, image_names
 
-def evaluate(model_paths, test_sets):
+def evaluate(model_paths, test_sets, correct_color=False):
 
     full_dict = {}
     per_view_dict = {}
@@ -69,7 +70,14 @@ def evaluate(model_paths, test_sets):
                 lpipss = []
 
                 for idx in tqdm(range(len(renders)), desc="Metric evaluation progress"):
-                    render = renders[idx].cuda()
+                    if correct_color:
+                        render_np = np.array(renders[idx], dtype=np.float64).transpose(0, 2, 3, 1)
+                        gt_np = np.array(gts[idx], dtype=np.float64).transpose(0, 2, 3, 1)
+                        render = torch.from_numpy(np.array(color_correct(render_np, gt_np)).transpose(0, 3, 1, 2)).contiguous()
+                    else:
+                        render = renders[idx]
+
+                    render = render.cuda()
                     gt = gts[idx].cuda()
                     ssims.append(ssim(render, gt))
                     psnrs.append(psnr(render, gt))
@@ -102,5 +110,6 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--model_paths', '-m', required=True, nargs="+", type=str, default=[])
     parser.add_argument('--test_sets', '-t', required=False, nargs="+", type=str, default=["test"])
+    parser.add_argument('--correct_color', '-c', action='store_true', default=False)
     args = parser.parse_args()
-    evaluate(args.model_paths, args.test_sets)
+    evaluate(args.model_paths, args.test_sets, args.correct_color)
