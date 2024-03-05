@@ -494,6 +494,7 @@ def render_lod(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor, sc
                 out_xyz_i, out_feats_i = lod_gs.xyz, lod_gs.feats
             else:
                 out_xyz_i, out_feats_i = lod_gs.get_feats(in_frustum_indices, distance3D)
+                # out_xyz_i, out_feats_i = lod_gs.get_feats_ptwise(viewpoint_cam)
             
             if out_xyz_i.shape[0] == 0:
                 continue

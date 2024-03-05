@@ -98,6 +98,25 @@ class BlockedGaussian:
             out_feats = self.feats[self.mask]
         return out_xyz, out_feats
 
+    def get_feats_ptwise(self, viewpoint_cam):
+        out_xyz = torch.tensor([], device=self.device, dtype=self.xyz.dtype)
+        out_feats = torch.tensor([], device=self.device, dtype=self.feats.dtype)
+
+        homo_xyz = torch.cat([self.xyz, torch.ones_like(self.xyz[..., [0]])], dim=-1)
+        cam_center = viewpoint_cam.camera_center
+        viewmatrix = viewpoint_cam.world_view_transform
+        xyz_cam = homo_xyz @ viewmatrix
+        self.mask = (xyz_cam[..., 2] > 0.2)
+        if self.mask.sum() == 0:
+            return out_xyz, out_feats
+
+        distances = torch.norm(self.xyz - cam_center[None, :3], dim=-1)
+        self.mask &= (distances >= self.range[0]) & (distances < self.range[1])
+        if self.mask.sum() > 0:
+            out_xyz = self.xyz[self.mask]
+            out_feats = self.feats[self.mask]
+        return out_xyz, out_feats
+
 def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cuda', source_path='data/matrix_city/aerial/test/block_all_test'):
     
     lp, op, pp = parse_cfg(cfg)
@@ -180,9 +199,9 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
 
         with torch.no_grad():
             torch.cuda.empty_cache()
-            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 2], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[2, 4], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[4, 100], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 2.5], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[2.5, 5], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[5, 100], compute_cov3D_python=pp.compute_cov3D_python)
             torch.cuda.empty_cache()
         
         if custom_test:
