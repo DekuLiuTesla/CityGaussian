@@ -6,15 +6,21 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/urban_scene_3d/sci-art-pixsfm/train",
+    partition_name: "block_sciart_all_lr_c9_loss_5_r4",
+    pretrain_path: "output/org_sciart_all/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
+    block_dim: [3, 1, 3],
+    aabb: [-110, -500, -205, 55, 100, 90],
+    filter_mode: "loss",
+    opacity_threshold: 0.05,
     resolution: 4,
     white_background: False,
     data_device: "cuda",
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "org_sciart_all_r4",
+        name: "block_sciart_all_lr_c9_loss_5_r4",
         project: "LargeGS"
     }
 }
@@ -23,6 +29,7 @@ model_params: {
 pipeline_params: {
     convert_SHs_python:  False,
     compute_cov3D_python:  False,
+    pre_load: False,
     debug:  False
 }
 
@@ -30,13 +37,13 @@ pipeline_params: {
 # Optimization Parameters
 optim_params: {
     iterations: 30_000,
-    position_lr_init: 0.00016,
-    position_lr_final: 0.0000016,
+    position_lr_init: 0.000064,
+    position_lr_final: 0.00000064,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
-    scaling_lr: 0.005,
+    scaling_lr: 0.004,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,
