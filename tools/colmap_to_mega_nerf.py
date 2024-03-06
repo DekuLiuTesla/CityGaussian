@@ -448,7 +448,7 @@ def main(hparams: Namespace) -> None:
             undistorted = cv2.undistort(distorted, camera_matrix, distortion)
             cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(i + num_train_images)), undistorted)
 
-            camera_in_drb = train_c2ws[image.id]
+            camera_in_drb = val_c2ws[image.id]
             camera_in_drb[:, 3] = (camera_in_drb[:, 3] - origin) / scale
 
             assert np.logical_and(camera_in_drb >= -1, camera_in_drb <= 1).all()
