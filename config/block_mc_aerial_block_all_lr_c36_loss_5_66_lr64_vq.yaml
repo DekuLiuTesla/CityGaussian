@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/matrix_city/aerial/train/block_all",
-    model_path: "block_mc_aerial_block_all_lr_c36_loss_5_66_lr64_vq",
+    model_path: "",
     images: "images",
     block_dim: [6, 6, 1],
     aabb: [-3.5, -4, 4.5, 2],
