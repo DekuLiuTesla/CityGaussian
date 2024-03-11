@@ -37,6 +37,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     max_render_time = 0
     avg_memory = 0
     max_memory = 0
+    avg_num_gaussians=0
+    max_num_gaussians=0
 
     render_path = os.path.join(model_path, name, "ours_{}".format(height), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(height), "gt")
@@ -52,7 +54,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
-        rendering = render(viewpoint_cam, gaussians, pipeline, background)["render"]
+        render_pkg = render(viewpoint_cam, gaussians, pipeline, background)
         torch.cuda.synchronize()
         end = time.time()
         avg_render_time += end-start
@@ -61,6 +63,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         forward_max_memory_allocated = torch.cuda.max_memory_allocated() / (1024.0 ** 2)
         avg_memory += forward_max_memory_allocated
         max_memory = max(max_memory, forward_max_memory_allocated)
+        avg_num_gaussians += render_pkg['visibility_filter'].sum().item()
+        max_num_gaussians = max(max_num_gaussians, render_pkg['visibility_filter'].sum().item())
         # no data saving
         # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
         # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
@@ -72,6 +76,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     print(f'Min FPS: {1/max_render_time:.4f}')
     print(f'Average Memory: {avg_memory/len(views):.4f} M')
     print(f'Max Memory: {max_memory:.4f} M')
+    print(f'Average Gaussians: {avg_num_gaussians/len(views):.4f}')
+    print(f'Max Gaussians: {max_num_gaussians:.4f}')
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool, pitch : float, height : float):
 
