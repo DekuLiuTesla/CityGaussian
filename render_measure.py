@@ -42,6 +42,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
     render_path = os.path.join(model_path, name, "ours_{}".format(height), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(height), "gt")
+    print(f"Number of overall Gaussians: {gaussians.get_xyz.shape[0]}")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
