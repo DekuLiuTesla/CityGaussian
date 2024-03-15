@@ -26,3 +26,5 @@ config/org_mc_aerial_block3_prune_distill.yaml
 config/org_mc_aerial_block3_prune.yaml
 config/dump
 wandb
+bypy_upload.sh
+config/vox_mc_aerial_block_all_avg_half_lr2_30k_scale1.yaml
