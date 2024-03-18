@@ -33,6 +33,8 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False):
             assert False, "Unknown aabb format!"
         aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
+        num_threshold = args.num_threshold if hasattr(args, 'num_threshold') else 25000
+        print(f"Block number: {block_num}, Gaussian number threshold: {num_threshold}")
 
         camera_mask = torch.zeros((len(cameras), block_num), dtype=torch.bool, device=xyz_org.device)
         
@@ -65,7 +67,7 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False):
 
                     
                     num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
-                    while num_gs < 25000:
+                    while num_gs < num_threshold:
                         # TODO: select better threshold
                         block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
                                     & (xyz[:, 1] >= min_y) & (xyz[:, 1] < max_y) \
