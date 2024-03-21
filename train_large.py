@@ -181,7 +181,7 @@ def prepare_output_and_logger(args):
         args.model_path = os.path.join("./output/", config_name)
         if args.block_id >= 0:
             if args.block_id < args.block_dim[0] * args.block_dim[1] * args.block_dim[2]:
-                args.model_path = f"{args.model_path}_cell{args.block_id}"
+                args.model_path = f"{args.model_path}/cells/cell{args.block_id}"
                 if hasattr(args, "logger_config"):
                     args.logger_config['name'] = f"{args.logger_config['name']}_cell{args.block_id}"
             else:
