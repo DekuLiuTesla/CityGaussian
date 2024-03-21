@@ -147,7 +147,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     duration_list = []
     frames = []
 
-    for height in tqdm(range(500, 2525, 25)):
+    for height in tqdm(range(500, 2525, 10)):
         
         viewpoint_cam = loadCamV2(lp, idx, views[idx], 1.0, pitch, float(height)/100)
 
@@ -163,11 +163,14 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         avg_render_time += end-start
         max_render_time = max(max_render_time, end-start)
     
-    imageio.mimsave(os.path.join(video_path, f"video.gif"), frames, duration=duration_list)
-    print(f'Saved to {video_path}')
+    video = imageio.get_writer(os.path.join(video_path, "video.mp4"), mode="I", fps=int(len(duration_list)/avg_render_time), codec="libx264", bitrate="16M", quality=10)
+    for frame in frames:
+        video.append_data(frame)
+    video.close()
+    print(f'Video saved to {video_path}')
     
     print(f"Height: {height}")
-    print(f'Average FPS: {len(views)/avg_render_time:.4f}')
+    print(f'Average FPS: {len(duration_list)/avg_render_time:.4f}')
     print(f'Min FPS: {1/max_render_time:.4f}')
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool, pitch : float, height : float):
