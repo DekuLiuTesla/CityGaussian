@@ -17,6 +17,7 @@ from internal.models.gaussian_model import GaussianModel
 # from internal.models.appearance_model import AppearanceModel
 from internal.renderers import Renderer, VanillaRenderer
 from internal.utils.ssim import ssim
+from internal.utils.lpips import lpips
 from jsonargparse import lazy_instance
 
 
@@ -333,6 +334,8 @@ class GaussianSplatting(LightningModule):
         self.log(f"{name}/ssim", ssim_metric, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
         self.log(f"{name}/loss", loss, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         self.log(f"{name}/psnr", self.psnr(outputs["render"], gt_image), on_epoch=True, prog_bar=True,
+                 batch_size=self.batch_size)
+        self.log(f"{name}/lpips", lpips(outputs["render"], gt_image, net_type='vgg'), on_epoch=True, prog_bar=True,
                  batch_size=self.batch_size)
 
         # write validation image
