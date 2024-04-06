@@ -1,4 +1,6 @@
 .idea
+.vscode/
+data
 outputs
 camera_paths
 renders
