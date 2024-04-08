@@ -22,7 +22,7 @@ mkdir data/matrix_city/aerial_street_fusion/fuse/train
 mkdir data/matrix_city/aerial_street_fusion/fuse/test
 
 python tools/transform_json2txt_mc_fuse.py --transforms_path data/matrix_city/aerial_street_fusion/pose/transforms_train.json --target_path data/matrix_city/aerial_street_fusion
-python tools/convert_cam.py -s data/matrix_city/aerial_street_fusion/fuse/train
+python tools/convert_multi_cam.py -s data/matrix_city/aerial_street_fusion/fuse/train
 
 python tools/transform_json2txt_mc_fuse.py --transforms_path data/matrix_city/aerial_street_fusion/pose/transforms_test.json --target_path data/matrix_city/aerial_street_fusion
-python tools/convert_cam.py -s data/matrix_city/aerial_street_fusion/fuse/test
+python tools/convert_multi_cam.py -s data/matrix_city/aerial_street_fusion/fuse/test
