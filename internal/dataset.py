@@ -18,6 +18,7 @@ from internal.cameras.cameras import CameraType, Camera
 from internal.dataparsers import ImageSet
 from internal.configs.dataset import DatasetParams
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
+from internal.dataparsers.colmap_joint_dataparser import ColmapJointDataParser
 from internal.dataparsers.blender_dataparser import BlenderDataParser
 from internal.dataparsers.nsvf_dataparser import NSVFDataParser
 from internal.dataparsers.nerfies_dataparser import NerfiesDataparser
@@ -244,7 +245,7 @@ class DataModule(LightningDataModule):
             self,
             path: str,
             params: DatasetParams,
-            type: Literal["colmap", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
+            type: Literal["colmap", "colmap_joint", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
             distributed: bool = False,
             undistort_image: bool = False,
     ) -> None:
@@ -289,6 +290,8 @@ class DataModule(LightningDataModule):
 
         if self.hparams["type"] == "colmap":
             dataparser = ColmapDataParser(params=self.hparams["params"].colmap, **dataparser_params)
+        elif self.hparams["type"] == "colmap_joint":
+            dataparser = ColmapJointDataParser(params=self.hparams["params"].colmap_joint, **dataparser_params)
         elif self.hparams["type"] == "blender":
             dataparser = BlenderDataParser(params=self.hparams["params"].blender, **dataparser_params)
         elif self.hparams["type"] == "nsvf":
@@ -359,8 +362,10 @@ class DataModule(LightningDataModule):
                 torch.transpose(self.dataparser_outputs.train_set.cameras.world_to_camera, 1, 2)
             ).numpy()
             cameras = []
+            camera_ids = []
             for idx, image in enumerate(self.dataparser_outputs.train_set):
                 image_name, _, _, camera = image
+                camera_ids.append(camera.camera_type)
                 cameras.append({
                     'id': idx,
                     'img_name': image_name,
@@ -373,6 +378,18 @@ class DataModule(LightningDataModule):
                 })
             with open(os.path.join(output_path, "cameras.json"), "w") as f:
                 json.dump(cameras, f, indent=4, ensure_ascii=False)
+            
+            # generate WeightedRandomSampler for dataloader
+            if self.hparams["params"].use_data_sampler is True:
+                camera_ids_tensor = torch.tensor(camera_ids)
+                class_sample_count = torch.tensor(
+                    [(camera_ids_tensor == t).sum() for t in torch.unique(camera_ids_tensor, sorted=True)]
+                )
+                weight = 1. / class_sample_count.float()
+                samples_weight = torch.tensor([weight[t] for t in camera_ids_tensor])
+                self.trainer.sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
+            else:
+                self.trainer.sampler = None
 
             # save input point cloud to ply file
             store_ply(
@@ -396,6 +413,7 @@ class DataModule(LightningDataModule):
             shuffle=True,
             seed=torch.initial_seed() + self.global_rank,  # seed with global rank
             num_workers=self.hparams["params"].num_workers,
+            sampler=self.trainer.sampler,
             distributed=self.hparams["distributed"],
             world_size=self.trainer.world_size,
             global_rank=self.trainer.global_rank,

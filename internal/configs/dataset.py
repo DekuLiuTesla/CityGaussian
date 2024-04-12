@@ -108,6 +108,8 @@ class DatasetParams:
 
     colmap: ColmapParams
 
+    colmap_joint: ColmapParams
+
     blender: BlenderParams
 
     nsvf: NSVFParams
@@ -129,6 +131,8 @@ class DatasetParams:
     num_workers: int = 8
 
     add_background_sphere: bool = False
+
+    use_data_sampler: bool = False
 
     background_sphere_distance: float = 2.2
 
