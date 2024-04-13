@@ -388,8 +388,10 @@ class DataModule(LightningDataModule):
                 weight = 1. / class_sample_count.float()
                 samples_weight = torch.tensor([weight[t] for t in camera_ids_tensor])
                 self.trainer.sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
+                self.trainer.shuffle = None
             else:
                 self.trainer.sampler = None
+                self.trainer.shuffle = True
 
             # save input point cloud to ply file
             store_ply(
@@ -410,10 +412,10 @@ class DataModule(LightningDataModule):
         return CacheDataLoader(
             Dataset(self.dataparser_outputs.train_set, undistort_image=self.hparams["undistort_image"]),
             max_cache_num=self.hparams["params"].train_max_num_images_to_cache,
-            shuffle=True,
+            shuffle=self.trainer.shuffle,
+            sampler=self.trainer.sampler,
             seed=torch.initial_seed() + self.global_rank,  # seed with global rank
             num_workers=self.hparams["params"].num_workers,
-            sampler=self.trainer.sampler,
             distributed=self.hparams["distributed"],
             world_size=self.trainer.world_size,
             global_rank=self.trainer.global_rank,
