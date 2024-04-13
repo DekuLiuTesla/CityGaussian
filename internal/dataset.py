@@ -201,6 +201,8 @@ class CacheDataLoader(torch.utils.data.DataLoader):
             if self.shuffle is True:
                 indices = torch.randperm(len(self.cached), generator=self.generator).tolist()  # shuffle for each epoch
                 # print("#{} 1st index: {}".format(os.getpid(), indices[0]))
+            elif self.shuffle is None and self.sampler is not None:
+                indices = list(self.sampler)
             else:
                 indices = list(range(len(self.cached)))
 
@@ -210,6 +212,8 @@ class CacheDataLoader(torch.utils.data.DataLoader):
             if self.shuffle is True:
                 indices = torch.randperm(len(self.indices), generator=self.generator).tolist()  # shuffle for each epoch
                 # print("#{} 1st index: {}".format(os.getpid(), indices[0]))
+            elif self.shuffle is None and self.sampler is not None:
+                indices = list(self.sampler)
             else:
                 indices = self.indices.copy()
 
