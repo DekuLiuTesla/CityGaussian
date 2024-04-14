@@ -30,6 +30,7 @@ class GaussianSplatting(LightningModule):
             # enable_appearance_model: bool = False,
             background_color: Tuple[float, float, float] = (0., 0., 0.),
             output_path: str = None,
+            init_from: str = None,
             save_val_output: bool = False,
             max_save_val_output: int = -1,
             renderer: Renderer = lazy_instance(VanillaRenderer),
@@ -73,10 +74,16 @@ class GaussianSplatting(LightningModule):
 
     def setup(self, stage: str):
         if stage == "fit":
-            self.gaussian_model.create_from_pcd(
-                self.trainer.datamodule.point_cloud,
-                deivce=self.device,
-            )
+            if self.hparams["init_from"] is None:
+                self.gaussian_model.create_from_pcd(
+                    self.trainer.datamodule.point_cloud,
+                    deivce=self.device,
+                )
+            else:
+                self.gaussian_model.load_ply(self.hparams["init_from"], device=self.device)
+                self.gaussian_model.max_radii2D = torch.zeros((self.gaussian_model.get_xyz.shape[0]), device=self.gaussian_model._xyz.device)
+                self.gaussian_model.xyz_gradient_accum = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
+                self.gaussian_model.denom = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
 
         self.renderer.setup(stage, lightning_module=self)
 
