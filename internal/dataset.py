@@ -350,39 +350,12 @@ class DataModule(LightningDataModule):
             normals=np.zeros_like(self.dataparser_outputs.point_cloud.xyz),
         )
 
-        # write some files that SIBR_viewer required
-        if self.global_rank == 0 and stage == "fit":
-            # write appearance group id
-            if self.dataparser_outputs.appearance_group_ids is not None:
-                torch.save(
-                    self.dataparser_outputs.appearance_group_ids,
-                    os.path.join(output_path, "appearance_group_ids.pth"),
-                )
-                with open(os.path.join(output_path, "appearance_group_ids.json"), "w") as f:
-                    json.dump(self.dataparser_outputs.appearance_group_ids, f, indent=4, ensure_ascii=False)
-
-            # write cameras.json
-            camera_to_world = torch.linalg.inv(
-                torch.transpose(self.dataparser_outputs.train_set.cameras.world_to_camera, 1, 2)
-            ).numpy()
-            cameras = []
+        if stage == "fit":
             camera_ids = []
             for idx, image in enumerate(self.dataparser_outputs.train_set):
                 image_name, _, _, camera = image
                 camera_ids.append(camera.camera_type)
-                cameras.append({
-                    'id': idx,
-                    'img_name': image_name,
-                    'width': int(camera.width),
-                    'height': int(camera.height),
-                    'position': camera_to_world[idx, :3, 3].tolist(),
-                    'rotation': [x.tolist() for x in camera_to_world[idx, :3, :3]],
-                    'fy': float(camera.fy),
-                    'fx': float(camera.fx),
-                })
-            with open(os.path.join(output_path, "cameras.json"), "w") as f:
-                json.dump(cameras, f, indent=4, ensure_ascii=False)
-            
+
             # generate WeightedRandomSampler for dataloader
             if self.hparams["params"].use_data_sampler is True:
                 camera_ids_tensor = torch.tensor(camera_ids)
@@ -397,20 +370,51 @@ class DataModule(LightningDataModule):
                 self.trainer.sampler = None
                 self.trainer.shuffle = True
 
-            # save input point cloud to ply file
-            store_ply(
-                os.path.join(output_path, "input.ply"),
-                xyz=self.dataparser_outputs.point_cloud.xyz,
-                rgb=self.dataparser_outputs.point_cloud.rgb,
-            )
+            # write some files that SIBR_viewer required
+            if self.global_rank == 0:
+                # write appearance group id
+                if self.dataparser_outputs.appearance_group_ids is not None:
+                    torch.save(
+                        self.dataparser_outputs.appearance_group_ids,
+                        os.path.join(output_path, "appearance_group_ids.pth"),
+                    )
+                    with open(os.path.join(output_path, "appearance_group_ids.json"), "w") as f:
+                        json.dump(self.dataparser_outputs.appearance_group_ids, f, indent=4, ensure_ascii=False)
 
-            # write cfg_args
-            with open(os.path.join(output_path, "cfg_args"), "w") as f:
-                f.write("Namespace(sh_degree={}, white_background={}, source_path='{}')".format(
-                    self.trainer.lightning_module.hparams["gaussian"].sh_degree,
-                    True if torch.all(self.trainer.lightning_module.background_color == 1.) else False,
-                    self.hparams["path"],
-                ))
+                # write cameras.json
+                camera_to_world = torch.linalg.inv(
+                    torch.transpose(self.dataparser_outputs.train_set.cameras.world_to_camera, 1, 2)
+                ).numpy()
+                cameras = []
+                for idx, image in enumerate(self.dataparser_outputs.train_set):
+                    image_name, _, _, camera = image
+                    cameras.append({
+                        'id': idx,
+                        'img_name': image_name,
+                        'width': int(camera.width),
+                        'height': int(camera.height),
+                        'position': camera_to_world[idx, :3, 3].tolist(),
+                        'rotation': [x.tolist() for x in camera_to_world[idx, :3, :3]],
+                        'fy': float(camera.fy),
+                        'fx': float(camera.fx),
+                    })
+                with open(os.path.join(output_path, "cameras.json"), "w") as f:
+                    json.dump(cameras, f, indent=4, ensure_ascii=False)
+
+                # save input point cloud to ply file
+                store_ply(
+                    os.path.join(output_path, "input.ply"),
+                    xyz=self.dataparser_outputs.point_cloud.xyz,
+                    rgb=self.dataparser_outputs.point_cloud.rgb,
+                )
+
+                # write cfg_args
+                with open(os.path.join(output_path, "cfg_args"), "w") as f:
+                    f.write("Namespace(sh_degree={}, white_background={}, source_path='{}')".format(
+                        self.trainer.lightning_module.hparams["gaussian"].sh_degree,
+                        True if torch.all(self.trainer.lightning_module.background_color == 1.) else False,
+                        self.hparams["path"],
+                    ))
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         return CacheDataLoader(
