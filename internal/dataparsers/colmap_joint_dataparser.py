@@ -210,6 +210,12 @@ class ColmapJointDataParser(ColmapDataParser):
         normalized_appearance_id = torch.tensor(normalized_appearance_id_list, dtype=torch.float32)
         camera_type = torch.tensor(camera_type_list, dtype=torch.int8)
 
+        class_sample_count = torch.tensor(
+            [(camera_type == t).sum() for t in torch.unique(camera_type, sorted=True)])
+        weight = 1. / class_sample_count.float()
+        samples_weight = torch.tensor([weight[t] for t in camera_type])
+        sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
+
         # recalculate intrinsics if down sample enabled
         if self.params.down_sample_factor != 1:
             down_sampled_width = torch.round(width.to(torch.float) / self.params.down_sample_factor)
@@ -319,4 +325,5 @@ class ColmapJointDataParser(ColmapDataParser):
             ),
             # camera_extent=norm["radius"],
             appearance_group_ids=appearance_group_name_to_appearance_id,
+            sampler=sampler,
         )

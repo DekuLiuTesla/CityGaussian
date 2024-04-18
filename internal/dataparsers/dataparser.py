@@ -61,6 +61,8 @@ class DataParserOutputs:
 
     camera_extent: Optional[float] = None
 
+    sampler: Optional[torch.utils.data.Sampler] = None
+
     def __post_init__(self):
         if self.camera_extent is None:
             camera_centers = self.train_set.cameras.camera_center

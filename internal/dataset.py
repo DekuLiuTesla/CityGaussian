@@ -358,13 +358,7 @@ class DataModule(LightningDataModule):
 
             # generate WeightedRandomSampler for dataloader
             if self.hparams["params"].use_data_sampler is True:
-                camera_ids_tensor = torch.tensor(camera_ids)
-                class_sample_count = torch.tensor(
-                    [(camera_ids_tensor == t).sum() for t in torch.unique(camera_ids_tensor, sorted=True)]
-                )
-                weight = 1. / class_sample_count.float()
-                samples_weight = torch.tensor([weight[t] for t in camera_ids_tensor])
-                self.trainer.sampler = torch.utils.data.WeightedRandomSampler(samples_weight, len(samples_weight))
+                self.trainer.sampler = self.dataparser_outputs.sampler
                 self.trainer.shuffle = None
             else:
                 self.trainer.sampler = None
