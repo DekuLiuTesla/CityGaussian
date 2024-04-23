@@ -7,3 +7,6 @@ renders
 edited
 **/__pycache__
 submodules/simple-knn
+submodules/tiny-cuda-nn-fp32
+internal/dataparsers/colmap_cluster_dataparser.py
+internal/utils/data_sampler.py
