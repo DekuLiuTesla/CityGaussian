@@ -53,6 +53,7 @@ class AppearanceMLPRenderer(VanillaRenderer):
         else:
             outputs = super().forward(viewpoint_camera, pc, bg_color, scaling_modifier, override_color)
             rendered_image = outputs["render"]
+            outputs["render_org"] = rendered_image.clone()
 
             # apply appearance transform
             rendered_image = torch.pow(rendered_image, gamma)
