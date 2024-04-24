@@ -7,19 +7,19 @@ get_available_gpu() {
 }
 
 # large scale dataset
-NAME=sci-art-pixsfm-app
+NAME=sci-art-pixsfm-app2
 
-# downsample images
+# # Downsample images
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/train/images --factor 4
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/val/images --factor 4
 
-# # 1. Generate appearance groups
+# # Generate appearance groups
 # python utils/generate_image_apperance_groups.py data/urban_scene_3d/sci-art-pixsfm/train \
-#     --camera \
-#     --name appearance_group_by_camera
+#     --image \
+#     --name appearance_group_by_image
 # python utils/generate_image_apperance_groups.py data/urban_scene_3d/sci-art-pixsfm/val \
-#     --camera \
-#     --name appearance_group_by_camera
+#     --image \
+#     --name appearance_group_by_image
 
 # Single GPU at the beginning
 gpu_id=$(get_available_gpu)
@@ -28,7 +28,7 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
     --config configs/large_scale_appearance.yaml \
     --data.path data/urban_scene_3d/sci-art-pixsfm/train \
     --data.params.colmap.down_sample_factor 4 \
-    --data.params.colmap.appearance_groups appearance_group_by_camera \
+    --data.params.colmap.appearance_groups appearance_group_by_image \
     -n $NAME \
     --logger wandb \
     --project JointGS \
