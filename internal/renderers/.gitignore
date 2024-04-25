@@ -4,6 +4,7 @@
 !renderer.py
 !vanilla_renderer.py
 !appearance_mlp_renderer.py
+!appearance_swag_renderer.py
 !rgb_mlp_renderer.py
 !deformable_renderer.py
 !vanilla_deformable_renderer.py
