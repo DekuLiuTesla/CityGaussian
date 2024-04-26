@@ -7,7 +7,7 @@ get_available_gpu() {
 }
 
 # large scale dataset
-NAME=sci-art-pixsfm-app2
+NAME=sci-art-pixsfm-app-swag6
 
 # # Downsample images
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/train/images --factor 4
@@ -25,7 +25,7 @@ NAME=sci-art-pixsfm-app2
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-    --config configs/large_scale_appearance.yaml \
+    --config configs/large_scale_appearance_swag4.yaml \
     --data.path data/urban_scene_3d/sci-art-pixsfm/train \
     --data.params.colmap.down_sample_factor 4 \
     --data.params.colmap.appearance_groups appearance_group_by_image \

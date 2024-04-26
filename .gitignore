@@ -10,3 +10,5 @@ submodules/simple-knn
 submodules/tiny-cuda-nn-fp32
 internal/dataparsers/colmap_cluster_dataparser.py
 internal/utils/data_sampler.py
+sh_run_1.sh
+sh_run_2.sh
