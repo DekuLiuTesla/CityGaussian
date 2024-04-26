@@ -102,4 +102,4 @@ class SWAGModel(nn.Module):
         output = self.theta(input)
 
         # (c^I, Δα^I)
-        return torch.clamp(output[:, :3], 0, 1), output[:, -1]
+        return nn.functional.sigmoid(output[:, :3]), output[:, -1]
