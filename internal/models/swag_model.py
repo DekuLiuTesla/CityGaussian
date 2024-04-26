@@ -32,16 +32,16 @@ class EmbeddingConfig:
 
 @dataclass
 class GridEncodingOptimizationConfig:
-    lr: float = 1e-3
-    max_steps: int = 30_000
+    lr: float = 2.5e-3
+    max_steps: int = 60_000
     lr_final_factor: float = 0.01
     eps: float = 1e-15
 
 
 @dataclass
 class EmbeddingOptimizationConfig:
-    lr: float = 1e-3
-    max_steps: int = 30_000
+    lr: float = 2.5e-3
+    max_steps: int = 60_000
     lr_final_factor: float = 0.01
     eps: float = 1e-15
 
@@ -102,4 +102,4 @@ class SWAGModel(nn.Module):
         output = self.theta(input)
 
         # (c^I, Δα^I)
-        return nn.functional.sigmoid(output[:, :3]), output[:, -1]
+        return torch.clamp(output[:, :3], 0, 1), output[:, -1]
