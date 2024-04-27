@@ -73,6 +73,7 @@ class SWAGRenderer(Renderer):
             pc: GaussianModel,
             bg_color: torch.Tensor,
             scaling_modifier=1.0,
+            u=None,
             **kwargs,
     ):
         colors = eval_gaussian_model_sh(viewpoint_camera, pc)  # [n, 3]
