@@ -79,6 +79,7 @@ class GaussianSplatting(LightningModule):
                     self.trainer.datamodule.point_cloud,
                     deivce=self.device,
                 )
+                self.training = True
             else:
                 self.gaussian_model.load_ply(self.hparams["init_from"], device=self.device)
                 self.gaussian_model.max_radii2D = torch.zeros((self.gaussian_model.get_xyz.shape[0]), device=self.gaussian_model._xyz.device)

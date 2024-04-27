@@ -50,7 +50,8 @@ class SWAGRenderer(Renderer):
                 torch.log(1 - u + self.eps)
         ))  # [n]
         final_opacity = torch.clamp_min(pc.get_opacity.squeeze(-1) - image_dependent_opacity_variation, 0).unsqueeze(-1)  # [n, 1]
-
+        
+        # inference stage use no appearance embedding
         return VanillaRenderer.render(
             means3D=pc.get_xyz,
             opacity=final_opacity,
@@ -61,7 +62,7 @@ class SWAGRenderer(Renderer):
             viewpoint_camera=viewpoint_camera,
             bg_color=bg_color,
             scaling_modifier=scaling_modifier,
-            colors_precomp=image_conditioned_colors,
+            colors_precomp=colors,
         )
 
     def training_forward(
@@ -74,14 +75,47 @@ class SWAGRenderer(Renderer):
             scaling_modifier=1.0,
             **kwargs,
     ):
-        return self(
+        colors = eval_gaussian_model_sh(viewpoint_camera, pc)  # [n, 3]
+        image_conditioned_colors, image_conditioned_delta_alpha = self.swag_model(colors, self._get_normalized_xyz(gaussian_model=pc), viewpoint_camera.appearance_id)
+
+        # fix U at 0.5 during the evaluation
+        if u is None:
+            u = torch.tensor(0.5, dtype=torch.float, device=bg_color.device)
+
+        image_dependent_opacity_variation = torch.nn.functional.sigmoid(1 / self.temperature * (
+                torch.log(torch.abs(image_conditioned_delta_alpha) + self.eps) +
+                torch.log(u + self.eps) -
+                torch.log(1 - u + self.eps)
+        ))  # [n]
+        final_opacity = torch.clamp_min(pc.get_opacity.squeeze(-1) - image_dependent_opacity_variation, 0).unsqueeze(-1)  # [n, 1]
+
+        outputs = VanillaRenderer.render(
+            means3D=pc.get_xyz,
+            opacity=final_opacity,
+            scales=pc.get_scaling,
+            rotations=pc.get_rotation,
+            features=None,
+            active_sh_degree=pc.active_sh_degree,
             viewpoint_camera=viewpoint_camera,
-            pc=pc,
             bg_color=bg_color,
             scaling_modifier=scaling_modifier,
-            # u=self.uniform_sampler.sample((pc.get_xyz.shape[0],)),
-            u=self.uniform_sampler.sample((1,)),
+            colors_precomp=image_conditioned_colors,
         )
+
+        outputs["render_org"] = VanillaRenderer.render(
+            means3D=pc.get_xyz,
+            opacity=final_opacity,
+            scales=pc.get_scaling,
+            rotations=pc.get_rotation,
+            features=None,
+            active_sh_degree=pc.active_sh_degree,
+            viewpoint_camera=viewpoint_camera,
+            bg_color=bg_color,
+            scaling_modifier=scaling_modifier,
+            colors_precomp=colors,
+        )["render"]
+
+        return outputs
 
     def setup(self, stage: str, lightning_module, *args: Any, **kwargs: Any) -> Any:
         with torch.no_grad():
