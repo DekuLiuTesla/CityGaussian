@@ -173,8 +173,8 @@ class GaussianSplatting(LightningModule):
         # calculate loss
         if masked_pixels is not None:
             gt_image[masked_pixels] = image.detach()[masked_pixels]  # copy masked pixels from prediction to G.T.
-        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render_org"] if "render_org" in outputs else outputs["render"], gt_image)
-        ssim_metric = ssim(outputs["render"], gt_image)
+        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render"], gt_image)
+        ssim_metric = ssim(outputs["render_org"] if "render_org" in outputs else outputs["render"], gt_image)
         loss = (1.0 - self.lambda_dssim) * rgb_diff_loss + self.lambda_dssim * (1. - ssim_metric)
 
         return outputs, loss, rgb_diff_loss, ssim_metric
