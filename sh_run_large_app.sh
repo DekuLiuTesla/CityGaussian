@@ -6,9 +6,6 @@ get_available_gpu() {
   '
 }
 
-# large scale dataset
-NAME=sci-art-pixsfm-swag-grad
-
 # # Downsample images
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/train/images --factor 4
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/val/images --factor 4
@@ -21,12 +18,14 @@ NAME=sci-art-pixsfm-swag-grad
 #     --image \
 #     --name appearance_group_by_image
 
+NAME=campus-pixsfm-swag-grad
+
 # Single GPU at the beginning
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-    --config configs/large_scale_appearance_swag.yaml \
-    --data.path data/urban_scene_3d/sci-art-pixsfm/train \
+    --config configs/large_scale_appearance_swag_campus.yaml \
+    --data.path data/urban_scene_3d/campus-pixsfm/train \
     --data.params.colmap.down_sample_factor 4 \
     --data.params.colmap.appearance_groups appearance_group_by_image \
     -n $NAME \
@@ -37,8 +36,34 @@ gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config outputs/$NAME/config.yaml \
-    --data.path data/urban_scene_3d/sci-art-pixsfm/val \
+    --data.path data/urban_scene_3d/campus-pixsfm/val \
     --data.params.colmap.down_sample_factor 4 \
     --data.params.colmap.eval_image_select_mode ratio \
     --data.params.colmap.eval_ratio 1.0 \
     --model.save_val_output true \
+
+
+# # large scale dataset
+# NAME=sci-art-pixsfm-swag-grad
+
+# # Single GPU at the beginning
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
+#     --config configs/large_scale_appearance_swag.yaml \
+#     --data.path data/urban_scene_3d/sci-art-pixsfm/train \
+#     --data.params.colmap.down_sample_factor 4 \
+#     --data.params.colmap.appearance_groups appearance_group_by_image \
+#     -n $NAME \
+#     --logger wandb \
+#     --project JointGS \
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
+#     --config outputs/$NAME/config.yaml \
+#     --data.path data/urban_scene_3d/sci-art-pixsfm/val \
+#     --data.params.colmap.down_sample_factor 4 \
+#     --data.params.colmap.eval_image_select_mode ratio \
+#     --data.params.colmap.eval_ratio 1.0 \
+#     --model.save_val_output true \
