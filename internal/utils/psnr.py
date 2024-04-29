@@ -10,8 +10,8 @@
 #
 
 import torch
-import jax
-import jax.numpy as jnp
+# import jax
+# import jax.numpy as np
 import numpy as np
 
 def color_correct(img, ref, num_iters=5, eps=0.5 / 255):
@@ -35,8 +35,8 @@ def color_correct(img, ref, num_iters=5, eps=0.5 / 255):
     for c in range(num_channels):
       a_mat.append(img_mat[:, c:(c + 1)] * img_mat[:, c:])  # Quadratic term.
     a_mat.append(img_mat)  # Linear term.
-    a_mat.append(jnp.ones_like(img_mat[:, :1]))  # Bias term.
-    a_mat = jnp.concatenate(a_mat, axis=-1)
+    a_mat.append(np.ones_like(img_mat[:, :1]))  # Bias term.
+    a_mat = np.concatenate(a_mat, axis=-1)
     warp = []
     for c in range(num_channels):
       # Construct the right hand side of a linear system containing each color
@@ -45,16 +45,16 @@ def color_correct(img, ref, num_iters=5, eps=0.5 / 255):
       # Ignore rows of the linear system that were saturated in the input or are
       # saturated in the current corrected color estimate.
       mask = mask0[:, c] & is_unclipped(img_mat[:, c]) & is_unclipped(b)
-      ma_mat = jnp.where(mask[:, None], a_mat, 0)
-      mb = jnp.where(mask, b, 0)
-      # Solve the linear system. We're using the np.lstsq instead of jnp because
+      ma_mat = np.where(mask[:, None], a_mat, 0)
+      mb = np.where(mask, b, 0)
+      # Solve the linear system. We're using the np.lstsq instead of np because
       # it's significantly more stable in this case, for some reason.
       w = np.linalg.lstsq(ma_mat, mb, rcond=-1)[0]
-      assert jnp.all(jnp.isfinite(w))
+      assert np.all(np.isfinite(w))
       warp.append(w)
-    warp = jnp.stack(warp, axis=-1)
+    warp = np.stack(warp, axis=-1)
     # Apply the warp to update img_mat.
-    img_mat = jnp.clip(
-        jnp.matmul(a_mat, warp, precision=jax.lax.Precision.HIGHEST), 0, 1)
-  corrected_img = jnp.reshape(img_mat, img.shape)
+    img_mat = np.clip(
+        np.matmul(a_mat, warp), 0, 1)
+  corrected_img = np.reshape(img_mat, img.shape)
   return corrected_img

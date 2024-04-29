@@ -4,6 +4,7 @@ from typing import Tuple, List, Union, Any
 import torch.optim
 import torchvision
 import wandb
+import numpy as np
 from lightning.pytorch.core.module import MODULE_OPTIMIZERS
 from torchmetrics.image import PeakSignalNoiseRatio
 from lightning.pytorch import LightningDataModule, LightningModule
@@ -18,6 +19,7 @@ from internal.models.gaussian_model import GaussianModel
 from internal.renderers import Renderer, VanillaRenderer
 from internal.utils.ssim import ssim
 from internal.utils.lpips import lpips
+from internal.utils.psnr import color_correct
 from jsonargparse import lazy_instance
 
 
@@ -31,6 +33,7 @@ class GaussianSplatting(LightningModule):
             background_color: Tuple[float, float, float] = (0., 0., 0.),
             output_path: str = None,
             init_from: str = None,
+            correct_color: bool = False,
             save_val_output: bool = False,
             max_save_val_output: int = -1,
             renderer: Renderer = lazy_instance(VanillaRenderer),
@@ -339,8 +342,14 @@ class GaussianSplatting(LightningModule):
         outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
 
         self.log(f"{name}/rgb_diff", rgb_diff_loss, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{name}/ssim", ssim_metric, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
+        
         self.log(f"{name}/loss", loss, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
+        if self.hparams["correct_color"]:
+            render_np = np.array(outputs["render"][None, ...].cpu(), dtype=np.float64).transpose(0, 2, 3, 1)
+            gt_np = np.array(gt_image[None, ...].cpu(), dtype=np.float64).transpose(0, 2, 3, 1)
+            outputs["render"] = torch.from_numpy(np.array(color_correct(render_np, gt_np), dtype=np.float32).transpose(0, 3, 1, 2)).contiguous().to(gt_image.device)[0]
+        
+        self.log(f"{name}/ssim", ssim(outputs["render"], gt_image), on_epoch=True, prog_bar=False, batch_size=self.batch_size)
         self.log(f"{name}/psnr", self.psnr(outputs["render"], gt_image), on_epoch=True, prog_bar=True,
                  batch_size=self.batch_size)
         self.log(f"{name}/lpips", lpips(outputs["render"], gt_image, net_type='vgg'), on_epoch=True, prog_bar=True,
