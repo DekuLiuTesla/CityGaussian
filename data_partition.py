@@ -17,7 +17,7 @@ from utils.loss_utils import ssim
 from utils.camera_utils import loadCam
 from arguments import GroupParams
 
-def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False):
+def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False, disable_inblock=False, simple_selection=False):
         if not hasattr(args, 'filter_mode'):
             args.filter_mode = 'opacity'
         else:
@@ -67,6 +67,20 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False):
 
                     
                     num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
+                    if simple_selection:
+                        # enlarge the box to 1.5x
+                        min_x -= 0.25 * (org_max_x - org_min_x)
+                        max_x += 0.25 * (org_max_x - org_min_x)
+                        min_y -= 0.25 * (org_max_y - org_min_y)
+                        max_y += 0.25 * (org_max_y - org_min_y)
+                        min_z -= 0.25 * (org_max_z - org_min_z)
+                        max_z += 0.25 * (org_max_z - org_min_z)
+                        if contract_cam_center[0] > min_x and contract_cam_center[0] < max_x \
+                            and contract_cam_center[1] > min_y and contract_cam_center[1] < max_y \
+                            and contract_cam_center[2] > min_z and contract_cam_center[2] < max_z :
+                            camera_mask[idx, block_id] = True
+                        continue
+
                     while num_gs < num_threshold:
                         # TODO: select better threshold
                         block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
@@ -91,9 +105,9 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False):
                     masked_gaussians._opacity = gaussians._opacity[block_mask]
                     masked_gaussians.max_radii2D = gaussians.max_radii2D[block_mask]
 
-                    if contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
+                    if (not disable_inblock) and contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
                         and contract_cam_center[1] > org_min_y and contract_cam_center[1] < org_max_y \
-                        and contract_cam_center[2] > org_min_z and contract_cam_center[2] < org_max_z:
+                        and contract_cam_center[2] > org_min_z and contract_cam_center[2] < org_max_z :
                         camera_mask[idx, block_id] = True
                         continue
 
@@ -124,8 +138,10 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--config', type=str, help='train config file path')
     parser.add_argument('--debug_from', type=int, default=-1)
-    parser.add_argument('--detect_anomaly', action='store_true', default=False)
+    parser.add_argument('--detect_anomaly', action='store_true')
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--disable_inblock", action="store_true")
+    parser.add_argument("--simple_selection", action="store_true")
     args = parser.parse_args(sys.argv[1:])
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -149,7 +165,7 @@ if __name__ == "__main__":
     model_config = lp.model_config
     gaussians = getattr(modules, model_config['name'])(lp.sh_degree, **model_config['kwargs'])
     scene = LargeScene(lp, gaussians, shuffle=False)
-    camera_mask = block_filtering(scene.getTrainCameras(), gaussians, lp, pp, scale=1.0)
+    camera_mask = block_filtering(scene.getTrainCameras(), gaussians, lp, pp, 1.0, args.quiet, args.disable_inblock, args.simple_selection)
     camera_mask = camera_mask.cpu().numpy()
     if not os.path.exists(os.path.join(lp.source_path, "data_partitions")):
         os.makedirs(os.path.join(lp.source_path, "data_partitions"))
