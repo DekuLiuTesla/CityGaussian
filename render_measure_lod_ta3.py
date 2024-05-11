@@ -233,7 +233,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 render_set(dataset.model_path, "train", scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, traj_info)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, height)
+                render_set(dataset.model_path, "test", scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, traj_info)
 
 def parse_cfg(cfg):
     lp = GroupParams()
