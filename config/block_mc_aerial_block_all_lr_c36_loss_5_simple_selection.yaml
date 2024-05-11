@@ -6,6 +6,7 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/matrix_city/aerial/train/block_all",
+    partition_name: "block_mc_aerial_block_all_lr_c36_loss_5_simple_selection",
     pretrain_path: "output/org_mc_aerial_block_all_lr2/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
