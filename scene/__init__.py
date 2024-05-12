@@ -215,7 +215,7 @@ class LargeScene(Scene):
                 if partition[i, args.block_id]:
                     filtered_train_cameras.append(scene_info.train_cameras[i])
             filtered_train_cameras = filtered_train_cameras if len(filtered_train_cameras) > 50 else []
-            print(f"Filtered Cameras: {len(filtered_train_cameras)}")
+            print(f"Filtered Cameras: {len(filtered_train_cameras)}. Using Partition File {args.partition_name}.npy")
             scene_info = SceneInfo(point_cloud=scene_info.point_cloud,
                                    train_cameras=filtered_train_cameras,
                                    test_cameras=scene_info.test_cameras,
