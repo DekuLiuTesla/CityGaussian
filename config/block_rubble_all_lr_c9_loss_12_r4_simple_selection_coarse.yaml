@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/mill19/rubble-pixsfm/train",
-    partition_name: "block_rubble_all_lr_c9_loss_12_r4_simple_selection_coarse",
+    partition_name: "block_rubble_all_lr_c9_loss_12_r4_simple_selection",
     model_path: "",
     images: "images",
     block_dim: [3, 1, 3],
