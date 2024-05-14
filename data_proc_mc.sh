@@ -63,6 +63,13 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python convert_cam.py -s data/matrix_city/aerial/train/block_all
 python convert_cam.py -s data/matrix_city/aerial/test/block_all_test
 
+mkdir data/matrix_city/street/train/block_A
+mkdir data/matrix_city/street/test/block_A_test
+python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/train/block_A --intrinsic_path data/matrix_city/street/pose/block_A/transforms_train.json
+python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/test/block_A_test --intrinsic_path data/matrix_city/street/pose/block_A/transforms_test.json
+python convert_cam.py -s data/matrix_city/street/train/block_A
+python convert_cam.py -s data/matrix_city/street/test/block_A_test
+
 python tools/colmap_to_mega_nerf.py --train_model_path data/matrix_city/aerial/train/block_all/sparse/0 \
                                     --train_images_path data/matrix_city/aerial/train/block_all/images \
                                     --val_model_path data/matrix_city/aerial/test/block_all_test/sparse/0 \
