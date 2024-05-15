@@ -67,14 +67,15 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False, disabl
 
                     
                     num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
-                    if simple_selection:
+                    if simple_selection > 1.0:
                         # enlarge the box to 1.5x
-                        min_x -= 0.25 * (org_max_x - org_min_x)
-                        max_x += 0.25 * (org_max_x - org_min_x)
-                        min_y -= 0.25 * (org_max_y - org_min_y)
-                        max_y += 0.25 * (org_max_y - org_min_y)
-                        min_z -= 0.25 * (org_max_z - org_min_z)
-                        max_z += 0.25 * (org_max_z - org_min_z)
+                        rate = (simple_selection - 1.0) / 2
+                        min_x -= rate * (org_max_x - org_min_x)
+                        max_x += rate * (org_max_x - org_min_x)
+                        min_y -= rate * (org_max_y - org_min_y)
+                        max_y += rate * (org_max_y - org_min_y)
+                        min_z -= rate * (org_max_z - org_min_z)
+                        max_z += rate * (org_max_z - org_min_z)
                         if contract_cam_center[0] > min_x and contract_cam_center[0] < max_x \
                             and contract_cam_center[1] > min_y and contract_cam_center[1] < max_y \
                             and contract_cam_center[2] > min_z and contract_cam_center[2] < max_z :
@@ -141,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument('--detect_anomaly', action='store_true')
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--disable_inblock", action="store_true")
-    parser.add_argument("--simple_selection", action="store_true")
+    parser.add_argument("--simple_selection", type=float, default=0)
     args = parser.parse_args(sys.argv[1:])
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
