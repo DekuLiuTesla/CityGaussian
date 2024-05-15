@@ -18,7 +18,7 @@ import torch
 import numpy as np
 from utils.system_utils import searchForMaxIteration
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly, SceneInfo
-from scene.gaussian_model import GaussianModel, GaussianModelVox, GaussianModelVoxV2, GaussianModelLOD, GaussianModelFusion
+from scene.gaussian_model import GaussianModel, BasicPointCloud
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON
@@ -241,6 +241,39 @@ class LargeScene(Scene):
             self.gaussians.load_ply(os.path.join(self.pretrain_path, "point_cloud.ply"))
             self.gaussians.spatial_lr_scale = self.cameras_extent
         else:
+            if hasattr(args, 'add_background_sphere') and args.add_background_sphere:
+                import math
+                scene_center = -scene_info.nerf_normalization['translate']
+                scene_radius = scene_info.nerf_normalization['radius']
+                # build unit sphere points
+                n_points = args.background_sphere_points
+                samples = np.arange(n_points)
+                y = 1 - (samples / float(n_points - 1)) * 2  # y goes from 1 to -1
+                radius = np.sqrt(1 - y * y)  # radius at y
+                phi = math.pi * (math.sqrt(5.) - 1.)  # golden angle in radians
+                theta = phi * samples  # golden angle increment
+                x = np.cos(theta) * radius
+                z = np.sin(theta) * radius
+                unit_sphere_points = np.concatenate([x[:, None], y[:, None], z[:, None]], axis=1)
+                # build background sphere
+                background_sphere_point_xyz = (unit_sphere_points * scene_radius * args.background_sphere_radius) + scene_center
+                background_sphere_point_rgb = np.asarray(np.random.random(background_sphere_point_xyz.shape), dtype=np.float64)
+                # add background sphere to scene
+                scene_info = SceneInfo(
+                    point_cloud=BasicPointCloud(
+                                points=np.concatenate([scene_info.point_cloud.points, background_sphere_point_xyz], axis=0),
+                                colors=np.concatenate([scene_info.point_cloud.colors, background_sphere_point_rgb], axis=0),
+                                normals=np.zeros_like(background_sphere_point_xyz)),
+                    train_cameras=scene_info.train_cameras,
+                    test_cameras=scene_info.test_cameras,
+                    nerf_normalization=scene_info.nerf_normalization,
+                    ply_path=scene_info.ply_path)
+                # increase prune extent
+                # TODO: resize scene_extent without changing lr
+                self.cameras_extent = scene_radius * args.background_sphere_radius * 1.0001
+
+                print("added {} background sphere points, rescale prune extent from {} to {}".format(n_points, scene_radius, self.cameras_extent))
+
             self.gaussians.create_from_pcd(scene_info.point_cloud, self.cameras_extent)
     
     def save(self, iteration, args=None):
