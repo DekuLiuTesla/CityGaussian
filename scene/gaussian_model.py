@@ -412,6 +412,15 @@ class GaussianModel:
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
 
+class GaussianModelMax(GaussianModel):
+    def __init__(self, 
+                 sh_degree : int):
+        super().__init__(sh_degree)
+
+    def add_densification_stats(self, viewspace_point_tensor, update_filter):
+        self.xyz_gradient_accum[update_filter] = torch.maximum(self.xyz_gradient_accum[update_filter], torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True))
+        self.denom[update_filter] = 1
+
 class GaussianModelLOD(GaussianModel):
     def __init__(self, 
                  sh_degree : int,
