@@ -69,10 +69,12 @@ def blockMerge(lp, iteration):
                 gaussians.load_ply(os.path.join(out_dir, f"cells/cell{idx}", "point_cloud_blocks", "scale_1.0",
                                                 "iteration_" + str(iteration),
                                                 "point_cloud.ply"))
+                num_iter = iteration
             except:
                 gaussians.load_ply(os.path.join(out_dir, f"cells/cell{idx}", "point_cloud_blocks", "scale_1.0",
                                                 "iteration_" + str(1),
                                                 "point_cloud.ply"))
+                num_iter = 1
             
             if len(merged_gaussians._xyz) == 0:
                 merged_gaussians._xyz = gaussians.get_xyz
@@ -91,7 +93,7 @@ def blockMerge(lp, iteration):
                 merged_gaussians._opacity = torch.cat([merged_gaussians._opacity, gaussians._opacity], dim=0)
                 merged_gaussians.max_radii2D = torch.cat([merged_gaussians.max_radii2D, gaussians.max_radii2D], dim=0)
             
-            print(f"Merged {len(gaussians.get_xyz)} points from block {idx}")
+            print(f"Merged {len(gaussians.get_xyz)} points from block {idx} from iteration {num_iter}.")
     
     save_path = os.path.join(out_dir, "point_cloud", "iteration_" + str(iteration), "point_cloud.ply")
     print(f"Saving merged {len(merged_gaussians.get_xyz)} point cloud to {save_path}")
