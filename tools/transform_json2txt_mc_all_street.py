@@ -54,7 +54,7 @@ if __name__ == "__main__":
             c2w[:3, 1:3] *= -1
             w2c = np.linalg.inv(c2w)
             qw, qx, qy, qz = mat2quat(w2c[:3, :3])
-            tx, ty, tz = w2c[:3, 3]
+            tx, ty, tz = w2c[:3, 3] * 100
             f.write('{} {} {} {} {} {} {} {} 1 {}\n'.format(idx+1, qw, qx, qy, qz, tx, ty, tz, file_path))
             f.write('\n')  # make sure every other line is empty
 
