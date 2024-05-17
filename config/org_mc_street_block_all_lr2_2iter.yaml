@@ -14,7 +14,7 @@ model_params: {
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "org_mc_street_block_all_lr2_long_interval",
+        name: "org_mc_street_block_all_lr2_2it",
         project: "LargeGS"
     }
 }
@@ -29,22 +29,22 @@ pipeline_params: {
 
 # Optimization Parameters
 optim_params: {
-    iterations: 30_000,
-    position_lr_init: 1.6e-5,
-    position_lr_final: 1.6e-6,
+    iterations: 60_000,
+    position_lr_init: 0.00008,
+    position_lr_final: 0.0000008,
     position_lr_delay_mult: 0.01,
     position_lr_max_steps: 30_000,
     feature_lr: 0.0025,
     opacity_lr: 0.05,
-    scaling_lr: 0.001,
+    scaling_lr: 0.0025,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,
-    densification_interval: 1000,
-    opacity_reset_interval: 20000,
-    densify_from_iter: 4000,
-    densify_until_iter: 15_000,
-    densify_grad_threshold: 0.00005
+    densification_interval: 200,
+    opacity_reset_interval: 6000,
+    densify_from_iter: 1000,
+    densify_until_iter: 30_000,
+    densify_grad_threshold: 0.0002
 }
 
 

@@ -6,15 +6,21 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/matrix_city/street/train/block_A",
+    partition_name: "block_mc_street_block_all_lr_c36_simple_selection",
+    pretrain_path: "output/org_mc_street_block_all_lr2_long_interval/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
+    block_dim: [5, 4, 1],
+    aabb: [-600, -400, -300, -200],
+    filter_mode: "loss",
+    opacity_threshold: 0.05,
     resolution: -1,
     white_background: False,
     data_device: "cuda",
     eval: False,
     logger_config: {
         logger: "wandb",
-        name: "org_mc_street_block_all_lr2_long_interval",
+        name: "block_mc_street_block_all_lr_c36_simple_selection_lr2",
         project: "LargeGS"
     }
 }
@@ -23,28 +29,29 @@ model_params: {
 pipeline_params: {
     convert_SHs_python:  False,
     compute_cov3D_python:  False,
+    pre_load: False,
     debug:  False
 }
 
 
 # Optimization Parameters
 optim_params: {
-    iterations: 30_000,
-    position_lr_init: 1.6e-5,
-    position_lr_final: 1.6e-6,
+    iterations: 60_000,
+    position_lr_init: 0.8e-5,
+    position_lr_final: 0.8e-6,
     position_lr_delay_mult: 0.01,
-    position_lr_max_steps: 30_000,
+    position_lr_max_steps: 60_000,
     feature_lr: 0.0025,
-    opacity_lr: 0.05,
+    opacity_lr: 0.01,
     scaling_lr: 0.001,
     rotation_lr: 0.001,
     percent_dense: 0.01,
     lambda_dssim: 0.2,
     densification_interval: 1000,
-    opacity_reset_interval: 20000,
-    densify_from_iter: 4000,
-    densify_until_iter: 15_000,
-    densify_grad_threshold: 0.00005
+    opacity_reset_interval: 10000,
+    densify_from_iter: 500,
+    densify_until_iter: 30_000,
+    densify_grad_threshold: 0.0001
 }
 
 
