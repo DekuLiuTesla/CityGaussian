@@ -93,6 +93,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--iteration", default=-1, type=int)
+    parser.add_argument("--resolution", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
     parser.add_argument("--quiet", action="store_true")
@@ -107,6 +108,7 @@ if __name__ == "__main__":
         cfg = yaml.load(f, Loader=yaml.FullLoader)
         lp, op, pp = parse_cfg(cfg)
         setattr(lp, 'config_path', args.config)
+        setattr(lp, 'resolution', args.resolution)
         if lp.model_path == '':
             lp.model_path = args.model_path
 
