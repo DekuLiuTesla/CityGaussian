@@ -28,3 +28,4 @@ config/dump
 wandb
 bypy_upload.sh
 config/vox_mc_aerial_block_all_avg_half_lr2_30k_scale1.yaml
+config/mc_street_fusion.yaml

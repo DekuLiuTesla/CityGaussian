@@ -17,6 +17,7 @@ import yaml
 import torch
 import numpy as np
 from utils.system_utils import searchForMaxIteration
+from utils.graphics_utils import BasicPointCloud
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly, SceneInfo
 from scene.gaussian_model import GaussianModel, GaussianModelMax, GaussianModelVox, GaussianModelVoxV2, GaussianModelLOD, GaussianModelFusion
 from arguments import ModelParams, GroupParams
