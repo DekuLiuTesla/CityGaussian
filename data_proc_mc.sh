@@ -70,6 +70,13 @@ python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/
 python convert_cam.py -s data/matrix_city/street/train/block_A
 python convert_cam.py -s data/matrix_city/street/test/block_A_test
 
+mkdir data/matrix_city/street/train/block_small
+mkdir data/matrix_city/street/test/block_small_test
+python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/train/block_small --intrinsic_path data/matrix_city/street/pose/block_small/transforms_train.json
+python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/test/block_small_test --intrinsic_path data/matrix_city/street/pose/block_small/transforms_test.json
+python convert_cam.py -s data/matrix_city/street/train/block_small
+python convert_cam.py -s data/matrix_city/street/test/block_small_test
+
 python tools/colmap_to_mega_nerf.py --train_model_path data/matrix_city/aerial/train/block_all/sparse/0 \
                                     --train_images_path data/matrix_city/aerial/train/block_all/images \
                                     --val_model_path data/matrix_city/aerial/test/block_all_test/sparse/0 \
