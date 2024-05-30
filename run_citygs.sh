@@ -16,7 +16,7 @@ CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config conf
 
 # optimize each block
 port=4041
-for num in {0..8}; do
+for num in {0..35}; do
     while true; do
         gpu_id=$(get_available_gpu)
         if [[ -n $gpu_id ]]; then
@@ -38,7 +38,7 @@ wait
 # merge the blocks
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python merge.py --config config/$CONFIG.yaml
 
-# rendering and evaluation
+# rendering and evaluation, add --load_vq in rendering if you want to load compressed model
 TEST_PATH="data/matrix_city/aerial/test/block_all_test"
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large.py --config config/$CONFIG.yaml --custom_test $TEST_PATH
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t block_all_test

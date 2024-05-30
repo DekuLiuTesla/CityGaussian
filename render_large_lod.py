@@ -12,13 +12,11 @@
 import os
 import sys
 import yaml
+import json
 import torch
 import torchvision
-import imageio
 import time
-import inspect
 import numpy as np
-import pynvml
 from tqdm import tqdm
 from arguments import GroupParams
 from scene import LargeScene
@@ -31,7 +29,7 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 from torch.utils.data import DataLoader
-from utils.camera_utils import loadCamV2
+from utils.camera_utils import loadCam
 
 class BlockedGaussian:
 
@@ -135,45 +133,53 @@ def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cu
 
     return gaussians, scene
 
-def render_set(model_path, name, iteration, views, gaussians, pipeline, background, pitch, height):
+def render_set(model_path, name, iteration, views, gaussians, pipeline, background):
     avg_render_time = 0
     max_render_time = 0
+    avg_memory = 0
+    max_memory = 0
 
-    video_path = os.path.join(model_path, name, "ours_lod_video")
-    makedirs(video_path, exist_ok=True)
+    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
+    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
 
-    idx = 481
+    makedirs(render_path, exist_ok=True)
+    makedirs(gts_path, exist_ok=True)
 
-    duration_list = []
-    frames = []
-
-    for height in tqdm(range(500, 2525, 10)):
+    for idx in tqdm(range(len(views)), desc="Rendering progress"):
         
-        viewpoint_cam = loadCamV2(lp, idx, views[idx], 1.0, pitch, float(height)/100)
+        viewpoint_cam = loadCam(lp, idx, views[idx], 1.0)
 
         # gpu_tracker.track() 
+        torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
-        img = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
-        img = (img * 255).clamp(0, 255).to(torch.uint8).permute(1, 2, 0).cpu().numpy()
+        rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
         torch.cuda.synchronize()
         end = time.time()
-        frames.append(img)
-        duration_list.append(end - start)
         avg_render_time += end-start
         max_render_time = max(max_render_time, end-start)
-    
-    video = imageio.get_writer(os.path.join(video_path, "video.mp4"), mode="I", fps=int(len(duration_list)/avg_render_time), codec="libx264", bitrate="16M", quality=10)
-    for frame in frames:
-        video.append_data(frame)
-    video.close()
-    print(f'Video saved to {video_path}')
-    
-    print(f"Height: {height}")
-    print(f'Average FPS: {len(duration_list)/avg_render_time:.4f}')
-    print(f'Min FPS: {1/max_render_time:.4f}')
 
-def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool, pitch : float, height : float):
+        forward_max_memory_allocated = torch.cuda.max_memory_allocated() / (1024.0 ** 2)
+        avg_memory += forward_max_memory_allocated
+        max_memory = max(max_memory, forward_max_memory_allocated)
+        # data saving
+        torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+        torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+    
+    with open(model_path + "/costs.json", 'w') as fp:
+        json.dump({
+            "Average FPS": len(views)/avg_render_time,
+            "Min FPS": 1/max_render_time,
+            "Average Memory(M)": avg_memory/len(views),
+            "Max Memory(M)": max_memory,
+        }, fp, indent=True)
+    
+    print(f'Average FPS: {len(views)/avg_render_time:.4f}')
+    print(f'Min FPS: {1/max_render_time:.4f}')
+    print(f'Average Memory: {avg_memory/len(views):.4f} M')
+    print(f'Max Memory: {max_memory:.4f} M')
+
+def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool):
     assert len(dataset.lod_configs)-1 == len(dataset.dist_threshold)
     dataset.dist_threshold = [0] + dataset.dist_threshold + [1e6]
 
@@ -197,14 +203,14 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         
         if custom_test:
             views = scene.getTrainCameras() + scene.getTestCameras()
-            render_set(dataset.model_path, filename, scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
+            render_set(dataset.model_path, filename, scene.loaded_iter, views, lod_gs_list, pipeline, background)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
+                render_set(dataset.model_path, "train", scene.loaded_iter, views, lod_gs_list, pipeline, background)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
+                render_set(dataset.model_path, "test", scene.loaded_iter, views, lod_gs_list, pipeline, background)
 
 def parse_cfg(cfg):
     lp = GroupParams()
@@ -232,8 +238,6 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
-    parser.add_argument("--pitch", type=float, default=-180.0)
-    parser.add_argument("--height", type=float, default=None)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
@@ -242,7 +246,7 @@ if __name__ == "__main__":
     if args.model_path is None:
         args.model_path = os.path.join('output', os.path.basename(args.config).split('.')[0])
     if args.load_vq:
-        args.iteration = None
+        args.iteration = 30000  # apply a default value
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
@@ -254,5 +258,4 @@ if __name__ == "__main__":
         if lp.model_path == '':
             lp.model_path = args.model_path
 
-    render_sets(lp, args.iteration, pp, args.load_vq, 
-                args.skip_train, args.skip_test, args.custom_test, args.pitch, args.height)
+    render_sets(lp, args.iteration, pp, args.load_vq, args.skip_train, args.skip_test, args.custom_test)
