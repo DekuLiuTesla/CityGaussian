@@ -1,0 +1,52 @@
+# Model Parameters
+model_params: {
+    model_config: {
+        name: "GaussianModel",
+        kwargs: {}
+    },
+    sh_degree: 3,
+    source_path: "data/mill19/building-pixsfm/train",
+    partition_name: "building_c20_r4",
+    pretrain_path: "output/building_coarse/point_cloud/iteration_30000",
+    model_path: "",
+    images: "images",
+    block_dim: [4, 1, 5],
+    aabb: [-140, -100, 0, -10, 900, 250],
+    filter_mode: "loss",
+    opacity_threshold: 0.1,
+    resolution: 4,
+    white_background: False,
+    data_device: "cuda",
+    eval: False,
+}
+
+# Pipeline Parameters
+pipeline_params: {
+    convert_SHs_python:  False,
+    compute_cov3D_python:  False,
+    pre_load: False,
+    debug:  False
+}
+
+
+# Optimization Parameters
+optim_params: {
+    iterations: 30_000,
+    position_lr_init: 0.000032,
+    position_lr_final: 0.00000032,
+    position_lr_delay_mult: 0.01,
+    position_lr_max_steps: 30_000,
+    feature_lr: 0.0025,
+    opacity_lr: 0.05,
+    scaling_lr: 0.002,
+    rotation_lr: 0.001,
+    percent_dense: 0.01,
+    lambda_dssim: 0.2,
+    densification_interval: 100,
+    opacity_reset_interval: 3000,
+    densify_from_iter: 500,
+    densify_until_iter: 15_000,
+    densify_grad_threshold: 0.0002
+}
+
+
