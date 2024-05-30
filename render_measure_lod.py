@@ -141,8 +141,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     avg_memory = 0
     max_memory = 0
 
-    render_path = os.path.join(model_path, name, "ours_lod_{}".format(height), "renders")
-    gts_path = os.path.join(model_path, name, "ours_lod_{}".format(height), "gt")
+    render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
+    gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
@@ -165,10 +165,8 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         avg_memory += forward_max_memory_allocated
         max_memory = max(max_memory, forward_max_memory_allocated)
         # no data saving
-        # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
-        # if idx >= 50:
-        #     break
+        torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+        torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
     
     print(f"Height: {height}")
     print(f'Average FPS: {len(views)/avg_render_time:.4f}')
@@ -177,33 +175,20 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
     print(f'Max Memory: {max_memory:.4f} M')
 
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool, pitch : float, height : float):
+    assert len(dataset.lod_configs)-1 == len(dataset.dist_threshold)
+    dataset.dist_threshold = [0] + dataset.dist_threshold + [1e6]
 
     with torch.no_grad():
-        config_2 = 'config/block_mc_aerial_block_all_lr_c36_loss_5_75_lr64_vq.yaml'
-        config_name_2 = os.path.splitext(os.path.basename(config_2))[0]
-        with open(config_2) as f:
-            cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lod_gs_2, scene = load_gaussians(cfg, config_name_2, iteration=None, load_vq=True)
+        lod_gs_list = []
+        for i in range(len(dataset.lod_configs)):
+            config = dataset.lod_configs[i]
+            config_name = os.path.splitext(os.path.basename(config))[0]
+            with open(config) as f:
+                cfg = yaml.load(f, Loader=yaml.FullLoader)
+            lod_gs, scene = load_gaussians(cfg, config_name, iteration, load_vq, source_path=custom_test)
+            lod_gs = BlockedGaussian(lod_gs, lp, range=[dataset.dist_threshold[i], dataset.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
+            lod_gs_list.append(lod_gs)
 
-        config_1 = 'config/block_mc_aerial_block_all_lr_c36_loss_5_66_lr64_vq.yaml'
-        config_name_1 = os.path.splitext(os.path.basename(config_1))[0]
-        with open(config_1) as f:
-            cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lod_gs_1, _ = load_gaussians(cfg, config_name_1, iteration=None, load_vq=True)
-
-        config_0 = 'config/block_mc_aerial_block_all_lr_c36_loss_5_50_lr64_vq.yaml'
-        config_name_0 = os.path.splitext(os.path.basename(config_0))[0]
-        with open(config_0) as f:
-            cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lod_gs_0, _ = load_gaussians(cfg, config_name_0, iteration=None, load_vq=True)
-
-        with torch.no_grad():
-            torch.cuda.empty_cache()
-            lod_gs_0 = BlockedGaussian(lod_gs_0, lp, range=[0, 2.5], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_1 = BlockedGaussian(lod_gs_1, lp, range=[2.5, 5], compute_cov3D_python=pp.compute_cov3D_python)
-            lod_gs_2 = BlockedGaussian(lod_gs_2, lp, range=[5, 100], compute_cov3D_python=pp.compute_cov3D_python)
-            torch.cuda.empty_cache()
-        
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
@@ -213,14 +198,14 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         
         if custom_test:
             views = scene.getTrainCameras() + scene.getTestCameras()
-            render_set(dataset.model_path, filename, scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, height)
+            render_set(dataset.model_path, filename, scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, height)
+                render_set(dataset.model_path, "train", scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", scene.loaded_iter, views, [lod_gs_0, lod_gs_1, lod_gs_2], pipeline, background, pitch, height)
+                render_set(dataset.model_path, "test", scene.loaded_iter, views, lod_gs_list, pipeline, background, pitch, height)
 
 def parse_cfg(cfg):
     lp = GroupParams()
@@ -243,6 +228,8 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--config', type=str, help='train config file path of fused model')
+    parser.add_argument('--lod_configs', type=list, help='configs of different detail levels, finest first')
+    parser.add_argument('--distance_threshold', type=list, default=[], help='configs of different detail levels, near to far')
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
@@ -268,4 +255,5 @@ if __name__ == "__main__":
         if lp.model_path == '':
             lp.model_path = args.model_path
 
-    render_sets(lp, args.iteration, pp, args.load_vq, args.skip_train, args.skip_test, args.custom_test, args.pitch, args.height)
+    render_sets(lp, args.iteration, pp, args.load_vq, 
+                args.skip_train, args.skip_test, args.custom_test, args.pitch, args.height)

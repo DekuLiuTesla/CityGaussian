@@ -1,5 +1,5 @@
 get_available_gpu() {
-  local mem_threshold=5000
+  local mem_threshold=500
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
@@ -39,6 +39,6 @@ wait
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python merge.py --config config/$CONFIG.yaml
 
 # rendering and evaluation
-TEST_PATH="data/mill19/rubble-pixsfm/val"
+TEST_PATH="data/matrix_city/aerial/test/block_all_test"
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large.py --config config/$CONFIG.yaml --custom_test $TEST_PATH
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_custom.py -m output/$CONFIG -t val
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t block_all_test
