@@ -1,4 +1,4 @@
-# for block 1 to block 10
+# Aerial View, for block 1 to block 10
 for num in {1..10}  
 do  
 python tools/transform_json2txt_mc.py --source_path data/matrix_city/aerial/train/block_$num
@@ -11,7 +11,7 @@ python tools/transform_json2txt_mc.py --source_path data/matrix_city/aerial/test
 python convert_cam.py -s data/matrix_city/aerial/test/block_${num}_test
 done 
 
-# block A
+# Aerial View, block A
 mkdir data/matrix_city/aerial/train/block_A
 mkdir data/matrix_city/aerial/test/block_A_test
 mkdir data/matrix_city/aerial/train/block_A/input
@@ -24,7 +24,7 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python convert_cam.py -s data/matrix_city/aerial/train/block_A
 python convert_cam.py -s data/matrix_city/aerial/test/block_A_test
 
-# block B
+# Aerial View, block B
 mkdir data/matrix_city/aerial/train/block_B
 mkdir data/matrix_city/aerial/test/block_B_test
 mkdir data/matrix_city/aerial/train/block_B/input
@@ -37,7 +37,7 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python convert_cam.py -s data/matrix_city/aerial/train/block_B
 python convert_cam.py -s data/matrix_city/aerial/test/block_B_test
 
-# block C
+# Aerial View, block C
 mkdir data/matrix_city/aerial/train/block_C
 mkdir data/matrix_city/aerial/test/block_C_test
 mkdir data/matrix_city/aerial/train/block_C/input
@@ -50,7 +50,7 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python convert_cam.py -s data/matrix_city/aerial/train/block_C
 python convert_cam.py -s data/matrix_city/aerial/test/block_C_test
 
-# block All
+# Aerial View, block All
 mkdir data/matrix_city/aerial/train/block_all
 mkdir data/matrix_city/aerial/test/block_all_test
 mkdir data/matrix_city/aerial/train/block_all/input
@@ -63,6 +63,7 @@ python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/
 python convert_cam.py -s data/matrix_city/aerial/train/block_all
 python convert_cam.py -s data/matrix_city/aerial/test/block_all_test
 
+# Street View
 mkdir data/matrix_city/street/train/block_A
 mkdir data/matrix_city/street/test/block_A_test
 python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/train/block_A --intrinsic_path data/matrix_city/street/pose/block_A/transforms_train.json
@@ -76,9 +77,3 @@ python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/
 python tools/transform_json2txt_mc_all_street.py --source_path data/matrix_city/street/test/block_small_test --intrinsic_path data/matrix_city/street/pose/block_small/transforms_test.json
 python convert_cam.py -s data/matrix_city/street/train/block_small
 python convert_cam.py -s data/matrix_city/street/test/block_small_test
-
-python tools/colmap_to_mega_nerf.py --train_model_path data/matrix_city/aerial/train/block_all/sparse/0 \
-                                    --train_images_path data/matrix_city/aerial/train/block_all/images \
-                                    --val_model_path data/matrix_city/aerial/test/block_all_test/sparse/0 \
-                                    --val_images_path data/matrix_city/aerial/test/block_all_test/images \
-                                    --output_path data/matrix_city/block_all-pixsfm
