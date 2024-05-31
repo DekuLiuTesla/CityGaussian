@@ -10,7 +10,6 @@
 #
 
 import torch
-import torch_scatter
 import traceback
 import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
@@ -20,7 +19,6 @@ from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH
 from simple_knn._C import distCUDA2
-from pytorch3d.transforms import matrix_to_quaternion
 from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation, build_symmetric
 from utils.large_utils import block_filtering

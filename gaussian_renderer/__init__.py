@@ -10,7 +10,6 @@
 #
 
 import torch
-import torch_scatter
 import math
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 from scene.gaussian_model import GaussianModel
