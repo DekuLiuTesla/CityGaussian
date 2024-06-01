@@ -76,6 +76,8 @@ if __name__ == "__main__":
                 c2w_4x4[:3, :3] = torch.inverse(RDF_TO_DRB) @ c2w[:3, :3] @ RDF_TO_DRB
                 c2w_4x4[:3, 3:] = torch.inverse(RDF_TO_DRB) @ c2w[:3, 3:]
 
+                # c2w_4x4[:3,3] /= 100  # postion scale down for convenient visualization
+                
                 w2c = np.linalg.inv(c2w_4x4.numpy())
                 qw, qx, qy, qz = mat2quat(w2c[:3, :3])
                 tx, ty, tz = w2c[:3, 3]

@@ -65,6 +65,16 @@ if not args.skip_matching:
     if exit_code != 0:
         logging.error(f"Mapper failed with code {exit_code}. Exiting.")
         exit(exit_code)
+    
+    ### Manhattan world alignment
+    # aligner_cmd = (colmap_command + " model_orientation_aligner \
+    #     --image_path " + args.source_path + "/input \
+    #     --input_path "  + args.source_path + "/sparse \
+    #     --output_path "  + args.source_path + "/sparse")
+    # exit_code = os.system(aligner_cmd)
+    # if exit_code != 0:
+    #     logging.error(f"Model orientation alignment failed with code {exit_code}. Exiting.")
+    #     exit(exit_code)
 
 ### Image undistortion
 ## We need to undistort our images into ideal pinhole intrinsics.
