@@ -24,14 +24,35 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False, disabl
             assert args.filter_mode in ['opacity', 'loss'], "Unknown filter mode!"
 
         xyz_org = gaussians.get_xyz
-        if len(args.aabb) == 4:
-            aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
-                    args.aabb[2], args.aabb[3], xyz_org[:, -1].max()]
-        elif len(args.aabb) == 6:
-            aabb = args.aabb
+        if not hasattr(args, 'aabb'):
+            with torch.no_grad():
+                sorted_x = torch.sort(xyz_org[::100, 0], descending=True)[0]
+                sorted_y = torch.sort(xyz_org[::100, 1], descending=True)[0]
+                sorted_z = torch.sort(xyz_org[::100, 2], descending=True)[0]
+
+                ratio = 0.999
+                x_max = torch.quantile(sorted_x, ratio)
+                x_min = torch.quantile(sorted_x, 1-ratio)
+                y_max = torch.quantile(sorted_y, ratio)
+                y_min = torch.quantile(sorted_y, 1-ratio)
+                z_max = torch.quantile(sorted_z, ratio)
+                z_min = torch.quantile(sorted_z, 1-ratio)
+
+                xyz_min = torch.stack([x_min, y_min, z_min])
+                xyz_max = torch.stack([x_max, y_max, z_max])
+                central_min = xyz_min + (xyz_max - xyz_min) / 3
+                central_max = xyz_max - (xyz_max - xyz_min) / 3
+
+                aabb = torch.cat([central_min, central_max], dim=-1)
         else:
-            assert False, "Unknown aabb format!"
-        aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
+            if len(args.aabb) == 4:
+                aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
+                        args.aabb[2], args.aabb[3], xyz_org[:, -1].max()]
+            elif len(args.aabb) == 6:
+                aabb = args.aabb
+            else:
+                assert False, "Unknown aabb format!"
+            aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
         num_threshold = args.num_threshold if hasattr(args, 'num_threshold') else 25000
         print(f"Block number: {block_num}, Gaussian number threshold: {num_threshold}")
