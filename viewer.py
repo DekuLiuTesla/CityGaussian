@@ -4,6 +4,7 @@ import math
 import glob
 import time
 import json
+import yaml
 import argparse
 from typing import Tuple, Literal, List
 
@@ -11,7 +12,7 @@ import numpy as np
 import viser
 import viser.transforms as vtf
 import torch
-from gaussian_renderer import render
+from gaussian_renderer import render_viewer
 from scene.viewer import ClientThread, ViewerRenderer
 from scene.viewer.ui import populate_render_tab, TransformPanel, EditPanel
 
@@ -74,7 +75,7 @@ class Viewer:
         # create renderer
         self.viewer_renderer = ViewerRenderer(
             model,
-            render,
+            render_viewer,
             torch.tensor(background_color, dtype=torch.float, device=self.device),
         )
 
@@ -227,6 +228,15 @@ class Viewer:
             # )
         self.toggle_camera_button.on_click(toggle_camera_visibility)
         # self.camera_scale_slider.on_update(update_camera_scale)
+    
+    @staticmethod
+    def _do_initialize_models_from_vq(point_cloud_path: str, sh_degree, device):
+        # if simplified is True:
+        #     return GaussianModelLoader.initialize_simplified_model_from_point_cloud(point_cloud_path, sh_degree, device)
+        from scene.gaussian_model import GaussianModelLOD
+        model = GaussianModelLOD(sh_degree=sh_degree, device=device)
+        model.load_vq(point_cloud_path)
+        return model, render_viewer
 
     @staticmethod
     def _do_initialize_models_from_point_cloud(point_cloud_path: str, sh_degree, device):
@@ -235,7 +245,7 @@ class Viewer:
         from scene.gaussian_model import GaussianModel
         model = GaussianModel(sh_degree=sh_degree)
         model.load_ply(point_cloud_path)
-        return model, render
+        return model, render_viewer
 
     def _initialize_models_from_point_cloud(self, point_cloud_path: str):
         return self._do_initialize_models_from_point_cloud(point_cloud_path, self.sh_degree, self.device)
@@ -244,14 +254,33 @@ class Viewer:
         print("load model from {}".format(load_from))
         checkpoint = None
         dataset_type = None
-        if load_from.endswith(".ckpt") is True:
-            model, renderer, checkpoint = self._initialize_models_from_checkpoint(load_from)
-            training_output_base_dir = os.path.dirname(os.path.dirname(load_from))
-            dataset_type = checkpoint["datamodule_hyper_parameters"]["type"]
-            self.sh_degree = model.max_sh_degree
+        if load_from.endswith(".yaml") is True:
+            from render_large_lod import parse_cfg, BlockedGaussian
+            with open(load_from) as f:
+                cfg = yaml.load(f, Loader=yaml.FullLoader)
+                config_name = os.path.splitext(os.path.basename(load_from))[0]
+                lp, op, pp = parse_cfg(cfg)
+                assert len(lp.lod_configs)-1 == len(lp.dist_threshold)
+                lp.dist_threshold = [0] + lp.dist_threshold + [1e6]
+                lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
+                training_output_base_dir = os.path.dirname(lp.model_path)
+                self.sh_degree = lp.sh_degree
+            
+            with torch.no_grad():
+                model = []
+                for i in range(len(lp.lod_configs)):
+                    config = lp.lod_configs[i]
+                    config_name = os.path.splitext(os.path.basename(config))[0]
+                    pcd_path = os.path.join(training_output_base_dir, config_name)
+                    
+                    lod_gs, renderer = self._do_initialize_models_from_vq(pcd_path, self.sh_degree, self.device)
+                    lod_gs = BlockedGaussian(lod_gs, lp, range=[lp.dist_threshold[i], lp.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
+                    model.append(lod_gs)
+            
         elif load_from.endswith(".ply") is True:
             model, renderer = self._initialize_models_from_point_cloud(load_from)
             training_output_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(load_from)))
+            self.sh_degree = model.max_sh_degree
         else:
             raise ValueError("unsupported file {}".format(load_from))
 
@@ -330,13 +359,13 @@ class Viewer:
                 )
                 self.scaling_modifier.on_update(self._handle_option_updated)
 
-                if self.viewer_renderer.gaussian_model.max_sh_degree > 0:
+                if self.sh_degree > 0:
                     self.active_sh_degree_slider = server.add_gui_slider(
                         "Active SH Degree",
                         min=0,
-                        max=self.viewer_renderer.gaussian_model.max_sh_degree,
+                        max=self.sh_degree,
                         step=1,
-                        initial_value=self.viewer_renderer.gaussian_model.max_sh_degree,
+                        initial_value=self.sh_degree,
                     )
                     self.active_sh_degree_slider.on_update(self._handle_activate_sh_degree_slider_updated)
 
