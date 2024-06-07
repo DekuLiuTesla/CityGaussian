@@ -551,4 +551,4 @@ def render_viewer(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.T
     if isinstance(pc, GaussianModel):
         return render(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)
     else:
-        return render_lod_v3(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)
+        return render_lod_v2(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)

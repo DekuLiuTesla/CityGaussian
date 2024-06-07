@@ -255,7 +255,7 @@ class Viewer:
         checkpoint = None
         dataset_type = None
         if load_from.endswith(".yaml") is True:
-            from render_large_lod import parse_cfg, BlockedGaussian
+            from render_large_lod_v2 import parse_cfg, BlockedGaussian
             with open(load_from) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
