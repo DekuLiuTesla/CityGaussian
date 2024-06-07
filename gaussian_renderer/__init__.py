@@ -12,7 +12,7 @@
 import torch
 import math
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
-from scene.gaussian_model import GaussianModel
+from scene.gaussian_model import GaussianModel, GatheredGaussian
 from utils.sh_utils import eval_sh
 from utils.large_utils import in_frustum
 
@@ -449,55 +449,55 @@ def render_lod_v2(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor,
             "visibility_filter" : radii > 0,
             "radii": radii}
 
-def render_lod_v3(viewpoint_cam, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
+def render_lod_v3(viewpoint_cam, pc: GatheredGaussian, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
     
     # sort cells by distance to camera
 
-    in_frustum_mask = in_frustum(viewpoint_cam, cell_corners, aabb, block_dim)
+    in_frustum_mask = in_frustum(viewpoint_cam, pc.cell_corners, pc.aabb, pc.block_dim)
     in_frustum_indices = in_frustum_mask.nonzero().squeeze(0)
     cam_center = viewpoint_cam.camera_center
-    distance3D = torch.norm(cell_corners[in_frustum_mask, :, :2] - cam_center[:2], dim=2).min(dim=1).values
+    distance3D = torch.norm(pc.cell_corners[in_frustum_mask, :, :2] - cam_center[:2], dim=2).min(dim=1).values
 
     focal_length = 0.5 * viewpoint_cam.image_width / math.tan(viewpoint_cam.FoVx * 0.5)
     nyquist_scalings = 2 * distance3D / focal_length
-    avg_scalings = block_scalings[:, in_frustum_mask]
+    avg_scalings = pc.block_scalings[:, in_frustum_mask]
     
     # compare avg_scalings with nyquist_scalings to decide which lod to use
     values, lod_indices = torch.max((avg_scalings > nyquist_scalings.unsqueeze(0)).to(torch.uint8), dim=0)
-    lod_indices[values==0] = block_scalings.shape[0] - 1
+    lod_indices[values==0] = pc.block_scalings.shape[0] - 1
 
-    in_frustum_indices = in_frustum_indices.squeeze() + lod_indices * block_dim[0] * block_dim[1] * block_dim[2]
-    mask = torch.isin(gs_ids, in_frustum_indices.to(gs_feats.device))
+    in_frustum_indices = in_frustum_indices.squeeze() + lod_indices * pc.block_dim[0] * pc.block_dim[1] * pc.block_dim[2]
+    mask = torch.isin(pc.gs_ids, in_frustum_indices.to(pc.gs_feats.device))
     
     # used for BlockedGaussianV3
-    feat_end_dim = 3 * (max_sh_degree + 1) ** 2 + 1
+    feat_end_dim = 3 * (pc.max_sh_degree + 1) ** 2 + 1
 
-    means3D = gs_xyz[mask, :3].float()
+    means3D = pc.gs_xyz[mask, :3].float()
     screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
     means2D = screenspace_points
-    opacity = gs_feats[mask, 4].float()
+    opacity = pc.gs_feats[mask, 4].float()
     # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
     # scaling / rotation by the rasterizer.
     scales = None
     rotations = None
     cov3D_precomp = None
     if pipe.compute_cov3D_python:
-        cov3D_precomp = gs_feats[mask, feat_end_dim:].float()
+        cov3D_precomp = pc.gs_feats[mask, feat_end_dim:].float()
     else:
-        scales = gs_feats[mask, feat_end_dim:feat_end_dim+3].float()
-        rotations = gs_feats[mask, (feat_end_dim+3):].float()
+        scales = pc.gs_feats[mask, feat_end_dim:feat_end_dim+3].float()
+        rotations = pc.gs_feats[mask, (feat_end_dim+3):].float()
         
     # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
     # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
     shs = None
     colors_precomp = None
     if override_color is None:
-        features = gs_feats[mask, 1:feat_end_dim].reshape(-1, (max_sh_degree+1)**2, 3).float()
+        features = pc.gs_feats[mask, 1:feat_end_dim].reshape(-1, (pc.max_sh_degree+1)**2, 3).float()
         if pipe.convert_SHs_python:
-            shs_view = features.transpose(1, 2).view(-1, 3, (max_sh_degree+1)**2)
+            shs_view = features.transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
             dir_pp = (means3D - viewpoint_cam.camera_center.repeat(features.shape[0], 1))
             dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
-            sh2rgb = eval_sh(max_sh_degree, shs_view, dir_pp_normalized)
+            sh2rgb = eval_sh(pc.max_sh_degree, shs_view, dir_pp_normalized)
             colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
         else:
             shs = features
@@ -517,7 +517,7 @@ def render_lod_v3(viewpoint_cam, gs_xyz, gs_feats, gs_ids, block_scalings, cell_
         scale_modifier=scaling_modifier,
         viewmatrix=viewpoint_cam.world_view_transform,
         projmatrix=viewpoint_cam.full_proj_transform,
-        sh_degree=max_sh_degree,
+        sh_degree=pc.max_sh_degree,
         campos=viewpoint_cam.camera_center, 
         prefiltered=False,
         debug=pipe.debug
@@ -551,4 +551,4 @@ def render_viewer(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.T
     if isinstance(pc, GaussianModel):
         return render(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)
     else:
-        return render_lod_v2(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)
+        return render_lod_v3(viewpoint_camera, pc, pipe, bg_color, scaling_modifier, override_color)

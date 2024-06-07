@@ -19,7 +19,7 @@ import numpy as np
 from utils.system_utils import searchForMaxIteration
 from utils.graphics_utils import BasicPointCloud
 from scene.dataset_readers import sceneLoadTypeCallbacks, storePly, SceneInfo
-from scene.gaussian_model import GaussianModel, GaussianModelLOD
+from scene.gaussian_model import GaussianModel, GaussianModelLOD, GatheredGaussian
 from arguments import ModelParams, GroupParams
 from plyfile import PlyData, PlyElement
 from utils.camera_utils import cameraList_from_camInfos, camera_to_JSON

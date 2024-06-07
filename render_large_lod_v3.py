@@ -27,7 +27,7 @@ from utils.general_utils import safe_state
 from utils.large_utils import which_block, block_filtering
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
-from gaussian_renderer import GaussianModel
+from gaussian_renderer import GaussianModel, GatheredGaussian
 from torch.utils.data import DataLoader
 from utils.camera_utils import loadCam
 
@@ -116,7 +116,7 @@ def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cu
 
     return gaussians, scene
 
-def render_set(model_path, name, iteration, views, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipeline, background):
+def render_set(model_path, name, iteration, views, model, max_sh_degree, pipeline, background):
     avg_render_time = 0
     max_render_time = 0
     avg_memory = 0
@@ -136,7 +136,7 @@ def render_set(model_path, name, iteration, views, gs_xyz, gs_feats, gs_ids, blo
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
-        rendering = render_lod_v3(viewpoint_cam, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipeline, background)["render"]
+        rendering = render_lod_v3(viewpoint_cam, model, pipeline, background)["render"]
         torch.cuda.synchronize()
         end = time.time()
         avg_render_time += end-start
@@ -177,12 +177,18 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             lod_gs = BlockedGaussian(lod_gs, lp, range=[dataset.dist_threshold[i], dataset.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         
-        cell_corners, aabb, block_dim, num_cell, max_sh_degree = lod_gs_list[-1].cell_corners, lod_gs_list[-1].aabb, lod_gs_list[-1].block_dim, lod_gs_list[-1].num_cell, lod_gs_list[-1].max_sh_degree
-        gs_xyz = torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0)
-        gs_feats = torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half()
-        gs_ids = torch.cat([lod_gs.cell_ids+idx*num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8)
-        block_scalings = torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0)
+        num_cell, max_sh_degree = lod_gs_list[-1].num_cell, lod_gs_list[-1].max_sh_degree
         loaded_iter, train_cams, test_cams = scene.loaded_iter, scene.getTrainCameras(), scene.getTestCameras()
+        model = GatheredGaussian(
+            gs_xyz=torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0),
+            gs_feats=torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half(),
+            gs_ids=torch.cat([lod_gs.cell_ids+idx*num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8),
+            block_scalings=torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0),
+            cell_corners=lod_gs_list[-1].cell_corners,
+            aabb=lod_gs_list[-1].aabb,
+            block_dim=lod_gs_list[-1].block_dim,
+            max_sh_degree=max_sh_degree,
+        )
         del lod_gs_list, lod_gs, scene
 
         if custom_test:
@@ -194,14 +200,14 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         
         if custom_test:
             views = train_cams + test_cams
-            render_set(dataset.model_path, filename, loaded_iter, views, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipeline, background)
+            render_set(dataset.model_path, filename, loaded_iter, views, model, max_sh_degree, pipeline, background)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", loaded_iter, train_cams, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipeline, background)
+                render_set(dataset.model_path, "train", loaded_iter, train_cams, model, max_sh_degree, pipeline, background)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", loaded_iter, test_cams, gs_xyz, gs_feats, gs_ids, block_scalings, cell_corners, aabb, block_dim, max_sh_degree, pipeline, background)
+                render_set(dataset.model_path, "test", loaded_iter, test_cams, model, max_sh_degree, pipeline, background)
 
 def parse_cfg(cfg):
     lp = GroupParams()
