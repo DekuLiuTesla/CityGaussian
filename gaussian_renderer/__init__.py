@@ -452,7 +452,6 @@ def render_lod_v2(viewpoint_cam, lod_list : list, pipe, bg_color : torch.Tensor,
 def render_lod_v3(viewpoint_cam, pc: GatheredGaussian, pipe, bg_color : torch.Tensor, scaling_modifier = 1.0, override_color = None):
     
     # sort cells by distance to camera
-
     in_frustum_mask = in_frustum(viewpoint_cam, pc.cell_corners, pc.aabb, pc.block_dim)
     in_frustum_indices = in_frustum_mask.nonzero().squeeze(0)
     cam_center = viewpoint_cam.camera_center
@@ -465,17 +464,16 @@ def render_lod_v3(viewpoint_cam, pc: GatheredGaussian, pipe, bg_color : torch.Te
     # compare avg_scalings with nyquist_scalings to decide which lod to use
     values, lod_indices = torch.max((avg_scalings > nyquist_scalings.unsqueeze(0)).to(torch.uint8), dim=0)
     lod_indices[values==0] = pc.block_scalings.shape[0] - 1
-
     in_frustum_indices = in_frustum_indices.squeeze() + lod_indices * pc.block_dim[0] * pc.block_dim[1] * pc.block_dim[2]
     mask = torch.isin(pc.gs_ids, in_frustum_indices.to(pc.gs_feats.device))
     
     # used for BlockedGaussianV3
     feat_end_dim = 3 * (pc.max_sh_degree + 1) ** 2 + 1
 
-    means3D = pc.gs_xyz[mask, :3].float()
+    means3D = pc.gs_xyz[mask].float()
     screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
     means2D = screenspace_points
-    opacity = pc.gs_feats[mask, 4].float()
+    opacity = pc.gs_feats[mask, 0].float()
     # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
     # scaling / rotation by the rasterizer.
     scales = None
