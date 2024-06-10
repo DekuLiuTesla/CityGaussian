@@ -130,6 +130,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
+    parser.add_argument('--block_id', type=int, default=-1)
     parser.add_argument("--resolution", default=-1, type=int)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
@@ -150,6 +151,8 @@ if __name__ == "__main__":
         setattr(lp, 'config_path', args.config)
         if args.resolution != -1:
             setattr(lp, 'resolution', args.resolution)
+        if args.block_id != -1:
+            lp.block_id = args.block_id
         if lp.model_path == '':
             lp.model_path = args.model_path
 

@@ -129,7 +129,7 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
-def readColmapSceneInfo(path, images, eval, llffhold=8):
+def readColmapSceneInfo(path, images, eval, llffhold=8, partition=None):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -145,9 +145,21 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
+    if partition is not None:
+        filtered_cam_infos = []
+        for i in range(partition.shape[0]):
+            if partition[i]:
+                filtered_cam_infos.append(cam_infos[i])
+        cam_infos = filtered_cam_infos
+        print(f"Filtered Cameras: {len(cam_infos)}. ")
+
     if eval:
+        import math
+        eval_image_num = max(math.ceil(0.05 * len(cam_infos)), 1)
+        llffhold = max(len(cam_infos) // eval_image_num, llffhold)
         train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
         test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+        print(f"Train cameras: {len(train_cam_infos)}, Test cameras: {len(test_cam_infos)}")
     else:
         train_cam_infos = cam_infos
         test_cam_infos = []

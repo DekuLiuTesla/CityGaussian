@@ -119,8 +119,14 @@ class LargeScene(Scene):
         self.train_cameras = {}
         self.test_cameras = {}
 
+        if hasattr(args, 'block_id') and args.block_id >= 0:
+            partition = np.load(os.path.join(args.source_path, "data_partitions", f"{args.partition_name}.npy"))[:, args.block_id]
+            print(f"Using Partition File {args.partition_name}.npy")
+        else:
+            partition = None
+
         if os.path.exists(os.path.join(args.source_path, "sparse")):
-            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval)
+            scene_info = sceneLoadTypeCallbacks["Colmap"](args.source_path, args.images, args.eval, partition=partition)
         elif os.path.exists(os.path.join(args.source_path, "transforms_train.json")):
             print("Found transforms_train.json file, assuming Blender data set!")
             scene_info = sceneLoadTypeCallbacks["Blender"](args.source_path, args.white_background, args.eval)
@@ -140,21 +146,6 @@ class LargeScene(Scene):
                 json_cams.append(camera_to_JSON(id, cam))
             with open(os.path.join(self.model_path, "cameras.json"), 'w') as file:
                 json.dump(json_cams, file)
-        
-        if hasattr(args, 'block_id') and args.block_id >= 0:
-            from pathlib import Path
-            partition = np.load(os.path.join(args.source_path, "data_partitions", f"{args.partition_name}.npy"))
-            filtered_train_cameras = []
-            for i in range(partition.shape[0]):
-                if partition[i, args.block_id]:
-                    filtered_train_cameras.append(scene_info.train_cameras[i])
-            filtered_train_cameras = filtered_train_cameras if len(filtered_train_cameras) >= 50 else []
-            print(f"Filtered Cameras: {len(filtered_train_cameras)}. Using Partition File {args.partition_name}.npy")
-            scene_info = SceneInfo(point_cloud=scene_info.point_cloud,
-                                   train_cameras=filtered_train_cameras,
-                                   test_cameras=scene_info.test_cameras,
-                                   nerf_normalization=scene_info.nerf_normalization,
-                                   ply_path=scene_info.ply_path)
 
         if shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffcameras_extentling
