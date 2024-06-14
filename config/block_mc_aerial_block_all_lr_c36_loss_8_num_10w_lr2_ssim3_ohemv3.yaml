@@ -21,7 +21,7 @@ model_params: {
     eval: True,
     logger_config: {
         logger: "wandb",
-        name: "block_mc_aerial_block_all_lr_c36_loss_8_num_10w_lr2_ssim3",
+        name: "block_mc_aerial_block_all_lr_c36_loss_8_num_10w_lr2_ssim3_ohemv3",
         project: "LargeGS"
     }
 }
@@ -53,7 +53,7 @@ optim_params: {
     densify_from_iter: 500,
     densify_until_iter: 15_000,
     densify_grad_threshold: 0.0002,
-    ohem: 0.6
+    ohem: 0.65
 }
 
 

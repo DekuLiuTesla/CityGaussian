@@ -37,7 +37,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
     first_iter = 0
     sampler = None
     shuffle = True
-    ohem = True if hasattr(opt, "ohem") and opt.ohem else False
+    ohem = opt.ohem if hasattr(opt, "ohem") and opt.ohem > 0 else 0
     log_writer, image_logger = prepare_output_and_logger(dataset)
 
     modules = __import__('scene')
@@ -137,7 +137,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
                 if (iteration in refilter_iterations):
                     print("\n[ITER {}] Refiltering Training Data".format(iteration))
                     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
-                if ohem:
+                if ohem > 0:
                     # Use SSIM Loss as weights
                     samples_loss[cam_info['image_name'][0]] = Lssim.item()
 
@@ -167,11 +167,30 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
             if iteration >= opt.iterations:
                 break
         
-        if ohem:
-            from torch.utils.data import WeightedRandomSampler
+        if ohem > 0:
             if shuffle is True:
+                import numpy as np
+                from torch.utils.data import WeightedRandomSampler
                 print("Start applying OHEM.")
-            samples_weight = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
+
+            # v3
+            weights = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
+            num_bins = weights.shape[0] // 10
+            hist, bin_edges = torch.histogram(weights, bins=num_bins, density=True)
+            hist = torch.cumsum(hist / hist.sum(), dim=0)
+            hist = torch.clamp(hist, 1 - ohem, ohem)
+            samples_weight = torch.zeros_like(weights)
+            for i in range(num_bins):
+                samples_weight[(weights >= bin_edges[i]) & (weights <= bin_edges[i+1])] = hist[i]
+            
+            # v2
+            # samples_weight = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
+            # t = np.clip(iteration / opt.iterations, 0.0, 1.0)
+            # log_lerp = torch.tensor(np.exp(np.log(1e-3) * (1 - t) + np.log(1.0) * t), device=samples_weight.device)
+            # mask = samples_weight >= samples_weight.mean() + samples_weight.std() * 2 * (log_lerp - 0.5)
+            # samples_weight[~mask] = 1 - ohem
+            # samples_weight[mask] = ohem
+
             sampler = WeightedRandomSampler(samples_weight, len(gs_dataset), replacement=True)
             shuffle = None
 
