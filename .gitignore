@@ -15,3 +15,4 @@ sh_run_2.sh
 sh_run_large_app2.sh
 sh_run1.sh
 sh_run2.sh
+tools/merge_new_img.py
