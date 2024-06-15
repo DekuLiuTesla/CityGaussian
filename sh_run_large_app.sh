@@ -24,13 +24,13 @@ NAME=campus-pixsfm-swag-grad
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-    --config configs/large_scale_appearance_swag_campus.yaml \
-    --data.path data/urban_scene_3d/campus-pixsfm/train \
-    --data.params.colmap.down_sample_factor 4 \
-    --data.params.colmap.appearance_groups appearance_group_by_image \
-    -n $NAME \
-    --logger wandb \
-    --project JointGS \
+--config configs/large_scale_appearance_swag_campus.yaml \
+--data.path data/urban_scene_3d/campus-pixsfm/train \
+--data.params.colmap.down_sample_factor 4 \
+--data.params.colmap.appearance_groups appearance_group_by_image \
+-n $NAME \
+--logger wandb \
+--project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -41,10 +41,11 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.colmap.eval_image_select_mode ratio \
     --data.params.colmap.eval_ratio 1.0 \
     --model.save_val_output true \
+    --model.correct_color true \
 
 
 # # large scale dataset
-# NAME=sci-art-pixsfm-swag-grad
+NAME=sci-art-pixsfm-swag-grad8
 
 # # Single GPU at the beginning
 # gpu_id=$(get_available_gpu)
@@ -67,3 +68,4 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
 #     --data.params.colmap.eval_image_select_mode ratio \
 #     --data.params.colmap.eval_ratio 1.0 \
 #     --model.save_val_output true \
+#     --model.correct_color true \
