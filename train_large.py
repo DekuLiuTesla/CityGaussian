@@ -57,6 +57,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
     iter_end = torch.cuda.Event(enable_timing = True)
 
     samples_loss = {cam.image_name:1.0 for cam in gs_dataset.cameras}
+    samples_grad = {cam.image_name:1.0 for cam in gs_dataset.cameras}
     ema_loss_for_log = 0.0
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
@@ -140,6 +141,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
                 if ohem > 0:
                     # Use SSIM Loss as weights
                     samples_loss[cam_info['image_name'][0]] = Lssim.item()
+                    samples_grad[cam_info['image_name'][0]] = gaussians._xyz.grad[visibility_filter].mean(dim=-1).max().item()
 
                 # Densification
                 if iteration < opt.densify_until_iter:
@@ -173,23 +175,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
                 from torch.utils.data import WeightedRandomSampler
                 print("Start applying OHEM.")
 
-            # v3
-            weights = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
-            num_bins = weights.shape[0] // 10
-            hist, bin_edges = torch.histogram(weights, bins=num_bins, density=True)
-            hist = torch.cumsum(hist / hist.sum(), dim=0)
-            hist = torch.clamp(hist, 1 - ohem, ohem)
+            # v4
+            loss_weights = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
+            grad_weights = torch.tensor([samples_grad[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
+            weights = grad_weights.abs() * (grad_weights - grad_weights.mean()).abs() * (loss_weights - loss_weights.mean()).abs()
+            weights = -torch.log10(weights + 1e-10)
             samples_weight = torch.zeros_like(weights)
-            for i in range(num_bins):
-                samples_weight[(weights >= bin_edges[i]) & (weights <= bin_edges[i+1])] = hist[i]
-            
-            # v2
-            # samples_weight = torch.tensor([samples_loss[cam.image_name] for cam in gs_dataset.cameras], dtype=torch.float32)
-            # t = np.clip(iteration / opt.iterations, 0.0, 1.0)
-            # log_lerp = torch.tensor(np.exp(np.log(1e-3) * (1 - t) + np.log(1.0) * t), device=samples_weight.device)
-            # mask = samples_weight >= samples_weight.mean() + samples_weight.std() * 2 * (log_lerp - 0.5)
-            # samples_weight[~mask] = 1 - ohem
-            # samples_weight[mask] = ohem
+            mask = weights >= weights.mean() - weights.std()
+            samples_weight[~mask] = 1 - ohem
+            samples_weight[mask] = ohem
 
             sampler = WeightedRandomSampler(samples_weight, len(gs_dataset), replacement=True)
             shuffle = None
