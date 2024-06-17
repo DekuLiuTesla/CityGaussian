@@ -44,6 +44,55 @@ class ColmapParams:
 
     down_sample_factor: int = 1
 
+@dataclass
+class ColmapBlockParams:
+    """
+        Args:
+            image_dir: the path to the directory that store images
+
+            mask_dir:
+                the path to the directory store mask files;
+                the mask file of the image `a/image_name.jpg` is `a/image_name.jpg.png`;
+                single channel, 0 is the masked pixel;
+
+            split_mode: reconstruction: train model use all images; experiment: withholding a test set for evaluation
+
+            eval_step: -1: use all images as training set; > 1: pick an image for every eval_step
+
+            reorient: whether reorient the scene
+
+            appearance_groups: filename without extension
+    """
+
+    image_dir: str = None
+
+    mask_dir: str = None
+
+    split_mode: Literal["reconstruction", "experiment"] = "reconstruction"
+
+    eval_image_select_mode: Literal["step", "ratio"] = "step"
+
+    eval_step: int = 8
+
+    eval_ratio: float = 0.01
+
+    scene_scale: float = 1.
+
+    reorient: bool = False  # TODO
+
+    appearance_groups: Optional[str] = None
+
+    image_list: Optional[str] = None
+
+    down_sample_factor: int = 1
+
+    block_id: int = None
+
+    block_dim: list[int] = None
+
+    aabb: list[float] = None
+
+    opacity_threshold: float = 0.08
 
 @dataclass
 class BlenderParams:
@@ -109,6 +158,8 @@ class DatasetParams:
     colmap: ColmapParams
 
     colmap_joint: ColmapParams
+
+    colmap_block: ColmapBlockParams
 
     blender: BlenderParams
 

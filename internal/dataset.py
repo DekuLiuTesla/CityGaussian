@@ -19,6 +19,7 @@ from internal.dataparsers import ImageSet
 from internal.configs.dataset import DatasetParams
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_joint_dataparser import ColmapJointDataParser
+from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
 from internal.dataparsers.blender_dataparser import BlenderDataParser
 from internal.dataparsers.nsvf_dataparser import NSVFDataParser
 from internal.dataparsers.nerfies_dataparser import NerfiesDataparser
@@ -249,7 +250,7 @@ class DataModule(LightningDataModule):
             self,
             path: str,
             params: DatasetParams,
-            type: Literal["colmap", "colmap_joint", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
+            type: Literal["colmap", "colmap_joint", "colmap_block", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
             distributed: bool = False,
             undistort_image: bool = False,
     ) -> None:
@@ -296,6 +297,8 @@ class DataModule(LightningDataModule):
             dataparser = ColmapDataParser(params=self.hparams["params"].colmap, **dataparser_params)
         elif self.hparams["type"] == "colmap_joint":
             dataparser = ColmapJointDataParser(params=self.hparams["params"].colmap_joint, **dataparser_params)
+        elif self.hparams["type"] == "colmap_block":
+            dataparser = ColmapBlockDataParser(params=self.hparams["params"].colmap_block, **dataparser_params)
         elif self.hparams["type"] == "blender":
             dataparser = BlenderDataParser(params=self.hparams["params"].blender, **dataparser_params)
         elif self.hparams["type"] == "nsvf":
