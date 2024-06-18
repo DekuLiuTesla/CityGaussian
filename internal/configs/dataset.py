@@ -92,7 +92,9 @@ class ColmapBlockParams:
 
     aabb: list[float] = None
 
-    opacity_threshold: float = 0.08
+    num_threshold: int = 25_000
+
+    content_threshold: float = 0.08
 
 @dataclass
 class BlenderParams:

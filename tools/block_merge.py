@@ -2,6 +2,7 @@ import os
 import sys
 import yaml
 import torch
+import copy
 from tqdm import tqdm
 from argparse import ArgumentParser, Namespace
 
@@ -69,11 +70,15 @@ def block_merging(coarse_model,
             min_z, max_z = float(block_id_z) / block_dim[2], float(block_id_z + 1) / block_dim[2]
 
             block_path = os.path.join(output_path, "blocks", "block_{}".format(block_id))
-            model, _ = GaussianModelLoader.search_and_load(
-                block_path,
-                sh_degree=3,
-                device="cuda",
-            )
+            try:
+                model, _ = GaussianModelLoader.search_and_load(
+                    block_path,
+                    sh_degree=3,
+                    device="cuda",
+                )
+            except:
+                print(f"Block {block_id} not found. Using coarse Global Model")
+                model = copy.deepcopy(coarse_model)
             xyz_block = contract_to_unisphere(model.get_xyz, aabb, ord=torch.inf)
             mask_preserved = (xyz_block[:, 0] >= min_x) & (xyz_block[:, 0] < max_x)  \
                             & (xyz_block[:, 1] >= min_y) & (xyz_block[:, 1] < max_y) \

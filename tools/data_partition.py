@@ -126,8 +126,9 @@ def block_filtering(gaussians,
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
-    parser.add_argument('--model_path', type=str, help='path of coarse global model', required=True)
-    parser.add_argument("--block_dim", type=int, nargs="+", required=True)
+    parser.add_argument('--config_path', type=str, help='path of finetuned model', default=None)
+    parser.add_argument('--model_path', type=str, help='path of coarse global model')
+    parser.add_argument("--block_dim", type=int, nargs="+", default=None)
     parser.add_argument("--aabb", type=float, nargs="+", default=None)
     parser.add_argument("--num_threshold", type=int, default=25000)
     parser.add_argument("--content_threshold", type=float, default=0.08)
@@ -135,6 +136,17 @@ if __name__ == "__main__":
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--disable_inblock", action="store_true")
     args = parser.parse_args(sys.argv[1:])
+
+    if args.config_path is not None:
+        # parameters in config file will overwrite command line arguments
+        print(f"Loading parameters from config file {args.config_path}")
+        with open(args.config_path, 'r') as f:
+            config = parse(yaml.load(f, Loader=yaml.FullLoader))
+        args.block_dim = config.data.params.colmap_block.block_dim
+        args.aabb = config.data.params.colmap_block.aabb
+        args.num_threshold = config.data.params.colmap_block.num_threshold
+        args.content_threshold = config.data.params.colmap_block.content_threshold
+        args.model_path = config.model.init_from.split("/point_cloud/")[0]
     
     model, renderer = GaussianModelLoader.search_and_load(
         args.model_path,
@@ -146,13 +158,6 @@ if __name__ == "__main__":
     config_path = os.path.join(args.model_path, "config.yaml")
     with open(config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
-    
-    if args.save_dir is None:
-        save_dir = os.path.join(config.data.path, "partition", f"{args.block_dim[0]}_{args.block_dim[1]}_{args.block_dim[2]}")
-    else:
-        save_dir = args.save_dir
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
             
     dataparser_outputs = ColmapDataParser(
         os.path.expanduser(config.data.path),
@@ -160,6 +165,13 @@ if __name__ == "__main__":
         global_rank=0,
         params=config.data.params.colmap,
     ).get_outputs()
+    
+    if args.save_dir is None:
+        save_dir = os.path.join(config.data.path, "partition", f"{args.block_dim[0]}_{args.block_dim[1]}_{args.block_dim[2]}")
+    else:
+        save_dir = args.save_dir
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
     block_filtering(model, renderer, 
                     dataparser_outputs.train_set, 

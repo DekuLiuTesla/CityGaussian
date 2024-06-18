@@ -62,7 +62,7 @@ class CLI(LightningCLI):
         if config.version is not None:
             output_path = os.path.join(output_path, config.version)
         if config.data.type == "colmap_block" and config.data.params.colmap_block.block_id is not None:
-            output_path = os.path.join(output_path, "block_{}".format(config.data.params.colmap_block.block_id))
+            output_path = os.path.join(output_path, "blocks", "block_{}".format(config.data.params.colmap_block.block_id))
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
         config.model.output_path = output_path
