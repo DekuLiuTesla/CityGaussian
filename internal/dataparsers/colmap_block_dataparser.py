@@ -33,12 +33,11 @@ class ColmapBlockDataParser(ColmapDataParser):
         # filter images
         selected_image_ids = None
         selected_image_names = None
-        if self.params.image_list is not None:
+        if self.params.image_list is not None and self.params.block_id is not None:
             # load image list
             selected_image_ids = {}
             selected_image_names = {}
-            if self.params.block_id >= 0:
-                self.params.image_list = os.path.join(self.params.image_list, f"block_{self.params.block_id}.txt")
+            self.params.image_list = os.path.join(self.params.image_list, f"block_{self.params.block_id}.txt")
             with open(self.params.image_list, "r") as f:
                 for image_name in f:
                     image_name = image_name[:-1]
