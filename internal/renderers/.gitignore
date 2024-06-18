@@ -13,3 +13,5 @@
 !pypreprocess_gsplat_renderer.py
 !swag_renderer.py
 !mip_splatting_gsplat_renderer.py
+!gsplat_hit_pixel_count_renderer.py
+!vanilla_2dgs_renderer.py

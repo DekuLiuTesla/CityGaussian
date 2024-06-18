@@ -51,29 +51,31 @@ class VanillaGS4DRenderer(Renderer):
         scales = pc._scaling
         rotations = pc._rotation
         opacity = pc._opacity
+        shs = pc.get_features
         time = viewpoint_camera.time.repeat(means3D.shape[0], 1)
 
-        deformation_point = self.deformation_table
-        means3D_deform, scales_deform, rotations_deform, opacity_deform = self.deformation(
-            means3D[deformation_point],
-            scales[deformation_point],
-            rotations[deformation_point],
-            opacity[deformation_point],
-            time[deformation_point],
+        # deformation_point = self.deformation_table
+        means3D_final, scales_final, rotations_final, opacity_final, shs_final = self.deformation(
+            means3D,
+            scales,
+            rotations,
+            opacity,
+            shs,
+            time,
         )
 
-        means3D_final = torch.zeros_like(means3D)
-        rotations_final = torch.zeros_like(rotations)
-        scales_final = torch.zeros_like(scales)
-        opacity_final = torch.zeros_like(opacity)
-        means3D_final[deformation_point] = means3D_deform
-        rotations_final[deformation_point] = rotations_deform
-        scales_final[deformation_point] = scales_deform
-        opacity_final[deformation_point] = opacity_deform
-        means3D_final[~deformation_point] = means3D[~deformation_point]
-        rotations_final[~deformation_point] = rotations[~deformation_point]
-        scales_final[~deformation_point] = scales[~deformation_point]
-        opacity_final[~deformation_point] = opacity[~deformation_point]
+        # means3D_final = torch.zeros_like(means3D)
+        # rotations_final = torch.zeros_like(rotations)
+        # scales_final = torch.zeros_like(scales)
+        # opacity_final = torch.zeros_like(opacity)
+        # means3D_final[deformation_point] = means3D_deform
+        # rotations_final[deformation_point] = rotations_deform
+        # scales_final[deformation_point] = scales_deform
+        # opacity_final[deformation_point] = opacity_deform
+        # means3D_final[~deformation_point] = means3D[~deformation_point]
+        # rotations_final[~deformation_point] = rotations[~deformation_point]
+        # scales_final[~deformation_point] = scales[~deformation_point]
+        # opacity_final[~deformation_point] = opacity[~deformation_point]
 
         scales_final = pc.scaling_activation(scales_final)
         rotations_final = pc.rotation_activation(rotations_final)
@@ -84,7 +86,7 @@ class VanillaGS4DRenderer(Renderer):
             opacity=opacity_final,
             scales=scales_final,
             rotations=rotations_final,
-            features=pc.get_features,
+            features=shs_final,
             active_sh_degree=pc.active_sh_degree,
             viewpoint_camera=viewpoint_camera,
             bg_color=bg_color,

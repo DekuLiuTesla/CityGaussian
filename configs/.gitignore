@@ -16,3 +16,12 @@
 !pypreprocess_gsplat.yaml
 !swag_baseline.yaml
 !mip_splatting_gsplat.yaml
+!light_gaussian
+!light_gaussian/prune_finetune.yaml
+!light_gaussian/prune_finetune-gsplat.yaml
+!light_gaussian/prune_finetune-gsplat-experiment.yaml
+!light_gaussian/train_densify_prune-gsplat.yaml
+!light_gaussian/train_densify_prune-gsplat-experiment.yaml
+!gsplat-absgrad.yaml
+!gsplat-absgrad-experiment.yaml
+!vanilla_2dgs.yaml

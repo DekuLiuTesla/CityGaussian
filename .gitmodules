@@ -4,6 +4,3 @@
 [submodule "submodules/simple-knn"]
 	path = submodules/simple-knn
 	url = https://gitlab.inria.fr/bkerbl/simple-knn.git
-[submodule "submodules/tiny-cuda-nn-fp32"]
-	path = submodules/tiny-cuda-nn-fp32
-	url = https://github.com/yzslab/tiny-cuda-nn-fp32.git

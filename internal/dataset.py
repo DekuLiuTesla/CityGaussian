@@ -252,6 +252,7 @@ class DataModule(LightningDataModule):
             type: Literal["colmap", "colmap_joint", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
             distributed: bool = False,
             undistort_image: bool = False,
+            val_on_train: bool = False,
     ) -> None:
         r"""Load dataset
 
@@ -424,17 +425,25 @@ class DataModule(LightningDataModule):
         )
 
     def test_dataloader(self) -> EVAL_DATALOADERS:
+        if self.hparams["val_on_train"] is True:
+            image_set = self.dataparser_outputs.train_set
+        else:
+            image_set = self.dataparser_outputs.test_set
         return CacheDataLoader(
-            Dataset(self.dataparser_outputs.test_set, undistort_image=self.hparams["undistort_image"]),
+            Dataset(image_set, undistort_image=self.hparams["undistort_image"]),
             max_cache_num=self.hparams["params"].test_max_num_images_to_cache,
             shuffle=False,
-            num_workers=0,
+            num_workers=self.hparams["params"].num_workers,
         )
 
     def val_dataloader(self) -> EVAL_DATALOADERS:
+        if self.hparams["val_on_train"] is True:
+            image_set = self.dataparser_outputs.train_set
+        else:
+            image_set = self.dataparser_outputs.val_set
         return CacheDataLoader(
-            Dataset(self.dataparser_outputs.val_set, undistort_image=self.hparams["undistort_image"]),
+            Dataset(image_set, undistort_image=self.hparams["undistort_image"]),
             max_cache_num=self.hparams["params"].val_max_num_images_to_cache,
             shuffle=False,
-            num_workers=0,
+            num_workers=self.hparams["params"].num_workers,
         )

@@ -44,6 +44,8 @@ class ColmapParams:
 
     down_sample_factor: int = 1
 
+    down_sample_rounding_model: Literal["floor", "round", "ceil"] = "round"
+
 
 @dataclass
 class BlenderParams:

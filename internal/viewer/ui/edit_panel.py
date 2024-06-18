@@ -74,6 +74,8 @@ class EditPanel:
     def _setup_gaussian_edit_folder(self):
         server = self.server
 
+        self.edit_histories = []
+
         with server.add_gui_folder("Edit"):
             # initialize a list to store panel(grid)'s information
             self.grids: dict[int, list[
@@ -156,7 +158,8 @@ class EditPanel:
         @self.delete_gaussians_button.on_click
         def _(_):
             with server.atomic():
-                gaussian_to_be_deleted = self._get_selected_gaussians_mask()
+                gaussian_to_be_deleted, pose_and_size_list = self._get_selected_gaussians_mask(return_pose_and_size_list=True)
+                self.edit_histories.append(pose_and_size_list)
                 self.viewer.gaussian_model.delete_gaussians(gaussian_to_be_deleted)
                 self._update_pcd()
             self.viewer.rerender_for_all_client()
@@ -183,31 +186,41 @@ class EditPanel:
                             name = name_text.value
                             match = re.search("^[a-zA-Z0-9_\-]+$", name)
                             if match:
-                                # save ply
-                                ply_save_path = os.path.join("edited", "{}.ply".format(name))
-                                self.viewer.gaussian_model.to_ply_structure().save_to_ply(ply_save_path)
-                                message_text = "Saved to {}".format(ply_save_path)
+                                output_directory = "edited"
+                                os.makedirs(output_directory, exist_ok=True)
+                                try:
+                                    if len(self.edit_histories) > 0:
+                                        torch.save(self.edit_histories, os.path.join(output_directory, f"{name}-edit_histories.ckpt"))
+                                except:
+                                    traceback.print_exc()
 
-                                # save as a checkpoint if viewer started from a checkpoint
-                                if self.viewer.checkpoint is not None:
-                                    checkpoint_save_path = os.path.join("edited", "{}.ckpt".format(name))
+                                if self.viewer.checkpoint is None:
+                                    # save ply
+                                    ply_save_path = os.path.join(output_directory, "{}.ply".format(name))
+                                    self.viewer.gaussian_model.to_ply_structure().save_to_ply(ply_save_path)
+                                    message_text = "Saved to {}".format(ply_save_path)
+                                else:
+                                    # save as a checkpoint if viewer started from a checkpoint
+                                    checkpoint_save_path = os.path.join(output_directory, "{}.ckpt".format(name))
                                     checkpoint = self.viewer.checkpoint
                                     # update state dict of the checkpoint
                                     state_dict_value = self.viewer.gaussian_model.to_parameter_structure()
                                     for name_in_dict, name_in_dataclass in [
                                         ("xyz", "xyz"),
                                         ("features_dc", "features_dc"),
-                                        ("features_rest", "features_extra"),
+                                        ("features_rest", "features_rest"),
                                         ("scaling", "scales"),
                                         ("rotation", "rotations"),
                                         ("opacity", "opacities"),
+                                        ("features_extra", "real_features_extra"),
                                     ]:
                                         dict_key = "gaussian_model._{}".format(name_in_dict)
-                                        assert dict_key in checkpoint["state_dict"]
+                                        if dict_key not in checkpoint["state_dict"]:
+                                            print(f"WARNING: `{dict_key}` not found in original checkpoint")
                                         checkpoint["state_dict"][dict_key] = getattr(state_dict_value, name_in_dataclass)
                                     # save
                                     torch.save(checkpoint, checkpoint_save_path)
-                                    message_text += " & {}".format(checkpoint_save_path)
+                                    message_text = "Saved to {}".format(checkpoint_save_path)
                             else:
                                 message_text = "Invalid name"
                         except:
@@ -225,13 +238,14 @@ class EditPanel:
                 finally:
                     save_button.disabled = False
 
-    def _get_selected_gaussians_mask(self):
+    def _get_selected_gaussians_mask(self, return_pose_and_size_list: bool = False):
         xyz = self.viewer.gaussian_model.get_xyz
 
         # if no grid exists, do not delete any gaussians
         if len(self.grids) == 0:
             return torch.zeros(xyz.shape[0], device=xyz.device, dtype=torch.bool)
 
+        pose_and_size_list = []
         # initialize mask with True
         is_gaussian_selected = torch.ones(xyz.shape[0], device=xyz.device, dtype=torch.bool)
         for i in self.grids:
@@ -253,6 +267,11 @@ class EditPanel:
             is_gaussian_selected = torch.bitwise_and(is_gaussian_selected, y_mask)
             is_gaussian_selected = torch.bitwise_and(is_gaussian_selected, z_mask)
 
+            # add to history
+            pose_and_size_list.append((se3.cpu(), grid_size))
+
+        if return_pose_and_size_list is True:
+            return is_gaussian_selected, pose_and_size_list
         return is_gaussian_selected
 
     def _get_selected_gaussians_indices(self):

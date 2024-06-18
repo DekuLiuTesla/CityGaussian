@@ -22,6 +22,8 @@ def get_normalized_directions(directions):
 
 def normalize_aabb(pts, aabb):
     return (pts - aabb[0]) * (2.0 / (aabb[1] - aabb[0])) - 1.0
+
+
 def grid_sample_wrapper(grid: torch.Tensor, coords: torch.Tensor, align_corners: bool = True) -> torch.Tensor:
     grid_dim = coords.shape[-1]
 
@@ -48,6 +50,7 @@ def grid_sample_wrapper(grid: torch.Tensor, coords: torch.Tensor, align_corners:
     interp = interp.view(B, feature_dim, n).transpose(-1, -2)  # [B, n, feature_dim]
     interp = interp.squeeze()  # [B?, n, feature_dim?]
     return interp
+
 
 def init_grid_param(
         grid_nd: int,
@@ -87,7 +90,7 @@ def interpolate_ms_features(pts: torch.Tensor,
         num_levels = len(ms_grids)
     multi_scale_interp = [] if concat_features else 0.
     grid: nn.ParameterList
-    for scale_id,  grid in enumerate(ms_grids[:num_levels]):
+    for scale_id, grid in enumerate(ms_grids[:num_levels]):
         interp_space = 1.
         for ci, coo_comb in enumerate(coo_combs):
             # interpolate in plane
@@ -112,17 +115,17 @@ def interpolate_ms_features(pts: torch.Tensor,
 
 class HexPlaneField(nn.Module):
     def __init__(
-        self,
-        
-        bounds,
-        planeconfig,
-        multires
+            self,
+
+            bounds,
+            planeconfig,
+            multires
     ) -> None:
         super().__init__()
-        aabb = torch.tensor([[bounds,bounds,bounds],
-                             [-bounds,-bounds,-bounds]])
+        aabb = torch.tensor([[bounds, bounds, bounds],
+                             [-bounds, -bounds, -bounds]])
         self.aabb = nn.Parameter(aabb, requires_grad=False)
-        self.grid_config =  [planeconfig]
+        self.grid_config = [planeconfig]
         self.multiscale_res_multipliers = multires
         self.concat_features = True
 
@@ -134,8 +137,8 @@ class HexPlaneField(nn.Module):
             config = self.grid_config[0].copy()
             # Resolution fix: multi-res only on spatial planes
             config["resolution"] = [
-                r * res for r in config["resolution"][:3]
-            ] + config["resolution"][3:]
+                                       r * res for r in config["resolution"][:3]
+                                   ] + config["resolution"][3:]
             gp = init_grid_param(
                 grid_nd=config["grid_dimensions"],
                 in_dim=config["input_coordinate_dim"],
@@ -149,20 +152,23 @@ class HexPlaneField(nn.Module):
                 self.feat_dim = gp[-1].shape[1]
             self.grids.append(gp)
         # print(f"Initialized model grids: {self.grids}")
-        print("feature_dim:",self.feat_dim)
+        print("feature_dim:", self.feat_dim)
 
+    @property
+    def get_aabb(self):
+        return self.aabb[0], self.aabb[1]
 
-    def set_aabb(self,xyz_max, xyz_min):
+    def set_aabb(self, xyz_max, xyz_min):
         aabb = torch.tensor([
             xyz_max,
             xyz_min
-        ])
-        self.aabb = nn.Parameter(aabb,requires_grad=True)
-        print("Voxel Plane: set aabb=",self.aabb)
+        ], dtype=torch.float32)
+        self.aabb = nn.Parameter(aabb, requires_grad=False)
+        print("Voxel Plane: set aabb=", self.aabb)
 
     def get_density(self, pts: torch.Tensor, timestamps: Optional[torch.Tensor] = None):
         """Computes and returns the densities."""
-
+        # breakpoint()
         pts = normalize_aabb(pts, self.aabb)
         pts = torch.cat((pts, timestamps), dim=-1)  # [n_rays, n_samples, 4]
 
@@ -173,7 +179,6 @@ class HexPlaneField(nn.Module):
             concat_features=self.concat_features, num_levels=None)
         if len(features) < 1:
             features = torch.zeros((0, 1)).to(features.device)
-
 
         return features
 

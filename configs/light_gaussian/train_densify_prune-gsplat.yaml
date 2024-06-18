@@ -1,0 +1,12 @@
+data:
+  params:
+    val_max_num_images_to_cache: -1
+    test_max_num_images_to_cache: -1
+model:
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  light_gaussian:
+    prune_decay: 0.6
+    prune_percent: 0.6
+    prune_steps:
+      - 16_000
+      - 24_000

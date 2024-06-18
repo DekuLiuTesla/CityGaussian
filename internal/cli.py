@@ -1,4 +1,6 @@
 import os.path
+
+import torch
 from jsonargparse import Namespace
 from typing import Optional, Union, List, Literal
 from lightning.pytorch.cli import LightningCLI, LightningArgumentParser
@@ -20,6 +22,12 @@ class CLI(LightningCLI):
             os.path.dirname(os.path.dirname(__file__)),
             "outputs",
         ), help="the base directory of the output")
+        parser.add_argument("--float32_matmul_precision", "-f", type=Optional[Literal["medium", "high", "highest"]], default=None)
+        parser.add_argument("--viewer", action="store_true", default=False)
+        parser.add_argument("--save_val", action="store_true", default=False,
+                            help="Whether save images rendered during validation/test to files")
+        parser.add_argument("--val_train", action="store_true", default=False,
+                            help="Whether use train set to do validation")
 
         # parser.link_arguments("iterations", "trainer.max_steps")
         # parser.link_arguments("epochs", "trainer.max_epochs")
@@ -99,3 +107,13 @@ class CLI(LightningCLI):
             logger_config.class_path = config.logger
 
         config.trainer.logger = logger_config
+
+        # set torch float32_matmul_precision
+        if config.float32_matmul_precision is not None:
+            torch.set_float32_matmul_precision(config.float32_matmul_precision)
+
+        # set web viewer
+        config.model.web_viewer = config.viewer
+
+        config.model.save_val_output = config.save_val
+        config.data.val_on_train = config.val_train

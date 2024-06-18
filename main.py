@@ -1,11 +1,11 @@
 # main.py
+import lightning
 from internal.cli import CLI
 from jsonargparse import lazy_instance
 
 from internal.gaussian_splatting import GaussianSplatting
 from internal.dataset import DataModule
-from internal.callbacks import SaveGaussian
-import lightning.pytorch.loggers
+from internal.callbacks import SaveGaussian, KeepRunningIfWebViewerEnabled, StopImageSavingThreads, ProgressBar, ValidateOnTrainEnd
 
 
 def cli_main():
@@ -26,6 +26,10 @@ def cli_main():
             "enable_checkpointing": False,
             "callbacks": [
                 lazy_instance(SaveGaussian),
+                lazy_instance(ValidateOnTrainEnd),
+                lazy_instance(KeepRunningIfWebViewerEnabled),
+                lazy_instance(StopImageSavingThreads),
+                lazy_instance(ProgressBar),
             ],
         },
         save_config_kwargs={"overwrite": True},

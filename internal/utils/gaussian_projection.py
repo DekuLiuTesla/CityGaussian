@@ -9,7 +9,6 @@ def project_gaussians(
         scale_modifier: float,
         quaternions: torch.Tensor,  # [n, 4]
         world_to_camera: torch.Tensor,  # [4, 4]
-        full_ndc_projection: torch.Tensor,  # [4, 4]
         fx: torch.Tensor,
         fy: torch.Tensor,
         cx: torch.Tensor,
@@ -82,19 +81,17 @@ def project_gaussians(
     ], dim=-1)
 
     # transform means 3D to image plane
-    ## looks like the NDC projection performs better
-    projected_means_3d = torch.matmul(means_3d, full_ndc_projection[:3, :]) + full_ndc_projection[3, :]
-    means_2d_in_ndc = projected_means_3d / (projected_means_3d[:, -1:] + 1e-6)
-    means_2d_on_image_plane = ndc2Pix(means_2d_in_ndc[:, 0:2], torch.tensor([img_width, img_height], device=means_2d_in_ndc.device).int())
     ## project through camera intrinsics
-    # means_3d_on_normalized_plane = means_3d_in_camera_space / (means_3d_in_camera_space[:, 2:] + 1e-6)
-    # ## build intrinsics matrix
-    # intrinsics_matrix = torch.tensor([
-    #     [fx, 0, cx],
-    #     [0, fy, cy],
-    #     [0, 0, 1],
-    # ], dtype=means_3d_on_normalized_plane.dtype, device=means_3d_on_normalized_plane.device)
-    # means_2d_on_image_plane = torch.matmul(means_3d_on_normalized_plane, intrinsics_matrix.T)
+    means_3d_on_normalized_plane = means_3d_in_camera_space / (means_3d_in_camera_space[:, 2:] + 1e-6)
+    ## build intrinsics matrix
+    ## 0.5 offset should be added here to reach same quality as NDC projection,
+    ## but the rasterizer will do it, so just simply use original cx and cy
+    intrinsics_matrix = torch.tensor([
+        [fx, 0, cx],
+        [0, fy, cy],
+        [0, 0, 1],
+    ], dtype=means_3d_on_normalized_plane.dtype, device=means_3d_on_normalized_plane.device)
+    means_2d_on_image_plane = torch.matmul(means_3d_on_normalized_plane, intrinsics_matrix.T)
 
     # compute gaussian extent in screen space
     ## calculate two eigenvalues of the 2D covariance matrix
@@ -287,7 +284,3 @@ def compute_cov_2d(t, tan_fovx, tan_fovy, focal_x, focal_y, cov_3d, world_to_cam
     cov_2d = T @ cov_3d @ T.transpose(1, 2)
 
     return cov_2d[:, :2, :2]
-
-
-def ndc2Pix(v, S):
-    return ((v + 1.0) * S - 1.0) * 0.5

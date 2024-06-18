@@ -1,0 +1,12 @@
+data:
+  params:
+    val_max_num_images_to_cache: -1
+    test_max_num_images_to_cache: -1
+    colmap:
+      split_mode: "experiment"
+model:
+  gaussian:
+    optimization:
+      densify_grad_threshold: 0.0006
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  absgrad: true

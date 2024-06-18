@@ -1,0 +1,8 @@
+max_steps: 35_000
+model:
+  gaussian:
+    optimization:
+      position_lr_max_steps: 35_000
+  light_gaussian:
+    prune_steps:
+      - 30_001
