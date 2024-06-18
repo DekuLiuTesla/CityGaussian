@@ -5,3 +5,4 @@
 !network_factory_test.py
 !deformable_model_test.py
 !gaussian_projection_test.py
+!gaussian_model_test.py

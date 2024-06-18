@@ -393,7 +393,11 @@ def populate_render_tab(
         enable_transform: bool,
         background_color: Tuple[float, float, float],
         sh_degree: int,
+        extra_args: List[str] = None,
 ) -> None:
+    if extra_args is None:
+        extra_args = []
+
     fov_degrees = server.add_gui_slider(
         "FOV",
         initial_value=90.0,
@@ -802,7 +806,7 @@ def populate_render_tab(
                     " ".join(model_paths),
                     f"--camera-path-filename {json_outfile.absolute()}",
                     f"--output-path renders/{dataname}/{render_name_text.value}.mp4",
-                ]
+                ] + extra_args
             )
             event.client.add_gui_markdown(
                 "\n".join(

@@ -6,3 +6,4 @@
 !model.py
 !optimization.py
 !tcnn_encoding_config.py
+!light_gaussian.py

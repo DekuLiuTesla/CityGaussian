@@ -1,0 +1,9 @@
+model:
+  gaussian:
+    optimization:
+      cull_opacity_threshold: 0.05
+  renderer: internal.renderers.vanilla_2dgs_renderer.Vanilla2DGSRenderer
+data:
+  params:
+    val_max_num_images_to_cache: -1
+    test_max_num_images_to_cache: -1

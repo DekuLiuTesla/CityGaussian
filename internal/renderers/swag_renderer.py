@@ -36,6 +36,7 @@ class SWAGRenderer(Renderer):
             bg_color: torch.Tensor,
             scaling_modifier=1.0,
             u=None,
+            **kwargs,
     ):
         colors = eval_gaussian_model_sh(viewpoint_camera, pc)  # [n, 3]
         image_conditioned_colors, image_conditioned_delta_alpha = self.swag_model(colors, self._get_normalized_xyz(gaussian_model=pc), viewpoint_camera.appearance_id)

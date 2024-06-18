@@ -31,6 +31,7 @@ class AppearanceMLPRenderer(VanillaRenderer):
             scaling_modifier=1.0,
             override_color=None,
             appearance: Tuple = None,
+            **kwargs,
     ):
         # appearance
         if appearance is not None:

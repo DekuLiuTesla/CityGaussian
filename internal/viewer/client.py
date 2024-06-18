@@ -26,6 +26,12 @@ class ClientThread(threading.Thread):
 
         self.stop_client = False  # whether stop this thread
 
+
+        if viewer.default_camera_position is not None:
+            client.camera.position = np.asarray(viewer.default_camera_position)
+        if viewer.default_camera_look_at is not None:
+            client.camera.look_at = np.asarray(viewer.default_camera_look_at)
+
         client.camera.up_direction = viewer.up_direction
 
         @client.camera.on_update
@@ -71,7 +77,7 @@ class ClientThread(threading.Thread):
 
             # construct camera
             appearance_id = self.viewer.get_appearance_id_value()
-            fx = torch.tensor([fov2focal(cam.fov, image_width)], dtype=torch.float)
+            fx = torch.tensor([fov2focal(cam.fov, max_res)], dtype=torch.float)
             camera = Cameras(
                 R=R.unsqueeze(0),
                 T=T.unsqueeze(0),

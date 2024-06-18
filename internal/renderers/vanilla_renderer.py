@@ -29,12 +29,27 @@ class VanillaRenderer(Renderer):
             bg_color: torch.Tensor,
             scaling_modifier=1.0,
             override_color=None,
+            render_types: list = None,
     ):
         """
         Render the scene.
 
         Background tensor (bg_color) must be on GPU!
         """
+
+        if render_types is None:
+            render_types = ["rgb"]
+        assert len(render_types) == 1, "Only single type is allowed currently"
+
+        rendered_image_key = "render"
+        if "depth" in render_types:
+            rendered_image_key = "depth"
+            w2c = viewpoint_camera.world_to_camera  # already transposed
+            means3D_in_camera_space = torch.matmul(pc.get_xyz, w2c[:3, :3]) + w2c[3, :3]
+            depth = means3D_in_camera_space[:, 2:]
+            # bg_color = torch.ones_like(bg_color) * depth.max()
+            bg_color = torch.zeros_like(bg_color)
+            override_color = depth.repeat(1, 3)
 
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True,
@@ -111,7 +126,7 @@ class VanillaRenderer(Renderer):
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.
         return {
-            "render": rendered_image,
+            rendered_image_key: rendered_image,
             "viewspace_points": screenspace_points,
             "visibility_filter": radii > 0,
             "radii": radii,
@@ -199,3 +214,12 @@ class VanillaRenderer(Renderer):
             "visibility_filter": radii > 0,
             "radii": radii,
         }
+
+    def get_available_output_types(self) -> Dict:
+        return {
+            "rgb": "render",
+            "depth": "depth",
+        }
+
+    def is_type_depth_map(self, t: str) -> bool:
+        return t == "depth"

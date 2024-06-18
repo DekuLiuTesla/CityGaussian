@@ -16,6 +16,7 @@ from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.models.simplified_gaussian_model_manager import SimplifiedGaussianModelManager
 from internal.viewer import ClientThread, ViewerRenderer
 from internal.viewer.ui import populate_render_tab, TransformPanel, EditPanel
+from internal.viewer.ui.up_direction_folder import UpDirectionFolder
 
 DROPDOWN_USE_DIRECT_APPEARANCE_EMBEDDING_VALUE = "@Direct"
 
@@ -35,6 +36,13 @@ class Viewer:
             cameras_json: str = None,
             vanilla_deformable: bool = False,
             vanilla_gs4d: bool = False,
+            vanilla_gs2d: bool = False,
+            up: list[float] = None,
+            default_camera_position: List[float] = None,
+            default_camera_look_at: List[float] = None,
+            no_edit_panel: bool = False,
+            no_render_panel: bool = False,
+            gsplat: bool = False,
     ):
         self.device = torch.device("cuda")
 
@@ -46,14 +54,24 @@ class Viewer:
         self.sh_degree = sh_degree
         self.enable_transform = enable_transform
         self.show_cameras = show_cameras
+        self.extra_video_render_args = []
 
         self.up_direction = np.asarray([0., 0., 1.])
+        self.camera_center = np.asarray([0., 0., 0.])
+        self.default_camera_position = default_camera_position
+        self.default_camera_look_at = default_camera_look_at
+
+        self.use_gsplat = gsplat
 
         load_from = self._search_load_file(model_paths[0])
 
         self.simplified_model = True
         self.show_edit_panel = True
+        if no_edit_panel is True:
+            self.show_edit_panel = False
         self.show_render_panel = True
+        if no_render_panel is True:
+            self.show_render_panel = False
         # whether model is trained by other implementations
         if vanilla_gs4d is True:
             self.simplified_model = False
@@ -61,6 +79,10 @@ class Viewer:
         # TODO: load multiple models more elegantly
         # load and create models
         model, renderer, training_output_base_dir, dataset_type, self.checkpoint = self._load_model_from_file(load_from)
+        # whether a 2DGS model
+        if load_from.endswith(".ply") and model.get_scaling.shape[-1] == 2:
+            print("2DGS ply detected")
+            vanilla_gs2d = True
 
         def get_load_iteration() -> int:
             return int(os.path.basename(os.path.dirname(load_from)).replace("iteration_", ""))
@@ -84,14 +106,27 @@ class Viewer:
             )
             self.show_edit_panel = False
             self.show_render_panel = False
+        elif vanilla_gs2d is True:
+            from internal.renderers.vanilla_2dgs_renderer import Vanilla2DGSRenderer
+            renderer = Vanilla2DGSRenderer()
+            self.extra_video_render_args.append("--vanilla_gs2d")
 
         # reorient the scene
         cameras_json_path = cameras_json
         if cameras_json_path is None:
             cameras_json_path = os.path.join(training_output_base_dir, "cameras.json")
         self.camera_transform = self._reorient(cameras_json_path, mode=reorient, dataset_type=dataset_type)
+        if up is not None:
+            self.camera_transform = torch.eye(4, dtype=torch.float)
+            up = torch.tensor(up)
+            up = -up / torch.linalg.norm(up)
+            self.up_direction = up.numpy()
+
         # load camera poses
         self.camera_poses = self.load_camera_poses(cameras_json_path)
+        # calculate camera center
+        if len(self.camera_poses) > 0:
+            self.camera_center = np.mean(np.asarray([i["position"] for i in self.camera_poses]), axis=0)
 
         self.available_appearance_options = None
 
@@ -170,7 +205,7 @@ class Viewer:
         up = -up / torch.linalg.norm(up)
 
         print("up vector = {}".format(up))
-        self.up_direction = up
+        self.up_direction = up.numpy()
 
         return transform
 
@@ -282,40 +317,32 @@ class Viewer:
         elif load_from.endswith(".ply") is True:
             model, renderer = self._initialize_models_from_point_cloud(load_from)
             training_output_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(load_from)))
+            if self.use_gsplat is True:
+                from internal.renderers.gsplat_renderer import GSPlatRenderer
+                print("Use GSPlat renderer for ply file")
+                renderer = GSPlatRenderer()
         else:
             raise ValueError("unsupported file {}".format(load_from))
 
         return model, renderer, training_output_base_dir, dataset_type, checkpoint
 
-    def start(self):
+    def start(self, block: bool = True, server_config_fun=None, tab_config_fun=None):
         # create viser server
         server = viser.ViserServer(host=self.host, port=self.port)
         server.configure_theme(
             control_layout="collapsible",
             show_logo=False,
         )
-        # register hooks
-        server.on_client_connect(self._handle_new_client)
-        server.on_client_disconnect(self._handle_client_disconnect)
+
+        if server_config_fun is not None:
+            server_config_fun(self, server)
 
         tabs = server.add_gui_tab_group()
 
+        if tab_config_fun is not None:
+            tab_config_fun(self, server, tabs)
+
         with tabs.add_tab("General"):
-            reset_up_button = server.add_gui_button(
-                "Reset up direction",
-                icon=viser.Icon.ARROW_AUTOFIT_UP,
-                hint="Reset the orbit up direction.",
-            )
-
-            @reset_up_button.on_click
-            def _(event: viser.GuiEvent) -> None:
-                assert event.client is not None
-                event.client.camera.up_direction = vtf.SO3(event.client.camera.wxyz) @ np.array([0.0, -1.0, 0.0])
-
-            # add cameras
-            if self.show_cameras is True:
-                self.add_cameras_to_scene(server)
-
             # add render options
             with server.add_gui_folder("Render"):
                 self.max_res_when_static = server.add_gui_slider(
@@ -349,6 +376,8 @@ class Viewer:
                     step=1,
                     initial_value=60,
                 )
+
+            self.viewer_renderer.setup_options(self, server)
 
             with server.add_gui_folder("Model"):
                 self.scaling_modifier = server.add_gui_slider(
@@ -421,6 +450,22 @@ class Viewer:
                 )
                 self.time_slider.on_update(self._handle_option_updated)
 
+            # add cameras
+            if self.show_cameras is True:
+                self.add_cameras_to_scene(server)
+
+            UpDirectionFolder(self, server)
+
+            go_to_scene_center = server.add_gui_button(
+                "Go to scene center",
+            )
+
+            @go_to_scene_center.on_click
+            def _(event: viser.GuiEvent) -> None:
+                assert event.client is not None
+                event.client.camera.position = self.camera_center + np.asarray([2., 0., 0.])
+                event.client.camera.look_at = self.camera_center
+
         if self.show_edit_panel is True:
             with tabs.add_tab("Edit") as edit_tab:
                 self.edit_panel = EditPanel(server, self, edit_tab)
@@ -441,10 +486,16 @@ class Viewer:
                     enable_transform=self.enable_transform,
                     background_color=self.background_color,
                     sh_degree=self.sh_degree,
+                    extra_args=self.extra_video_render_args,
                 )
 
-        while True:
-            time.sleep(999)
+        # register hooks
+        server.on_client_connect(self._handle_new_client)
+        server.on_client_disconnect(self._handle_client_disconnect)
+
+        if block is True:
+            while True:
+                time.sleep(999)
 
     def _handle_appearance_embedding_slider_updated(self, event: viser.GuiEvent):
         """
@@ -561,7 +612,21 @@ if __name__ == "__main__":
     parser.add_argument("--cameras-json", "--cameras_json", type=str, default=None)
     parser.add_argument("--vanilla_deformable", action="store_true", default=False)
     parser.add_argument("--vanilla_gs4d", action="store_true", default=False)
+    parser.add_argument("--vanilla_gs2d", action="store_true", default=False)
+    parser.add_argument("--up", nargs=3, required=False, type=float, default=None)
+    parser.add_argument("--default_camera_position", "--dcp", nargs=3, required=False, type=float, default=None)
+    parser.add_argument("--default_camera_look_at", "--dcla", nargs=3, required=False, type=float, default=None)
+    parser.add_argument("--no_edit_panel", action="store_true", default=False)
+    parser.add_argument("--no_render_panel", action="store_true", default=False)
+    parser.add_argument("--gsplat", action="store_true", default=False,
+                        help="Use GSPlat renderer for ply file")
+    parser.add_argument("--float32_matmul_precision", "--fp", type=str, default=None)
     args = parser.parse_args()
+
+    # set torch float32_matmul_precision
+    if args.float32_matmul_precision is not None:
+        torch.set_float32_matmul_precision(args.float32_matmul_precision)
+    del args.float32_matmul_precision
 
     # arguments post process
     if len(args.background_color) == 1 and isinstance(args.background_color[0], str):
