@@ -10,6 +10,7 @@ from internal.utils.ssim import ssim
 from internal.utils.blocking import contract_to_unisphere
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
+from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
 
 def parse(data):
     data = Namespace(**data)
@@ -139,14 +140,17 @@ if __name__ == "__main__":
 
     if args.config_path is not None:
         # parameters in config file will overwrite command line arguments
-        print(f"Loading parameters from config file {args.config_path}")
+        print(f"Loading parameters according to config file {args.config_path}")
         with open(args.config_path, 'r') as f:
             config = parse(yaml.load(f, Loader=yaml.FullLoader))
         args.block_dim = config.data.params.colmap_block.block_dim
         args.aabb = config.data.params.colmap_block.aabb
         args.num_threshold = config.data.params.colmap_block.num_threshold
         args.content_threshold = config.data.params.colmap_block.content_threshold
-        args.model_path = config.model.init_from.split("/point_cloud/")[0]
+        if 'point_cloud' in config.model.init_from:
+            args.model_path = config.model.init_from.split("/point_cloud/")[0]
+        elif 'checkpoints' in config.model.init_from:
+            args.model_path = config.model.init_from.split("/checkpoints/")[0]
     
     model, renderer = GaussianModelLoader.search_and_load(
         args.model_path,
@@ -159,11 +163,11 @@ if __name__ == "__main__":
     with open(config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
             
-    dataparser_outputs = ColmapDataParser(
+    dataparser_outputs = ColmapBlockDataParser(
         os.path.expanduser(config.data.path),
         os.path.abspath(""),
         global_rank=0,
-        params=config.data.params.colmap,
+        params=config.data.params.colmap_block,
     ).get_outputs()
     
     if args.save_dir is None:
