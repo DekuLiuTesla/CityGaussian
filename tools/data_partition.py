@@ -162,7 +162,8 @@ if __name__ == "__main__":
     config_path = os.path.join(args.model_path, "config.yaml")
     with open(config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
-            
+    
+    # TODO: support other data parser
     dataparser_outputs = ColmapBlockDataParser(
         os.path.expanduser(config.data.path),
         os.path.abspath(""),

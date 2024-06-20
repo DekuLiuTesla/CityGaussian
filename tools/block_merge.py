@@ -98,9 +98,10 @@ def block_merging(coarse_model,
         checkpoint["state_dict"]["gaussian_model._xyz"] = merged_model.xyz
         checkpoint["state_dict"]["gaussian_model._opacity"] = merged_model.opacities
         checkpoint["state_dict"]["gaussian_model._features_dc"] = merged_model.features_dc
-        checkpoint["state_dict"]["gaussian_model._features_rest"] = merged_model.features_extra
+        checkpoint["state_dict"]["gaussian_model._features_rest"] = merged_model.features_rest
         checkpoint["state_dict"]["gaussian_model._scaling"] = merged_model.scales
         checkpoint["state_dict"]["gaussian_model._rotation"] = merged_model.rotations
+        checkpoint["state_dict"]["gaussian_model._features_extra"] = merged_model.real_features_extra
         torch.save(checkpoint, os.path.join(save_path, "merged.ckpt"))
 
         # save_path = os.path.join(output_path, "point_cloud/iteration_30000")
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--config_path', type=str, help='path of finetuned model', required=True)
-    parser.add_argument("--block_dim", type=int, nargs="+", required=True)
+    parser.add_argument("--block_dim", type=int, nargs="+", default=None)
     parser.add_argument("--aabb", type=float, nargs="+", default=None)
     parser.add_argument("--output", type=str, default=os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
@@ -124,6 +125,8 @@ if __name__ == "__main__":
     with open(args.config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
         config.name = os.path.basename(args.config_path).split(".")[0]
+        args.block_dim = config.data.params.colmap_block.block_dim if args.block_dim is None else args.block_dim
+        args.aabb = config.data.params.colmap_block.aabb if args.aabb is None else args.aabb
     
     coarse_model, _ = GaussianModelLoader.search_and_load(
         config.model.init_from,
