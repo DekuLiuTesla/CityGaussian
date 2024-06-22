@@ -319,7 +319,7 @@ class GaussianExtractor(object):
                     viewpoint_cam=viewpoint_cam.to_device("cuda"),
                 )
 
-                # volume integration
+                # volume integration with Cumulative Moving Average
                 sdf = sdf.flatten()
                 mask_proj = mask_proj & (sdf > -sdf_trunc)
                 sdf = torch.clamp(sdf / sdf_trunc, min=-1.0, max=1.0)[mask_proj]
