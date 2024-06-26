@@ -25,11 +25,13 @@ def block_merging(coarse_model,
                   output_path,
                   block_dim, 
                   aabb,
-                  image_cnt):
+                  corr_matrix):
 
         xyz_coarse = coarse_model.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
         block_model_list = []
+        trained_block_mask = torch.tensor([True if -corr_matrix[block_id, block_id] >= 50 else False for block_id in range(block_num)], dtype=torch.bool)
+        trained_block_idx = torch.where(trained_block_mask)[0]
 
         if aabb is None:
             with torch.no_grad():
@@ -70,17 +72,27 @@ def block_merging(coarse_model,
             min_y, max_y = float(block_id_y) / block_dim[1], float(block_id_y + 1) / block_dim[1]
             min_z, max_z = float(block_id_z) / block_dim[2], float(block_id_z + 1) / block_dim[2]
 
-            block_path = os.path.join(output_path, "blocks", "block_{}".format(block_id))
             try:
+                block_path = os.path.join(output_path, "blocks", "block_{}".format(block_id))
                 model, _ = GaussianModelLoader.search_and_load(
                     block_path,
                     sh_degree=3,
                     device="cuda",
                 )
             except:
-                if image_cnt[block_id] < 50:
-                    print(f"Block {block_id} not trained. Using coarse Global Model")
-                    model = copy.deepcopy(coarse_model)
+                if -corr_matrix[block_id, block_id] < 50:
+                    correlated_block = trained_block_idx[torch.argmax(corr_matrix[block_id, trained_block_mask])]
+                    if corr_matrix[block_id, correlated_block] > 0:
+                        print(f"Block {block_id} has no enough training data. Merging from block {correlated_block}")
+                        block_path = os.path.join(output_path, "blocks", "block_{}".format(correlated_block))
+                        model, _ = GaussianModelLoader.search_and_load(
+                            block_path,
+                            sh_degree=3,
+                            device="cuda",
+                        )
+                    else:
+                        print(f"Block {block_id} not trained. Using coarse Global Model")
+                        model = copy.deepcopy(coarse_model)
                 else:
                     raise FileNotFoundError
             xyz_block = contract_to_unisphere(model.get_xyz, aabb, ord=torch.inf)
@@ -138,16 +150,24 @@ if __name__ == "__main__":
         device="cuda",
     )
 
-    image_cnt = []
+    txt_dict = {}
     image_list = config.data.params.colmap_block.image_list
     for block_id in range(args.block_dim[0] * args.block_dim[1] * args.block_dim[2]):
         with open(os.path.join(image_list, f"block_{block_id}.txt"), 'r') as f:
-            image_cnt.append(len(f.readlines()))
+            txt_dict[block_id] = f.readlines()
+    
+    corr_matrix = torch.zeros((args.block_dim[0] * args.block_dim[1] * args.block_dim[2], 
+                                args.block_dim[0] * args.block_dim[1] * args.block_dim[2]), dtype=torch.int32)
+    for i in range(args.block_dim[0] * args.block_dim[1] * args.block_dim[2]):
+        for j in range(i+1, args.block_dim[0] * args.block_dim[1] * args.block_dim[2]):
+            corr_matrix[i, j] = len(set(txt_dict[i]) & set(txt_dict[j]))
+            corr_matrix[j, i] = corr_matrix[i, j]
+        corr_matrix[i, i] = -len(txt_dict[i])
     
     output_path = os.path.join(args.output, config.name)
     ckpt_path = GaussianModelLoader.search_load_file(config.model.init_from.split("/point_cloud/")[0])
 
-    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb, image_cnt)
+    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb, corr_matrix)
 
     # All done
     print("Merging complete.")
