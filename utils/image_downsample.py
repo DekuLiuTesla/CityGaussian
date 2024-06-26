@@ -25,7 +25,7 @@ def resize_image(image, factor):
     return image.resize((resized_width, resized_height))
 
 
-def process_task(src: str, dst: str, image_name: str, factor: int):
+def process_task(src: str, dst: str, image_name: str, factor: float):
     image = Image.open(os.path.join(src, image_name))
     image = resize_image(image, factor)
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("src")
     parser.add_argument("--dst", default=None)
-    parser.add_argument("--factor", type=int, default=2)
+    parser.add_argument("--factor", type=float, default=2)
     parser.add_argument("--extensions", nargs="+", default=[
         "jpg",
         "JPG",

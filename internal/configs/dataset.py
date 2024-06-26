@@ -42,7 +42,9 @@ class ColmapParams:
 
     image_list: Optional[str] = None
 
-    down_sample_factor: int = 1
+    down_sample_factor: float = 1
+
+    down_sample_rounding_model: Literal["floor", "round", "ceil"] = "round"
 
 @dataclass
 class ColmapBlockParams:
