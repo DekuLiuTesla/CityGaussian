@@ -16,11 +16,15 @@ class Vanilla2DGSRenderer(Renderer):
             depth_ratio: float = 0.,
             lambda_normal: float = 0.05,
             lambda_dist: float = 0.,
+            normal_regularization_from_iter: int = 7000,
+            dist_regularization_from_iter: int = 3000,
     ):
         super().__init__()
         self.depth_ratio = depth_ratio
         self.lambda_normal = lambda_normal
         self.lambda_dist = lambda_dist
+        self.normal_regularization_from_iter = normal_regularization_from_iter
+        self.dist_regularization_from_iter = dist_regularization_from_iter
 
     def forward(
             self,
@@ -194,8 +198,8 @@ class Vanilla2DGSRenderer(Renderer):
         metrics, prog_bar = pl_module.vanilla_train_metric_calculator(pl_module, step, batch, outputs)
 
         # regularization
-        lambda_normal = self.lambda_normal if step > 7000 else 0.0
-        lambda_dist = self.lambda_dist if step > 3000 else 0.0
+        lambda_normal = self.lambda_normal if step > self.normal_regularization_from_iter else 0.0
+        lambda_dist = self.lambda_dist if step > self.dist_regularization_from_iter else 0.0
 
         rend_dist = outputs["rend_dist"]
         rend_normal = outputs['rend_normal']
