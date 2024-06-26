@@ -24,7 +24,8 @@ def block_merging(coarse_model,
                   ckpt_path,
                   output_path,
                   block_dim, 
-                  aabb):
+                  aabb,
+                  image_cnt):
 
         xyz_coarse = coarse_model.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
@@ -77,8 +78,11 @@ def block_merging(coarse_model,
                     device="cuda",
                 )
             except:
-                print(f"Block {block_id} not found. Using coarse Global Model")
-                model = copy.deepcopy(coarse_model)
+                if image_cnt[block_id] < 50:
+                    print(f"Block {block_id} not trained. Using coarse Global Model")
+                    model = copy.deepcopy(coarse_model)
+                else:
+                    raise FileNotFoundError
             xyz_block = contract_to_unisphere(model.get_xyz, aabb, ord=torch.inf)
             mask_preserved = (xyz_block[:, 0] >= min_x) & (xyz_block[:, 0] < max_x)  \
                             & (xyz_block[:, 1] >= min_y) & (xyz_block[:, 1] < max_y) \
@@ -133,11 +137,17 @@ if __name__ == "__main__":
         sh_degree=3,
         device="cuda",
     )
+
+    image_cnt = []
+    image_list = config.data.params.colmap_block.image_list
+    for block_id in range(args.block_dim[0] * args.block_dim[1] * args.block_dim[2]):
+        with open(os.path.join(image_list, f"block_{block_id}.txt"), 'r') as f:
+            image_cnt.append(len(f.readlines()))
     
     output_path = os.path.join(args.output, config.name)
     ckpt_path = GaussianModelLoader.search_load_file(config.model.init_from.split("/point_cloud/")[0])
 
-    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb)
+    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb, image_cnt)
 
     # All done
     print("Merging complete.")

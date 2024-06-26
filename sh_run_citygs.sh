@@ -8,17 +8,17 @@ get_available_gpu() {
 
 
 # downsample images
-# python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/train/images --factor 4
-# python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/val/images --factor 4
+# python utils/image_downsample.py data/mill19/building-pixsfm/train/images --factor 4
+# python utils/image_downsample.py data/mill19/building-pixsfm/val/images --factor 4
 
-NAME=citygs_sciart_coarse
-DATA_PATH="data/urban_scene_3d/sci-art-pixsfm"
+NAME=citygs_building_coarse
+DATA_PATH="data/mill19/building-pixsfm"
 
 # train and eval coarse model
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-    --config configs/citygs_sciart_coarse.yaml \
+    --config configs/citygs_building_coarse.yaml \
     -n $NAME \
     --logger wandb \
     --project JointGS \
@@ -27,19 +27,16 @@ gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config outputs/$NAME/config.yaml \
-    --data.path data/urban_scene_3d/sci-art-pixsfm/val \
+    --data.path data/mill19/building-pixsfm/val \
     --data.params.colmap_block.eval_image_select_mode ratio \
     --data.params.colmap_block.eval_ratio 1.0 \
-    --model.save_val_output true \
+    --save_val \
 
 # generate partition
-python tools/data_partition.py --model_path outputs/$NAME \
-    --block_dim 3 1 3 \
-    --aabb "-110" "-500" "-205" "55" "100" "90" \
-    --content_threshold 0.05 \
+NAME=citygs_building
+python tools/data_partition.py --config_path configs/$NAME.yaml
 
-NAME=citygs_sciart
-for num in {0..8}; do
+for num in {1..19}; do
     while true; do
         gpu_id=$(get_available_gpu)
         if [[ -n $gpu_id ]]; then
@@ -60,8 +57,6 @@ wait
 
 # merge blocks
 python tools/block_merge.py --config_path configs/$NAME.yaml \
-    --block_dim 3 1 3 \
-    --aabb "-110" "-500" "-205" "55" "100" "90" \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -69,8 +64,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config configs/$NAME.yaml \
     -n $NAME \
     --ckpt_path outputs/$NAME/checkpoints/merged.ckpt \
-    --data.path data/urban_scene_3d/sci-art-pixsfm/val \
+    --data.path data/mill19/building-pixsfm/val \
     --data.params.colmap_block.eval_image_select_mode ratio \
     --data.params.colmap_block.eval_ratio 1.0 \
-    --model.save_val_output true \
-    --model.correct_color true \
+    --save_val \
+    # --model.correct_color true \

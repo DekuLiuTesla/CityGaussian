@@ -177,6 +177,9 @@ if __name__ == "__main__":
         save_dir = args.save_dir
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
+    
+    # assert save_dir contains no files and avoid duplicated partitioning
+    assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
 
     block_filtering(model, renderer, 
                     dataparser_outputs.train_set, 
