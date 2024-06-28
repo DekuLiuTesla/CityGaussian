@@ -252,7 +252,7 @@ class GaussianExtractor(object):
             viewpoint_cam = self.viewpoint_stack[i].to_device("cuda")
             
             # if we have mask provided, use it
-            if mask_backgrond and (viewpoint_cam.gt_alpha_mask is not None):
+            if mask_backgrond and hasattr(viewpoint_cam, "gt_alpha_mask") and (viewpoint_cam.gt_alpha_mask is not None):
                 depth[(viewpoint_cam.gt_alpha_mask < 0.5)] = 0
 
             # make open3d rgbd

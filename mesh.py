@@ -27,6 +27,7 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--model_path', type=str, help='path of 2DGS model')
+    parser.add_argument('--config_path', type=str, default=None, help='path of configs')
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--voxel_size", default=-1.0, type=float, help='Mesh: voxel size for TSDF')
     parser.add_argument("--depth_trunc", default=-1.0, type=float, help='Mesh: Max depth range for TSDF')
@@ -43,7 +44,10 @@ if __name__ == "__main__":
         device="cuda",
     )
 
-    config_path = os.path.join(args.model_path, "config.yaml")
+    if args.config_path is None:
+        config_path = os.path.join(args.model_path, "config.yaml")
+    else:
+        config_path = args.config_path
     load_from = GaussianModelLoader.search_load_file(args.model_path)
     with open(config_path, 'r') as f:
         config = parse_cfg_yaml(yaml.load(f, Loader=yaml.FullLoader))

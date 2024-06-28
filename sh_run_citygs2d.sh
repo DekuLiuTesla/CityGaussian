@@ -11,7 +11,7 @@ get_available_gpu() {
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/train/images --factor 4
 # python utils/image_downsample.py data/urban_scene_3d/sci-art-pixsfm/val/images --factor 4
 
-NAME=citygs2d_sciart_coarse
+COARSE_NAME=citygs2d_sciart_coarse
 DATA_PATH="data/urban_scene_3d/sci-art-pixsfm"
 
 # train and eval coarse model
@@ -19,14 +19,14 @@ gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
     --config configs/citygs2d_sciart_coarse.yaml \
-    -n $NAME \
+    -n $COARSE_NAME \
     --logger wandb \
     --project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config outputs/$NAME/config.yaml \
+    --config outputs/$COARSE_NAME/config.yaml \
     --data.path data/urban_scene_3d/sci-art-pixsfm/val \
     --data.params.colmap_block.eval_image_select_mode ratio \
     --data.params.colmap_block.eval_ratio 1.0 \
@@ -60,7 +60,7 @@ wait
 
 # gpu_id=$(get_available_gpu)
 # echo "GPU $gpu_id is available."
-# CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py --model_path outputs/citygs2d_sciart_coarse --mesh_res 1024 --unbounded
+# CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py --model_path outputs/$NAME --config_path outputs/$COARSE_NAME/config.yaml --voxel_size 0.4 --sdf_trunc 2 --depth_trunc 300
 
 # merge blocks
 python tools/block_merge.py --config_path configs/$NAME.yaml \
