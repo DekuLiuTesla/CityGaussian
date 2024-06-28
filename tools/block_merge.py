@@ -3,6 +3,7 @@ import sys
 import yaml
 import torch
 import copy
+import numpy as np
 from tqdm import tqdm
 from argparse import ArgumentParser, Namespace
 
@@ -10,7 +11,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from internal.utils.ssim import ssim
 from internal.utils.blocking import contract_to_unisphere
 from internal.utils.gaussian_model_loader import GaussianModelLoader
-from internal.dataparsers.colmap_dataparser import ColmapDataParser
+from internal.utils.mesh_utils import focus_point_fn
+from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
 from internal.models.simplified_gaussian_model_manager import SimplifiedGaussianModelManager
 
 def parse(data):
@@ -34,33 +36,32 @@ def block_merging(coarse_model,
         trained_block_idx = torch.where(trained_block_mask)[0]
 
         if aabb is None:
-            with torch.no_grad():
-                sorted_x = torch.sort(xyz_coarse[::100, 0], descending=True)[0]
-                sorted_y = torch.sort(xyz_coarse[::100, 1], descending=True)[0]
-                sorted_z = torch.sort(xyz_coarse[::100, 2], descending=True)[0]
+            coarse_config_path = os.path.join(ckpt_path.split('checkpoints')[0], "config.yaml")
+            with open(coarse_config_path, 'r') as f:
+                coarse_config = parse(yaml.load(f, Loader=yaml.FullLoader))
 
-                ratio = 0.999
-                x_max = torch.quantile(sorted_x, ratio)
-                x_min = torch.quantile(sorted_x, 1-ratio)
-                y_max = torch.quantile(sorted_y, ratio)
-                y_min = torch.quantile(sorted_y, 1-ratio)
-                z_max = torch.quantile(sorted_z, ratio)
-                z_min = torch.quantile(sorted_z, 1-ratio)
+            # TODO: support other data parser
+            dataset = ColmapBlockDataParser(
+                os.path.expanduser(coarse_config.data.path),
+                os.path.abspath(""),
+                global_rank=0,
+                params=coarse_config.data.params.colmap_block,
+            ).get_outputs().train_set
 
-                xyz_min = torch.stack([x_min, y_min, z_min])
-                xyz_max = torch.stack([x_max, y_max, z_max])
-                central_min = xyz_min + (xyz_max - xyz_min) / 3
-                central_max = xyz_max - (xyz_max - xyz_min) / 3
-
-                aabb = torch.cat([central_min, central_max], dim=-1)
+            torch.cuda.empty_cache()
+            c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in dataset.cameras])
+            poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
+            center = (focus_point_fn(poses))
+            radius = torch.tensor(np.median(np.abs(c2ws[:,:3,3] - center), axis=0), device=xyz_coarse.device)
+            center = torch.from_numpy(center).float().to(xyz_coarse.device)
+            if radius.min() / radius.max() < 0.02:
+                # If the radius is too small, we don't contract in this dimension
+                radius[torch.argmin(radius)] = 0.5 * (xyz_coarse[:, torch.argmin(radius)].max() - xyz_coarse[:, torch.argmin(radius)].min())
+            aabb = torch.zeros(6, device=xyz_coarse.device)
+            aabb[:3] = center - radius
+            aabb[3:] = center + radius
         else:
-            if len(aabb) == 4:
-                aabb = [aabb[0], aabb[1], xyz_coarse[:, -1].min(), 
-                        aabb[2], aabb[3], xyz_coarse[:, -1].max()]
-            elif len(aabb) == 6:
-                aabb = aabb
-            else:
-                assert False, "Unknown aabb format!"
+            assert len(aabb) == 6, "Unknown aabb format!"
             aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_coarse.device)
         
         for block_id in range(block_num):
@@ -142,13 +143,15 @@ if __name__ == "__main__":
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
         config.name = os.path.basename(args.config_path).split(".")[0]
         args.block_dim = config.data.params.colmap_block.block_dim if args.block_dim is None else args.block_dim
-        args.aabb = config.data.params.colmap_block.aabb if args.aabb is None else args.aabb
+        if args.aabb is None and hasattr(config.data.params.colmap_block, "aabb"):
+            args.aabb = config.data.params.colmap_block.aabb
     
     coarse_model, _ = GaussianModelLoader.search_and_load(
         config.model.init_from,
         sh_degree=3,
         device="cuda",
     )
+
 
     txt_dict = {}
     image_list = config.data.params.colmap_block.image_list

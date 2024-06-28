@@ -2,12 +2,14 @@ import os
 import sys
 import yaml
 import torch
+import numpy as np
 from tqdm import tqdm
 from argparse import ArgumentParser, Namespace
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from internal.utils.ssim import ssim
 from internal.utils.blocking import contract_to_unisphere
+from internal.utils.mesh_utils import focus_point_fn
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
@@ -18,6 +20,17 @@ def parse(data):
         if isinstance(getattr(data, arg), dict):
             setattr(data, arg, parse(getattr(data, arg)))
     return data
+
+def contract(x):
+    mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
+    out = torch.where(mag < 1, x, (2 - (1 / mag)) * (x / mag)) # [-inf, inf] is at [-2, 2]
+    out = out / 4 + 0.5  # [-2, 2] is at [0, 1]
+    return out
+
+def uncontract(y):
+    y = y * 4 - 2  # [0, 1] is at [-2, 2]
+    mag = torch.linalg.norm(y, ord=2, dim=-1)[..., None]
+    return torch.where(mag < 1, y, (1 / (2-mag) * (y/mag)))
 
 def block_filtering(gaussians, 
                     renderer, 
@@ -36,33 +49,20 @@ def block_filtering(gaussians,
         bg_color=torch.tensor(background_color, dtype=torch.float, device="cuda")
 
         if aabb is None:
-            with torch.no_grad():
-                sorted_x = torch.sort(xyz_org[::100, 0], descending=True)[0]
-                sorted_y = torch.sort(xyz_org[::100, 1], descending=True)[0]
-                sorted_z = torch.sort(xyz_org[::100, 2], descending=True)[0]
-
-                ratio = 0.999
-                x_max = torch.quantile(sorted_x, ratio)
-                x_min = torch.quantile(sorted_x, 1-ratio)
-                y_max = torch.quantile(sorted_y, ratio)
-                y_min = torch.quantile(sorted_y, 1-ratio)
-                z_max = torch.quantile(sorted_z, ratio)
-                z_min = torch.quantile(sorted_z, 1-ratio)
-
-                xyz_min = torch.stack([x_min, y_min, z_min])
-                xyz_max = torch.stack([x_max, y_max, z_max])
-                central_min = xyz_min + (xyz_max - xyz_min) / 3
-                central_max = xyz_max - (xyz_max - xyz_min) / 3
-
-                aabb = torch.cat([central_min, central_max], dim=-1)
+            torch.cuda.empty_cache()
+            c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in dataset.cameras])
+            poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
+            center = (focus_point_fn(poses))
+            radius = torch.tensor(np.median(np.abs(c2ws[:,:3,3] - center), axis=0), device=xyz_org.device)
+            center = torch.from_numpy(center).float().to(xyz_org.device)
+            if radius.min() / radius.max() < 0.02:
+                # If the radius is too small, we don't contract in this dimension
+                radius[torch.argmin(radius)] = 0.5 * (xyz_org[:, torch.argmin(radius)].max() - xyz_org[:, torch.argmin(radius)].min())
+            aabb = torch.zeros(6, device=xyz_org.device)
+            aabb[:3] = center - radius
+            aabb[3:] = center + radius
         else:
-            if len(aabb) == 4:
-                aabb = [aabb[0], aabb[1], xyz_org[:, -1].min(), 
-                        aabb[2], aabb[3], xyz_org[:, -1].max()]
-            elif len(aabb) == 6:
-                aabb = aabb
-            else:
-                assert False, "Unknown aabb format!"
+            assert len(aabb) == 6, "Unknown aabb format!"
             aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
         
         print(f"Block number: {block_num}, Gaussian number threshold: {num_threshold}")
@@ -71,12 +71,13 @@ def block_filtering(gaussians,
         
         with torch.no_grad():
 
+            xyz = contract_to_unisphere(xyz_org, aabb, ord=torch.inf)
+
             for block_id in range(block_num):
                 block_id_z = block_id // (block_dim[0] * block_dim[1])
                 block_id_y = (block_id % (block_dim[0] * block_dim[1])) // block_dim[0]
                 block_id_x = (block_id % (block_dim[0] * block_dim[1])) % block_dim[0]
 
-                xyz = contract_to_unisphere(xyz_org, aabb, ord=torch.inf)
                 min_x, max_x = float(block_id_x) / block_dim[0], float(block_id_x + 1) / block_dim[0]
                 min_y, max_y = float(block_id_y) / block_dim[1], float(block_id_y + 1) / block_dim[1]
                 min_z, max_z = float(block_id_z) / block_dim[2], float(block_id_z + 1) / block_dim[2]
@@ -147,10 +148,19 @@ if __name__ == "__main__":
         args.aabb = config.data.params.colmap_block.aabb
         args.num_threshold = config.data.params.colmap_block.num_threshold
         args.content_threshold = config.data.params.colmap_block.content_threshold
+
+        if args.save_dir is None:
+            save_dir = config.data.params.colmap_block.image_list
+        else:
+            save_dir = args.save_dir
+        
         if 'point_cloud' in config.model.init_from:
             args.model_path = config.model.init_from.split("/point_cloud/")[0]
         elif 'checkpoints' in config.model.init_from:
             args.model_path = config.model.init_from.split("/checkpoints/")[0]
+    
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
     
     model, renderer = GaussianModelLoader.search_and_load(
         args.model_path,
@@ -171,12 +181,6 @@ if __name__ == "__main__":
         params=config.data.params.colmap_block,
     ).get_outputs()
     
-    if args.save_dir is None:
-        save_dir = os.path.join(config.data.path, "partition", f"{args.block_dim[0]}_{args.block_dim[1]}_{args.block_dim[2]}")
-    else:
-        save_dir = args.save_dir
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
     
     # assert save_dir contains no files and avoid duplicated partitioning
     assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
