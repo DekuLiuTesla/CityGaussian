@@ -1,3 +1,24 @@
-# CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians
+<br>
+<p align="center">
+<h1 align="center"><strong>[ECCV2024] CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians</strong></h1>
+  <p align="center">
+    Yang Liu&emsp;
+	  He Guan&emsp;
+    Chuanchen Luo&emsp;
+    Lue Fan&emsp;
+    Junran Peng&emsp;
+    Zhaoxiang Zhang&emsp;
+    <br>
+    <em>Institute of Automation, Chinese Academy of Sciences; University of Chinese Academy of Sciences</em>
+    <br>
+  </p>
+</p>
+
+<div id="top" align="center">
+
+[![](https://img.shields.io/badge/Paper-%F0%9F%93%96-blue)](https://arxiv.org/pdf/2404.01133)
+[![](https://img.shields.io/badge/Project-%F0%9F%9A%80-blue)](https://dekuliutesla.github.io/citygs/)
+
+</div>
 
 The advancement of real-time 3D scene reconstruction and novel view synthesis has been significantly propelled by 3D Gaussian Splatting (3DGS). However, effectively training large-scale 3DGS and rendering it in real-time across various scales remains challenging. This paper introduces CityGaussian (CityGS), which employs a novel divide-and-conquer training approach and Level-of-Detail (LoD) strategy for efficient large-scale 3DGS training and rendering. Specifically, the global scene prior and adaptive training data selection enables efficient training and seamless fusion. Based on fused Gaussian primitives, we generate different detail levels through compression, and realize fast rendering across various scales through the proposed block-wise detail levels selection and aggregation strategy. Extensive experimental results on large-scale scenes demonstrate that our approach attains state-of-the-art rendering quality, enabling consistent real-time rendering of large-scale scenes across vastly different scales. **Welcome to visit our [Project Page](https://dekuliutesla.github.io/citygs/)**.
