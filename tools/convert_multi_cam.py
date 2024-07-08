@@ -55,13 +55,12 @@ if not args.skip_matching:
     ### Bundle adjustment
     # The default Mapper tolerance is unnecessarily large,
     # decreasing it speeds up bundle adjustment steps.
-    triangulator_cmd = (colmap_command + " point_triangulator \
+    mapper_cmd = (colmap_command + " mapper \
         --database_path " + args.source_path + "/distorted/database.db \
         --image_path "  + args.source_path + "/input \
-        --input_path " + args.source_path + "/sparse \
         --output_path "  + args.source_path + "/distorted/sparse \
         --Mapper.ba_global_function_tolerance=0.000001")
-    exit_code = os.system(triangulator_cmd)
+    exit_code = os.system(mapper_cmd)
     if exit_code != 0:
         logging.error(f"Mapper failed with code {exit_code}. Exiting.")
         exit(exit_code)
@@ -70,7 +69,7 @@ if not args.skip_matching:
 ## We need to undistort our images into ideal pinhole intrinsics.
 img_undist_cmd = (colmap_command + " image_undistorter \
     --image_path " + args.source_path + "/input \
-    --input_path " + args.source_path + "/distorted/sparse \
+    --input_path " + args.source_path + "/distorted/sparse/0 \
     --output_path " + args.source_path + "\
     --output_type COLMAP")
 exit_code = os.system(img_undist_cmd)
