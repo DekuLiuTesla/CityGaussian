@@ -26,3 +26,5 @@ python tools/convert_multi_cam.py -s data/matrix_city/aerial_street_fusion/fuse/
 
 python tools/transform_json2txt_mc_fuse.py --transforms_path data/matrix_city/aerial_street_fusion/pose/transforms_test.json --target_path data/matrix_city/aerial_street_fusion
 python tools/convert_multi_cam.py -s data/matrix_city/aerial_street_fusion/fuse/test
+
+python tools/merge_sensors_data.py -s data/dji_test/hongkong/ex0102_aerial -t data/dji_test/hongkong/ex0102_phone -o data/dji_test/hongkong/ex0102_fuse -m data/dji_test/hongkong/ex0102_aerial/World_aerial2phone.txt
