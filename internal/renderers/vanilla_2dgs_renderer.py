@@ -159,7 +159,8 @@ class Vanilla2DGSRenderer(Renderer):
     ]:
         with torch.no_grad():
             # key to a quality comparable to hbb1/2d-gaussian-splatting
-            module.gaussian_model._rotation.copy_(torch.rand_like(module.gaussian_model._rotation))
+            if module.hparams["init_from"] is None:
+                module.gaussian_model._rotation.copy_(torch.rand_like(module.gaussian_model._rotation))
         return super().training_setup(module)
 
     @staticmethod
