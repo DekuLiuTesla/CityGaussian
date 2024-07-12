@@ -87,6 +87,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
+            if dataset.resolution > 0:
+                filename += "_{}".format(dataset.resolution)
         scene = LargeScene(dataset, gaussians, load_iteration=iteration, load_vq=load_vq, shuffle=False)
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]

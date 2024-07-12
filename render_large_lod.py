@@ -197,6 +197,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
+            if dataset.resolution > 0:
+                filename += "_{}".format(dataset.resolution)
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
