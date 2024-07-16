@@ -181,14 +181,20 @@ class GaussianSplatting(LightningModule):
             else:
                 if self.hparams["init_from"].endswith(".ply"):
                     self.gaussian_model.load_ply(self.hparams["init_from"], device=self.device)
-                    
-                elif self.hparams["init_from"].endswith(".ckpt"):
-                    self.gaussian_model.load_ckpt(torch.load(self.hparams["init_from"])["state_dict"], device=self.device)
-                
-                self.gaussian_model.max_radii2D = torch.zeros((self.gaussian_model.get_xyz.shape[0]), device=self.gaussian_model._xyz.device)
-                self.gaussian_model.xyz_gradient_accum = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
-                self.gaussian_model.denom = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
+                    self.gaussian_model.max_radii2D = torch.zeros((self.gaussian_model.get_xyz.shape[0]), device=self.gaussian_model._xyz.device)
+                    self.gaussian_model.xyz_gradient_accum = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
+                    self.gaussian_model.denom = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
 
+                elif self.hparams["init_from"].endswith(".ckpt"):
+                    checkpoint = torch.load(self.hparams["init_from"])
+                    self.gaussian_model.load_ckpt(checkpoint["state_dict"], device=self.device)
+                    if "gaussian_model_extra_state_dict" in checkpoint:
+                        for i in checkpoint["gaussian_model_extra_state_dict"]:
+                            setattr(self.gaussian_model, i, checkpoint["gaussian_model_extra_state_dict"][i])
+                        # for previous version
+                        if "active_sh_degree" not in checkpoint["gaussian_model_extra_state_dict"]:
+                            self.gaussian_model.active_sh_degree = self.gaussian_model.max_sh_degree
+                
         self.renderer.setup(stage, lightning_module=self)
 
         # get metric calculator from renderer if available
