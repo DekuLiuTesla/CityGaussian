@@ -87,9 +87,9 @@ class BlockedGaussian:
                                        [xyz_max[0], xyz_max[1], xyz_min[2]],
                                        [xyz_max[0], xyz_max[1], xyz_max[2]]], device=xyz.device)
                 self.cell_corners.append(corners)
-                self.avg_scalings.append(torch.mean(scaling[cell_mask], dim=0))
+                self.avg_scalings.append(torch.median(scaling[cell_mask], dim=0)[0])
             
-            self.avg_scalings = torch.max(torch.stack(self.avg_scalings, dim=0), dim=-1).values
+            self.avg_scalings = torch.norm(torch.stack(self.avg_scalings, dim=0), dim=-1)
     
     def get_feats(self, indices):
         out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
