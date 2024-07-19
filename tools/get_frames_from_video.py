@@ -6,7 +6,7 @@ import sys
 from tqdm import tqdm
 from argparse import ArgumentParser
  
-def get_frame_from_video(video_paths, save_path, interval, downsample_factor):
+def get_frame_from_video(video_paths, save_path, interval, start_frame, end_frame, downsample_factor):
 
     if save_path is None:
         save_path = video_paths[0].split(".")[0] + "_frames/input/"
@@ -19,12 +19,17 @@ def get_frame_from_video(video_paths, save_path, interval, downsample_factor):
         os.makedirs(save_path)
         print('path of %s already exist and rebuild' % save_path)
     
-    for video_path in video_paths:
+    if start_frame == -1:
+        start_frame = [0] * len(video_paths)
+    if end_frame == -1:
+        end_frame = [int(cv2.VideoCapture(video_path).get(7)) for video_path in video_paths]
+    
+    for idx, video_path in enumerate(video_paths):
         
         video_capture = cv2.VideoCapture(video_path)
         video_name = video_path.split("/")[-1].split(".")[0]
         
-        for i in tqdm(range(0, int(video_capture.get(7)), interval), desc=f"Extracting frames from {video_path}"):
+        for i in tqdm(range(start_frame[idx], end_frame[idx], interval), desc=f"Extracting frames from {video_path}"):
             video_capture.set(cv2.CAP_PROP_POS_FRAMES, i)
             success, frame = video_capture.read()
             if downsample_factor > 0:
@@ -40,7 +45,10 @@ if __name__ == '__main__':
     parser.add_argument("--video_paths", type=str, required=True, nargs="+")
     parser.add_argument("--save_path", type=str, default=None)
     parser.add_argument("--frame_interval", type=int, default=15)
+    parser.add_argument("--start_frame", type=int, default=-1, nargs="+")
+    parser.add_argument("--end_frame", type=int, default=-1, nargs="+")
     parser.add_argument("--downsample_factor", type=int, default=-1)
 
     args = parser.parse_args(sys.argv[1:])
-    get_frame_from_video(args.video_paths, args.save_path, args.frame_interval, args.downsample_factor)
+    get_frame_from_video(args.video_paths, args.save_path, args.frame_interval, 
+                         args.start_frame, args.end_frame, args.downsample_factor)
