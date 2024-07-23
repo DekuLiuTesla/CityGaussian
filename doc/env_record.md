@@ -10,6 +10,16 @@ pip install opencv-python
 # conda install pytorch3d -c pytorch3d
 ```
 
+# CityGS
+```bash
+# clone tailored LightGaussian for LoD Generation
+git submodule add https://github.com/DekuLiuTesla/LargeLightGaussian
+pip install icecream
+pip install einops
+cd LargeLightGaussian
+pip install submodules/compress-diff-gaussian-rasterization
+```
+
 # COLMAP
 a. sudo dpkg -i cuda-keyring_1.0-1_all.deb
 

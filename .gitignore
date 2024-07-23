@@ -16,16 +16,7 @@ plug_in
 refine.py
 run_gpu*
 
-config/org_ue_aerial_20_block1cam_range.yaml
-config/lod_mc_aerial_block3_vox_23.yaml
-config/org_mc_aerial_block9_cell9.yaml
-config/lod_mc_aerial_block9_v*
-config/block_mc_aerial_block_all_lr_c36_loss_5_66.yaml
-config/org_mc_aerial_block3_66.yaml
-config/org_mc_aerial_block3_prune_distill.yaml
-config/org_mc_aerial_block3_prune.yaml
-config/dump
 wandb
 bypy_upload.sh
-config/vox_mc_aerial_block_all_avg_half_lr2_30k_scale1.yaml
-config/mc_street_fusion.yaml
+config/dump
+config/past
