@@ -8,13 +8,13 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
-
+import os
 import torch
 import traceback
 import numpy as np
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
 from torch import nn
-import os
+from typing import NamedTuple
 from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH
@@ -23,6 +23,16 @@ from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation, build_symmetric
 from utils.large_utils import block_filtering
 from utils.vq_utils import load_vqgaussian
+
+class GatheredGaussian(NamedTuple):
+    gs_xyz: torch.Tensor
+    gs_feats: torch.Tensor
+    gs_ids: torch.Tensor
+    block_scalings: torch.Tensor
+    cell_corners: torch.Tensor
+    aabb: list
+    block_dim: list
+    max_sh_degree: int
 
 class GaussianModel:
 

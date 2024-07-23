@@ -255,7 +255,7 @@ class Viewer:
         checkpoint = None
         dataset_type = None
         if load_from.endswith(".yaml") is True:
-            from render_large_lod import parse_cfg, BlockedGaussian
+            from render_large_lod import parse_cfg, BlockedGaussian, GatheredGaussian
             with open(load_from) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
@@ -265,17 +265,29 @@ class Viewer:
                 lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
                 training_output_base_dir = os.path.dirname(lp.model_path)
                 self.sh_degree = lp.sh_degree
-            
+                
             with torch.no_grad():
-                model = []
+                lod_gs_list = []
                 for i in range(len(lp.lod_configs)):
-                    config = lp.lod_configs[i]
+                    config = lp.lod_configs[i] 
                     config_name = os.path.splitext(os.path.basename(config))[0]
                     pcd_path = os.path.join(training_output_base_dir, config_name)
                     
                     lod_gs, renderer = self._do_initialize_models_from_vq(pcd_path, self.sh_degree, self.device)
                     lod_gs = BlockedGaussian(lod_gs, lp, range=[lp.dist_threshold[i], lp.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
-                    model.append(lod_gs)
+                    lod_gs_list.append(lod_gs)
+                
+                model = GatheredGaussian(
+                    gs_xyz=torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0),
+                    gs_feats=torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half(),
+                    gs_ids=torch.cat([lod_gs.cell_ids+idx*lod_gs_list[-1].num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8),
+                    block_scalings=torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0),
+                    cell_corners=lod_gs_list[-1].cell_corners,
+                    aabb=lod_gs_list[-1].aabb,
+                    block_dim=lod_gs_list[-1].block_dim,
+                    max_sh_degree=self.sh_degree,
+                )
+                del lod_gs_list, lod_gs
             
         elif load_from.endswith(".ply") is True:
             model, renderer = self._initialize_models_from_point_cloud(load_from)

@@ -27,7 +27,7 @@ from utils.general_utils import safe_state
 from utils.large_utils import which_block, block_filtering
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
-from gaussian_renderer import GaussianModel
+from gaussian_renderer import GaussianModel, GatheredGaussian
 from torch.utils.data import DataLoader
 from utils.camera_utils import loadCam
 
@@ -37,7 +37,7 @@ class BlockedGaussian:
 
     def __init__(self, gaussians, lp, range=[0, 1], scale=1.0, compute_cov3D_python=False):
         self.cell_corners = []
-        self.xyz = None
+        self.avg_scalings = []
         self.feats = None
         self.max_sh_degree = lp.sh_degree
         self.device = gaussians.get_xyz.device
@@ -61,21 +61,23 @@ class BlockedGaussian:
             else:
                 geometry = torch.cat([gaussians.get_scaling,
                                       gaussians.get_rotation], dim=1)
-            self.xyz = gaussians.get_xyz
-            self.feats = torch.cat([gaussians.get_opacity,  
+            self.feats = torch.cat([gaussians.get_xyz,
+                                    gaussians.get_opacity,  
                                     gaussians.get_features.reshape(geometry.shape[0], -1),
-                                    geometry], dim=1).half()
-            
+                                    geometry], dim=1)
+
+            xyz = gaussians.get_xyz
+            scaling = gaussians.get_scaling
             for cell_idx in range(self.num_cell):
-                cell_mask = block_filtering(cell_idx, self.xyz, self.aabb, self.block_dim, self.scale)
+                cell_mask = block_filtering(cell_idx, self.feats[:, :3], self.aabb, self.block_dim, self.scale)
                 self.cell_ids[cell_mask] = cell_idx
                 # MAD to eliminate influence of outsiders
-                xyz_median = torch.median(self.xyz[cell_mask], dim=0)[0]
-                delta_median = torch.median(torch.abs(self.xyz[cell_mask] - xyz_median), dim=0)[0]
+                xyz_median = torch.median(xyz[cell_mask], dim=0)[0]
+                delta_median = torch.median(torch.abs(xyz[cell_mask] - xyz_median), dim=0)[0]
                 xyz_min = xyz_median - n * delta_median
-                xyz_min = torch.max(xyz_min, torch.min(self.xyz[cell_mask], dim=0)[0])
+                xyz_min = torch.max(xyz_min, torch.min(xyz[cell_mask], dim=0)[0])
                 xyz_max = xyz_median + n * delta_median
-                xyz_max = torch.min(xyz_max, torch.max(self.xyz[cell_mask], dim=0)[0])
+                xyz_max = torch.min(xyz_max, torch.max(xyz[cell_mask], dim=0)[0])
                 corners = torch.tensor([[xyz_min[0], xyz_min[1], xyz_min[2]],
                                        [xyz_min[0], xyz_min[1], xyz_max[2]],
                                        [xyz_min[0], xyz_max[1], xyz_min[2]],
@@ -83,37 +85,18 @@ class BlockedGaussian:
                                        [xyz_max[0], xyz_min[1], xyz_min[2]],
                                        [xyz_max[0], xyz_min[1], xyz_max[2]],
                                        [xyz_max[0], xyz_max[1], xyz_min[2]],
-                                       [xyz_max[0], xyz_max[1], xyz_max[2]]], device=self.xyz.device)
+                                       [xyz_max[0], xyz_max[1], xyz_max[2]]], device=xyz.device)
                 self.cell_corners.append(corners)
+                self.avg_scalings.append(torch.mean(scaling[cell_mask], dim=0))
+            
+            self.avg_scalings = torch.max(torch.stack(self.avg_scalings, dim=0), dim=-1).values
     
-    def get_feats(self, indices, distances):
-        out_xyz = torch.tensor([], device=self.device, dtype=self.xyz.dtype)
-        out_feats = torch.tensor([], device=self.device, dtype=self.feats.dtype)
-        block_mask = (distances >= self.range[0]) & (distances < self.range[1])
-        if block_mask.sum() > 0:
-            self.mask = torch.isin(self.cell_ids, indices[block_mask].to(self.device))
-            out_xyz = self.xyz[self.mask]
-            out_feats = self.feats[self.mask]
-        return out_xyz, out_feats
-
-    def get_feats_ptwise(self, viewpoint_cam):
-        out_xyz = torch.tensor([], device=self.device, dtype=self.xyz.dtype)
-        out_feats = torch.tensor([], device=self.device, dtype=self.feats.dtype)
-
-        homo_xyz = torch.cat([self.xyz, torch.ones_like(self.xyz[..., [0]])], dim=-1)
-        cam_center = viewpoint_cam.camera_center
-        viewmatrix = viewpoint_cam.world_view_transform
-        xyz_cam = homo_xyz @ viewmatrix
-        self.mask = (xyz_cam[..., 2] > 0.2)
-        if self.mask.sum() == 0:
-            return out_xyz, out_feats
-
-        distances = torch.norm(self.xyz - cam_center[None, :3], dim=-1)
-        self.mask &= (distances >= self.range[0]) & (distances < self.range[1])
-        if self.mask.sum() > 0:
-            out_xyz = self.xyz[self.mask]
-            out_feats = self.feats[self.mask]
-        return out_xyz, out_feats
+    def get_feats(self, indices):
+        out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
+        if len(indices) > 0:
+            self.mask = torch.isin(self.cell_ids, indices.to(self.device))
+            out = self.feats[self.mask]
+        return out
 
 def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cuda', source_path='data/matrix_city/aerial/test/block_all_test'):
     
@@ -133,7 +116,7 @@ def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cu
 
     return gaussians, scene
 
-def render_set(model_path, name, iteration, views, gaussians, pipeline, background):
+def render_set(model_path, name, iteration, views, model, max_sh_degree, pipeline, background):
     avg_render_time = 0
     max_render_time = 0
     avg_memory = 0
@@ -141,6 +124,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
 
     render_path = os.path.join(model_path, name, "ours_{}".format(iteration), "renders")
     gts_path = os.path.join(model_path, name, "ours_{}".format(iteration), "gt")
+    print(f"Save Path: {os.path.join(model_path, name)}")
 
     makedirs(render_path, exist_ok=True)
     makedirs(gts_path, exist_ok=True)
@@ -153,7 +137,7 @@ def render_set(model_path, name, iteration, views, gaussians, pipeline, backgrou
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
-        rendering = render_lod(viewpoint_cam, gaussians, pipeline, background)["render"]
+        rendering = render_lod(viewpoint_cam, model, pipeline, background)["render"]
         torch.cuda.synchronize()
         end = time.time()
         avg_render_time += end-start
@@ -193,24 +177,40 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             lod_gs, scene = load_gaussians(cfg, config_name, iteration, load_vq, source_path=custom_test)
             lod_gs = BlockedGaussian(lod_gs, lp, range=[dataset.dist_threshold[i], dataset.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
+        
+        num_cell, max_sh_degree = lod_gs_list[-1].num_cell, lod_gs_list[-1].max_sh_degree
+        loaded_iter, train_cams, test_cams = scene.loaded_iter, scene.getTrainCameras(), scene.getTestCameras()
+        model = GatheredGaussian(
+            gs_xyz=torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0),
+            gs_feats=torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half(),
+            gs_ids=torch.cat([lod_gs.cell_ids+idx*num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8),
+            block_scalings=torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0),
+            cell_corners=lod_gs_list[-1].cell_corners,
+            aabb=lod_gs_list[-1].aabb,
+            block_dim=lod_gs_list[-1].block_dim,
+            max_sh_degree=max_sh_degree,
+        )
+        del lod_gs_list, lod_gs, scene
 
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
+            if dataset.resolution > 0:
+                filename += "_{}".format(dataset.resolution)
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
         
         if custom_test:
-            views = scene.getTrainCameras() + scene.getTestCameras()
-            render_set(dataset.model_path, filename, scene.loaded_iter, views, lod_gs_list, pipeline, background)
+            views = train_cams + test_cams
+            render_set(dataset.model_path, filename, loaded_iter, views, model, max_sh_degree, pipeline, background)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", scene.loaded_iter, views, lod_gs_list, pipeline, background)
+                render_set(dataset.model_path, "train", loaded_iter, train_cams, model, max_sh_degree, pipeline, background)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", scene.loaded_iter, views, lod_gs_list, pipeline, background)
+                render_set(dataset.model_path, "test", loaded_iter, test_cams, model, max_sh_degree, pipeline, background)
 
 def parse_cfg(cfg):
     lp = GroupParams()
@@ -238,6 +238,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
+    parser.add_argument("--resolution", default=-1, type=int)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
@@ -255,6 +256,9 @@ if __name__ == "__main__":
         cfg = yaml.load(f, Loader=yaml.FullLoader)
         lp, op, pp = parse_cfg(cfg)
         setattr(lp, 'config_path', args.config)
+        if args.resolution != -1:
+            setattr(lp, 'resolution', args.resolution)
+        print(f'Init with resolution {lp.resolution}\n')
         if lp.model_path == '':
             lp.model_path = args.model_path
 
