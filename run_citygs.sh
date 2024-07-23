@@ -5,40 +5,40 @@ get_available_gpu() {
   '
 }
 
-# train coarse global gaussian model
-CONFIG="org_mc_aerial_block_all_lr2"
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python train_large.py --config config/$CONFIG.yaml
+# # train coarse global gaussian model
+CONFIG="sciart_coarse"
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python train_large.py --config config//$CONFIG.yaml
 
 # train CityGaussian
-CONFIG="block_mc_aerial_block_all_lr_c36_loss_8"
+CONFIG="sciart_c9_r4"
 # obtain data partitioning
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config config/$CONFIG.yaml
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config config//$CONFIG.yaml
 
-# optimize each block
+# optimize each block, please adjust block number according to config
 port=4041
-for num in {0..35}; do
+for num in {0..8}; do
     while true; do
         gpu_id=$(get_available_gpu)
         if [[ -n $gpu_id ]]; then
             echo "GPU $gpu_id is available. Starting training block '$num'"
-            CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python train_large.py --config config/$CONFIG.yaml --block_id $num --port $port &
+            CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python train_large.py --config config//$CONFIG.yaml --block_id $num --port $port &
             # Increment the port number for the next run
             ((port++))
             # Allow some time for the process to initialize and potentially use GPU memory
-            sleep 180
+            sleep 120
             break
         else
-            echo "No GPU available at the moment. Retrying in 3 minute."
-            sleep 180
+            echo "No GPU available at the moment. Retrying in 2 minute."
+            sleep 120
         fi
     done
 done
 wait
 
 # merge the blocks
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python merge.py --config config/$CONFIG.yaml
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python merge.py --config config//$CONFIG.yaml
 
 # rendering and evaluation, add --load_vq in rendering if you want to load compressed model
-TEST_PATH="data/matrix_city/aerial/test/block_all_test"
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large.py --config config/$CONFIG.yaml --custom_test $TEST_PATH
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t block_all_test
+TEST_PATH="data/urban_scene_3d/sci-art-pixsfm/val"
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large.py --config config//$CONFIG.yaml --custom_test $TEST_PATH
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t val

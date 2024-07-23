@@ -5,8 +5,8 @@ get_available_gpu() {
   '
 }
 
-CONFIG="block_rubble_all_lr_c9_loss_12_r4_lod"
-TEST_PATH="data/mill19/rubble-pixsfm/val"
+CONFIG="block_mc_aerial_block_all_lr_c36_loss_8_lod"
+TEST_PATH="data/matrix_city/aerial/test/block_all_test"
 
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large_lod.py --config config/$CONFIG.yaml --custom_test $TEST_PATH --load_vq
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t val
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t block_all_test

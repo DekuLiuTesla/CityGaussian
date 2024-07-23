@@ -18,6 +18,7 @@ pip install icecream
 pip install einops
 cd LargeLightGaussian
 pip install submodules/compress-diff-gaussian-rasterization
+ln -s /path/to/output /path/to/LargeLightGaussian/output
 ```
 
 # COLMAP
