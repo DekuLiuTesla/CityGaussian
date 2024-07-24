@@ -15,10 +15,6 @@ class GSDataset(Dataset):
         self.scale = scale
         self.args = args
         
-        # if hasattr(args, 'block_id') and args.block_id >= 0:
-        #     self.block_filtering(scene.gaussians, args, pipe)
-        #     print(f"Filtered Cameras: {len(self.cameras)}")
-        
         if hasattr(pipe, 'blur_level') and pipe.blur_level > 0:
             self.blur_level = pipe.blur_level
         else:
@@ -84,94 +80,3 @@ class GSDataset(Dataset):
             x[mask] = (2 - 1 / mag[mask]) * (x[mask] / mag[mask])
             x = x / 4 + 0.5  # [-inf, inf] is at [0, 1]
             return x
-    
-    def block_filtering(self, gaussians, args, pp):
-        if not hasattr(args, 'filter_mode'):
-            args.filter_mode = 'opacity'
-        else:
-            assert args.filter_mode in ['opacity', 'loss'], "Unknown filter mode!"
-
-        xyz_org = gaussians.get_xyz
-        if len(args.aabb) == 4:
-            aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
-                    args.aabb[2], args.aabb[3], xyz_org[:, -1].max()]
-        elif len(args.aabb) == 6:
-            aabb = args.aabb
-        else:
-            assert False, "Unknown aabb format!"
-        self.aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
-        block_id_z = args.block_id // (args.block_dim[0] * args.block_dim[1])
-        block_id_y = (args.block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[0]
-        block_id_x = (args.block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[0]
-
-        if hasattr(args, 'xyz_limited') and args.xyz_limited:
-            xyz = xyz_org
-            min_x = self.aabb[0] + (self.aabb[3] - self.aabb[0]) * float(block_id_x) / args.block_dim[0]
-            max_x = self.aabb[0] + (self.aabb[3] - self.aabb[0]) * float(block_id_x + 1) / args.block_dim[0]
-            min_y = self.aabb[1] + (self.aabb[4] - self.aabb[1]) * float(block_id_y) / args.block_dim[1]
-            max_y = self.aabb[1] + (self.aabb[4] - self.aabb[1]) * float(block_id_y + 1) / args.block_dim[1]
-            min_z = self.aabb[2] + (self.aabb[5] - self.aabb[2]) * float(block_id_z) / args.block_dim[2]
-            max_z = self.aabb[2] + (self.aabb[5] - self.aabb[2]) * float(block_id_z + 1) / args.block_dim[2]
-        else:
-            xyz = self.contract_to_unisphere(xyz_org, self.aabb, ord=torch.inf)
-            min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
-            min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
-            min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
-
-        block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
-        num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
-        while num_gs < 25000:
-            # TODO: select better threshold
-            block_mask = (xyz[:, 0] >= min_x) & (xyz[:, 0] < max_x)  \
-                        & (xyz[:, 1] >= min_y) & (xyz[:, 1] < max_y) \
-                        & (xyz[:, 2] >= min_z) & (xyz[:, 2] < max_z)
-            num_gs = block_mask.sum()
-            min_x -= 0.01
-            max_x += 0.01
-            min_y -= 0.01
-            max_y += 0.01
-            min_z -= 0.01
-            max_z += 0.01
-        
-        block_mask = ~block_mask
-        sh_degree = gaussians.max_sh_degree
-        masked_gaussians = GaussianModel(sh_degree)
-        masked_gaussians._xyz = xyz_org[block_mask]
-        masked_gaussians._scaling = gaussians._scaling[block_mask]
-        masked_gaussians._rotation = gaussians._rotation[block_mask]
-        masked_gaussians._features_dc = gaussians._features_dc[block_mask]
-        masked_gaussians._features_rest = gaussians._features_rest[block_mask]
-        masked_gaussians._opacity = gaussians._opacity[block_mask]
-        masked_gaussians.max_radii2D = gaussians.max_radii2D[block_mask]
-
-        filtered_cameras = []
-        print(f"Getting Data of Block {args.block_id} / {block_num}")
-        with torch.no_grad():
-            for idx in tqdm(range(len(self.cameras))):
-                bg_color = [1,1,1] if args.white_background else [0, 0, 0]
-                background = torch.tensor(bg_color, dtype=torch.float32, device=xyz_org.device)
-                c = self.cameras[idx]
-                viewpoint_cam = loadCam(self.args, idx, c, self.scale)
-                contract_cam_center = self.contract_to_unisphere(viewpoint_cam.camera_center, self.aabb, ord=torch.inf)
-                if contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
-                    and contract_cam_center[1] > org_min_y and contract_cam_center[1] < org_max_y \
-                    and contract_cam_center[2] > org_min_z and contract_cam_center[2] < org_max_z:
-                    filtered_cameras.append(c)
-                    continue
-
-                render_pkg_block = render(viewpoint_cam, gaussians, pp, background)
-
-                if args.filter_mode == 'opacity':
-                    visibility_filter = render_pkg_block["visibility_filter"] & (~block_mask)
-                    total_opacity = render_pkg_block["geometry"][visibility_filter, 6].sum()
-                    if total_opacity > args.opacity_threshold:
-                        filtered_cameras.append(c)
-                elif args.filter_mode == 'loss':
-                    org_image_block = render_pkg_block["render"]
-                    render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)
-                    image_block = render_pkg_block["render"]
-                    loss = 1.0 - ssim(image_block, org_image_block)
-                    if loss > args.opacity_threshold:
-                        filtered_cameras.append(c)
-                    
-        self.cameras = filtered_cameras if len(filtered_cameras) > 75 else []

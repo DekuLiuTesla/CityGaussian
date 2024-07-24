@@ -15,7 +15,7 @@ Compact-3DGS-main
 plug_in
 refine.py
 run_gpu*
-
+notebooks
 wandb
 bypy_upload.sh
 config/dump

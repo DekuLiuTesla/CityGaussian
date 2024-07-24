@@ -25,11 +25,7 @@ def focus_point_fn(poses: np.ndarray) -> np.ndarray:
     focus_pt = np.linalg.inv(mt_m.mean(0)) @ (mt_m @ origins).mean(0)[:, 0]
     return focus_pt
 
-def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False, disable_inblock=False, simple_selection=False):
-        if not hasattr(args, 'filter_mode'):
-            args.filter_mode = 'opacity'
-        else:
-            assert args.filter_mode in ['opacity', 'loss'], "Unknown filter mode!"
+def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, disable_inblock=False, simple_selection=False):
 
         xyz_org = gaussians.get_xyz
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
@@ -134,18 +130,12 @@ def block_filtering(cameras, gaussians, args, pp, scale=1.0, quiet=False, disabl
 
                     render_pkg_block = render(viewpoint_cam, gaussians, pp, background)
 
-                    if args.filter_mode == 'opacity':
-                        visibility_filter = render_pkg_block["visibility_filter"] & (~block_mask)
-                        total_opacity = render_pkg_block["geometry"][visibility_filter, 6].sum()
-                        if total_opacity > args.opacity_threshold:
-                            camera_mask[idx, block_id] = True
-                    elif args.filter_mode == 'loss':
-                        org_image_block = render_pkg_block["render"]
-                        render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)
-                        image_block = render_pkg_block["render"]
-                        loss = 1.0 - ssim(image_block, org_image_block)
-                        if loss > args.opacity_threshold:
-                            camera_mask[idx, block_id] = True
+                    org_image_block = render_pkg_block["render"]
+                    render_pkg_block = render(viewpoint_cam, masked_gaussians, pp, background)
+                    image_block = render_pkg_block["render"]
+                    loss = 1.0 - ssim(image_block, org_image_block)
+                    if loss > args.ssim_threshold:
+                        camera_mask[idx, block_id] = True
         
         if not quiet:
             for block_id in range(block_num):
@@ -186,7 +176,7 @@ if __name__ == "__main__":
     model_config = lp.model_config
     gaussians = getattr(modules, model_config['name'])(lp.sh_degree, **model_config['kwargs'])
     scene = LargeScene(lp, gaussians, shuffle=False)
-    camera_mask = block_filtering(scene.getTrainCameras(), gaussians, lp, pp, 1.0, args.quiet, args.disable_inblock, args.simple_selection)
+    camera_mask = block_partitioning(scene.getTrainCameras(), gaussians, lp, pp, 1.0, args.quiet, args.disable_inblock, args.simple_selection)
     camera_mask = camera_mask.cpu().numpy()
     if not os.path.exists(os.path.join(lp.source_path, "data_partitions")):
         os.makedirs(os.path.join(lp.source_path, "data_partitions"))

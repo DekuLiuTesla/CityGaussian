@@ -15,7 +15,7 @@ import torch
 import torchvision
 from random import randint
 from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
-from gaussian_renderer import render, render_v2, network_gui
+from gaussian_renderer import render, render_large, network_gui
 import sys
 from lightning.pytorch.loggers import (
     TensorBoardLogger,
@@ -96,7 +96,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
             start = time.time()
             if (iteration - 1) == debug_from:
                 pipe.debug = True
-            render_pkg = render_v2(cam_info, gaussians, pipe, background)
+            render_pkg = render_large(cam_info, gaussians, pipe, background)
             image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
             end = time.time()
             ema_time_render = 0.4 * (end - start) + 0.6 * ema_time_render
@@ -137,7 +137,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
 
                 # Log and save
                 training_report(dataset, log_writer, image_logger, iteration, Ll1, loss, l1_loss, ema_time, lr,
-                                iter_start.elapsed_time(iter_end), testing_iterations, scene, render_v2, (pipe, background))
+                                iter_start.elapsed_time(iter_end), testing_iterations, scene, render_large, (pipe, background))
                 if (iteration in saving_iterations):
                     print("\n[ITER {}] Saving Gaussians".format(iteration))
                     scene.save(iteration, dataset)

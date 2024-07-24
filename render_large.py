@@ -22,7 +22,7 @@ from arguments import GroupParams
 from scene import LargeScene
 from scene.datasets import GSDataset
 from os import makedirs
-from gaussian_renderer import render_v2
+from gaussian_renderer import render_large
 from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
@@ -46,7 +46,7 @@ def render_set(model_path, name, iteration, gs_dataset, gaussians, pipeline, bac
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
         start = time.time()
-        rendering = render_v2(cam_info, gaussians, pipeline, background)["render"]
+        rendering = render_large(cam_info, gaussians, pipeline, background)["render"]
         torch.cuda.synchronize()
         end = time.time()
         
