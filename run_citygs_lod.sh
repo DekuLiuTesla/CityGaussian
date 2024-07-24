@@ -5,8 +5,10 @@ get_available_gpu() {
   '
 }
 
-CONFIG="block_rubble_all_lr_c9_loss_12_r4_lod"
+CONFIG="rubble_c9_r4_lod"
 TEST_PATH="data/mill19/rubble-pixsfm/val"
 
+out_name="val_4"  # 4 denotes resolution
+
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large_lod.py --config config/$CONFIG.yaml --custom_test $TEST_PATH --load_vq
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t val_4
+CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t $out_name
