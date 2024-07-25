@@ -260,7 +260,7 @@ def render_lod(viewpoint_cam, pc: GatheredGaussian, pipe, bg_color : torch.Tenso
     in_frustum_indices = in_frustum_indices.squeeze() + lod_indices * pc.block_dim[0] * pc.block_dim[1] * pc.block_dim[2]
     mask = torch.isin(pc.gs_ids, in_frustum_indices.to(pc.gs_feats.device))
     
-    # used for BlockedGaussianV3
+    # used for BlockedGaussian
     feat_end_dim = 3 * (pc.max_sh_degree + 1) ** 2 + 1
 
     means3D = pc.gs_xyz[mask].float()

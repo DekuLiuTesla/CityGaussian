@@ -13,6 +13,7 @@ import viser
 import viser.transforms as vtf
 import torch
 from gaussian_renderer import render_viewer
+from utils.general_utils import parse_cfg
 from scene.viewer import ClientThread, ViewerRenderer
 from scene.viewer.ui import populate_render_tab, TransformPanel, EditPanel
 
@@ -255,13 +256,11 @@ class Viewer:
         checkpoint = None
         dataset_type = None
         if load_from.endswith(".yaml") is True:
-            from render_large_lod import parse_cfg, BlockedGaussian, GatheredGaussian
+            from scene.gaussian_model import GatheredGaussian, BlockedGaussian
             with open(load_from) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
                 lp, op, pp = parse_cfg(cfg)
-                assert len(lp.lod_configs)-1 == len(lp.dist_threshold)
-                lp.dist_threshold = [0] + lp.dist_threshold + [1e6]
                 lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
                 training_output_base_dir = os.path.dirname(lp.model_path)
                 self.sh_degree = lp.sh_degree

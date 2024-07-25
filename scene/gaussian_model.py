@@ -19,6 +19,7 @@ from utils.system_utils import mkdir_p
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import RGB2SH
 from simple_knn._C import distCUDA2
+from utils.large_utils import block_filtering
 from utils.graphics_utils import BasicPointCloud
 from utils.general_utils import strip_symmetric, build_scaling_rotation, build_symmetric
 from utils.vq_utils import load_vqgaussian
@@ -418,6 +419,72 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
+
+class BlockedGaussian:
+
+    gaussians : GaussianModel
+
+    def __init__(self, gaussians, lp, scale=1.0, compute_cov3D_python=False):
+        self.cell_corners = []
+        self.avg_scalings = []
+        self.feats = None
+        self.max_sh_degree = lp.sh_degree
+        self.device = gaussians.get_xyz.device
+        self.compute_cov3D_python = compute_cov3D_python
+        self.cell_ids = torch.zeros(gaussians.get_opacity.shape[0], dtype=torch.long, device=self.device)
+        self.mask = torch.zeros(gaussians.get_opacity.shape[0], dtype=torch.bool, device=self.device)
+
+        self.block_dim = lp.block_dim
+        self.num_cell = lp.block_dim[0] * lp.block_dim[1] * lp.block_dim[2]
+        self.aabb = lp.aabb
+        self.scale = scale
+
+        self.cell_divider(gaussians)
+        self.cell_corners = torch.stack(self.cell_corners, dim=0)
+
+    def cell_divider(self, gaussians, n=4):
+        with torch.no_grad():
+            if self.compute_cov3D_python:
+                geometry = gaussians.get_covariance(self.scale).to(self.device)
+            else:
+                geometry = torch.cat([gaussians.get_scaling,
+                                      gaussians.get_rotation], dim=1)
+            self.feats = torch.cat([gaussians.get_xyz,
+                                    gaussians.get_opacity,  
+                                    gaussians.get_features.reshape(geometry.shape[0], -1),
+                                    geometry], dim=1)
+
+            xyz = gaussians.get_xyz
+            scaling = gaussians.get_scaling
+            for cell_idx in range(self.num_cell):
+                cell_mask = block_filtering(cell_idx, self.feats[:, :3], self.aabb, self.block_dim, self.scale)
+                self.cell_ids[cell_mask] = cell_idx
+                # MAD to eliminate influence of outsiders
+                xyz_median = torch.median(xyz[cell_mask], dim=0)[0]
+                delta_median = torch.median(torch.abs(xyz[cell_mask] - xyz_median), dim=0)[0]
+                xyz_min = xyz_median - n * delta_median
+                xyz_min = torch.max(xyz_min, torch.min(xyz[cell_mask], dim=0)[0])
+                xyz_max = xyz_median + n * delta_median
+                xyz_max = torch.min(xyz_max, torch.max(xyz[cell_mask], dim=0)[0])
+                corners = torch.tensor([[xyz_min[0], xyz_min[1], xyz_min[2]],
+                                       [xyz_min[0], xyz_min[1], xyz_max[2]],
+                                       [xyz_min[0], xyz_max[1], xyz_min[2]],
+                                       [xyz_min[0], xyz_max[1], xyz_max[2]],
+                                       [xyz_max[0], xyz_min[1], xyz_min[2]],
+                                       [xyz_max[0], xyz_min[1], xyz_max[2]],
+                                       [xyz_max[0], xyz_max[1], xyz_min[2]],
+                                       [xyz_max[0], xyz_max[1], xyz_max[2]]], device=xyz.device)
+                self.cell_corners.append(corners)
+                self.avg_scalings.append(torch.mean(scaling[cell_mask], dim=0))
+            
+            self.avg_scalings = torch.max(torch.stack(self.avg_scalings, dim=0), dim=-1).values
+    
+    def get_feats(self, indices):
+        out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
+        if len(indices) > 0:
+            self.mask = torch.isin(self.cell_ids, indices.to(self.device))
+            out = self.feats[self.mask]
+        return out
 
 class GaussianModelLOD(GaussianModel):
     def __init__(self, 
