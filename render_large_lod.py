@@ -27,20 +27,13 @@ from arguments import ModelParams, PipelineParams
 from scene.gaussian_model import GatheredGaussian, BlockedGaussian
 from utils.camera_utils import loadCam
 
-def load_gaussians(cfg, config_name, iteration=30_000, load_vq=False, device='cuda', source_path='data/matrix_city/aerial/test/block_all_test'):
-    
-    lp, op, pp = parse_cfg(cfg)
-    setattr(lp, 'config_path', cfg)
-    lp.source_path = source_path
-    lp.model_path = os.path.join("output/", config_name)
+def load_gaussians(lp, iteration=30_000, load_vq=False, device='cuda'):
 
     modules = __import__('scene')
     
     with torch.no_grad():
         gaussians = getattr(modules, lp.model_config['name'])(lp.sh_degree, device=device, **lp.model_config['kwargs'])
         scene = LargeScene(lp, gaussians, load_iteration=iteration, load_vq=load_vq, shuffle=False)
-        print(f'Init {config_name} with {len(gaussians.get_opacity)} points\n')
-
     return gaussians, scene
 
 def render_set(model_path, name, iteration, views, model, max_sh_degree, pipeline, background):
@@ -93,13 +86,17 @@ def render_set(model_path, name, iteration, views, model, max_sh_degree, pipelin
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool):
 
     with torch.no_grad():
+        if custom_test:
+            dataset.source_path = custom_test
+            filename = os.path.basename(dataset.source_path)
+            if dataset.resolution > 0:
+                filename += "_{}".format(dataset.resolution)
+
         lod_gs_list = []
         for i in range(len(dataset.lod_configs)):
-            config = dataset.lod_configs[i]
-            config_name = os.path.splitext(os.path.basename(config))[0]
-            with open(config) as f:
-                cfg = yaml.load(f, Loader=yaml.FullLoader)
-            lod_gs, scene = load_gaussians(cfg, config_name, iteration, load_vq, source_path=custom_test)
+            lp.model_path = dataset.lod_configs[i]
+            lod_gs, scene = load_gaussians(lp, iteration, load_vq)
+            print(f"Init LoD {i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
             lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         
@@ -116,12 +113,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             max_sh_degree=max_sh_degree,
         )
         del lod_gs_list, lod_gs, scene
-
-        if custom_test:
-            dataset.source_path = custom_test
-            filename = os.path.basename(dataset.source_path)
-            if dataset.resolution > 0:
-                filename += "_{}".format(dataset.resolution)
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")

@@ -149,7 +149,7 @@ class Viewer:
         up = -up / torch.linalg.norm(up)
 
         print("up vector = {}".format(up))
-        self.up_direction = up
+        self.up_direction = up.numpy()
 
         return transform
 
@@ -262,18 +262,15 @@ class Viewer:
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
                 lp, op, pp = parse_cfg(cfg)
                 lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
-                training_output_base_dir = os.path.dirname(lp.model_path)
+                training_output_base_dir = lp.model_path
                 self.sh_degree = lp.sh_degree
                 
             with torch.no_grad():
                 lod_gs_list = []
                 for i in range(len(lp.lod_configs)):
-                    config = lp.lod_configs[i] 
-                    config_name = os.path.splitext(os.path.basename(config))[0]
-                    pcd_path = os.path.join(training_output_base_dir, config_name)
-                    
+                    pcd_path = lp.lod_configs[i]                     
                     lod_gs, renderer = self._do_initialize_models_from_vq(pcd_path, self.sh_degree, self.device)
-                    lod_gs = BlockedGaussian(lod_gs, lp, range=[lp.dist_threshold[i], lp.dist_threshold[i+1]], compute_cov3D_python=pp.compute_cov3D_python)
+                    lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
                     lod_gs_list.append(lod_gs)
                 
                 model = GatheredGaussian(

@@ -44,6 +44,30 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
   <img src="assets/Render.png" align="center" width="100%">
 </p>
 
+## 🔧 Usage
+
+Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder.
+### Training
+To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks` and `out_name` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
+```bash
+bash run_citygs.sh
+```
+**Tips for adjusting the parameters on your own dataset:**
+- We recommend ssim_threshold as 0.08 as a good start point
+- For foreground area `aabb`, you can try our default setting first before adjusting it
+
+### Viewer
+We borrowed Web viewer from [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning). Take the scene Rubble as an example. To render the scene with no LoD, you can use the following command:
+```bash
+python viewer.py output/rubble_c9_r4
+```
+To render the scene with LoD, you can use the following command:
+```bash
+# copy cameras.json first for direction initialization
+cp output/rubble_c9_r4/cameras.json output/rubble_c9_r4_lod/
+python viewer.py config/rubble_c9_r4_lod.yaml
+```
+
 ## 📝 TODO List
 
 - \[x\] First Release.
