@@ -47,14 +47,31 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 ## 🔧 Usage
 
 Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder.
-### Training
-To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks` and `out_name` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
+### Training and Vanilla Rendering
+To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
 ```bash
 bash run_citygs.sh
 ```
+This script will also render and evaluate the result without LoD.
+
 **Tips for adjusting the parameters on your own dataset:**
 - We recommend ssim_threshold as 0.08 as a good start point
 - For foreground area `aabb`, you can try our default setting first before adjusting it
+
+### Rendering with LoD
+First, the LoD generation is realized by the following command:
+```bash
+cd LargeLightGaussian
+bash scripts/run_prune_finetune_$your_scene.sh
+bash scripts/run_distill_finetune_$your_scene.sh
+bash scripts/run_vectree_quantize_$your_scene.sh
+cd ..
+```
+After that, configure the LoD setting in another yaml file. Then replace `CONFIG`, `TEST_PATH`, and `out_name` with yours in `run_citygs_lod.sh`. Then you can render the scene with LoD by using:
+```bash
+bash run_citygs_lod.sh
+```
+Note that the LoD selection is now based on Nyquist sampling rate instead of manually defined distance threshold for better generalization and anti-aliasing performance.
 
 ### Viewer
 We borrowed Web viewer from [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning). Take the scene Rubble as an example. To render the scene with no LoD, you can use the following command:
