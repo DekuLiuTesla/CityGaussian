@@ -6,6 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/matrix_city/aerial/train/block_all",
+    partition_name: "mc_aerial_c36",
     model_path: "",
     images: "images",
     block_dim: [6, 6, 1],

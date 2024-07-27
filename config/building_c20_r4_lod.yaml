@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/mill19/building-pixsfm/train",
-    partition_name: "block_building_all_lr_c20_loss_10_lr2",
+    partition_name: "building_c20_r4",
     pretrain_path: "output/org_building_all_lr2/point_cloud/iteration_30000",
     model_path: "",
     images: "images",

@@ -93,12 +93,14 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 filename += "_{}".format(dataset.resolution)
 
         lod_gs_list = []
+        org_model_path = dataset.model_path
         for i in range(len(dataset.lod_configs)):
             lp.model_path = dataset.lod_configs[i]
             lod_gs, scene = load_gaussians(lp, iteration, load_vq)
             print(f"Init LoD {i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
             lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
+        dataset.model_path = org_model_path
         
         num_cell, max_sh_degree = lod_gs_list[-1].num_cell, lod_gs_list[-1].max_sh_degree
         loaded_iter, train_cams, test_cams = scene.loaded_iter, scene.getTrainCameras(), scene.getTestCameras()

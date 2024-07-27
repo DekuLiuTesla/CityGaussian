@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/urban_scene_3d/residence-pixsfm/train",
-    partition_name: "block_residence_all_lr_c20_loss_8",
+    partition_name: "residence_c20_r4",
     pretrain_path: "output/org_residence_all/point_cloud/iteration_30000",
     model_path: "",
     images: "images",

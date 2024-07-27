@@ -47,6 +47,45 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 ## 🔧 Usage
 
 Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder.
+
+### Installation
+#### a. Clone the repository
+```bash
+# clone repository
+git clone --recursive https://github.com/DekuLiuTesla/CityGaussian.git
+cd CityGaussian
+```
+
+#### b. Create virtual environment
+```bash
+# create virtual environment
+conda create -yn citygs python=3.9 pip
+conda activate citygs
+```
+
+#### c. Install PyTorch
+* Tested on `PyTorch==2.0.1`
+* You must install the one match to the version of your nvcc (nvcc --version)
+* For CUDA 11.8
+
+  ```bash
+  pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
+  ```
+
+#### d. Install requirements
+```bash
+pip install -r requirements.txt
+```
+
+#### e. Install tailored LightGaussian
+```bash
+git submodule add https://github.com/DekuLiuTesla/LargeLightGaussian
+cd LargeLightGaussian
+pip install submodules/compress-diff-gaussian-rasterization
+ln -s /path/to/output /path/to/LargeLightGaussian/output
+cd ..
+```
+
 ### Training and Vanilla Rendering
 To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
 ```bash

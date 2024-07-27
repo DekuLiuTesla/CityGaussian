@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/urban_scene_3d/sci-art-pixsfm/train",
-    partition_name: "block_sciart_all_lr_c9_loss_5_r4",
+    partition_name: "sciart_c9_r4",
     pretrain_path: "output/org_sciart_all/point_cloud/iteration_30000",
     model_path: "",
     images: "images",

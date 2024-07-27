@@ -1,0 +1,16 @@
+lightning==2.0.9.post0
+lightning[pytorch-extra]
+splines==0.3.0
+plyfile==0.8.1
+tensorboard
+wandb
+tqdm
+jax
+icecream
+einops
+transforms3d
+imageio
+viser==0.1.29
+opencv-python==4.8.*
+./submodules/diff-gaussian-rasterization
+./submodules/simple-knn

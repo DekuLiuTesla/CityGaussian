@@ -6,6 +6,7 @@ model_params: {
     },
     sh_degree: 3,
     source_path: "data/matrix_city/aerial/train/block_all",
+    partition_name: "mc_aerial_c36",
     pretrain_path: "output/mc_aerial_coarse/point_cloud/iteration_30000",
     model_path: "",
     images: "images",

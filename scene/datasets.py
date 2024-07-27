@@ -14,11 +14,6 @@ class GSDataset(Dataset):
         self.cameras = cameras
         self.scale = scale
         self.args = args
-        
-        if hasattr(pipe, 'blur_level') and pipe.blur_level > 0:
-            self.blur_level = pipe.blur_level
-        else:
-            self.blur_level = 0
             
         if len(self.cameras) > 300:
             self.pre_load = False
@@ -49,9 +44,6 @@ class GSDataset(Dataset):
             "full_proj_transform": viewpoint_cam.full_proj_transform,
         }
         y = viewpoint_cam.original_image
-
-        if self.blur_level > 0:
-            y = F.gaussian_blur(y, self.blur_level * 30 +1)
         
         return x, y
     

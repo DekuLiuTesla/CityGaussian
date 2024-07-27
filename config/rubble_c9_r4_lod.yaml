@@ -6,7 +6,7 @@ model_params: {
     },
     sh_degree: 2,
     source_path: "data/mill19/rubble-pixsfm/train",
-    partition_name: "block_rubble_all_lr_c9_loss_12_r4",
+    partition_name: "rubble_c9_r4",
     pretrain_path: "output/org_rubble_all/point_cloud/iteration_30000",
     model_path: "",
     images: "images",
