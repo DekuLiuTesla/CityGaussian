@@ -22,7 +22,7 @@ from lightning.pytorch.loggers import (
     WandbLogger,
 )
 from scene import LargeScene
-from scene.datasets import GSDataset
+from scene.datasets import GSDataset, CacheDataLoader
 from utils.camera_utils import loadCam
 from utils.general_utils import safe_state, parse_cfg
 import uuid
@@ -42,6 +42,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
     gaussians = getattr(modules, model_config['name'])(dataset.sh_degree, **model_config['kwargs'])
     scene = LargeScene(dataset, gaussians)
     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
+    data_loader = CacheDataLoader(gs_dataset, max_cache_num=1024, seed=42, batch_size=1, shuffle=True, num_workers=8)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -67,7 +68,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
             print("\n[ITER {}] Saving Gaussians".format(iteration))
             scene.save(iteration, dataset)
             break    
-        data_loader = DataLoader(gs_dataset, batch_size=1, shuffle=True, num_workers=0)
+        
         for dataset_index, (cam_info, gt_image) in enumerate(data_loader):    
             if network_gui.conn == None:
                 network_gui.try_connect()
