@@ -14,7 +14,7 @@ from gaussian_renderer import render
 from utils.general_utils import safe_state, parse_cfg
 from utils.large_utils import contract_to_unisphere
 from utils.loss_utils import ssim
-from utils.camera_utils import loadCam
+from utils.camera_utils import loadCam_woImage
 from arguments import GroupParams
 
 def focus_point_fn(poses: np.ndarray) -> np.ndarray:
@@ -90,11 +90,11 @@ def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, dis
                 masked_gaussians._opacity = gaussians._opacity[block_mask]
                 masked_gaussians.max_radii2D = gaussians.max_radii2D[block_mask]
 
-                for idx in tqdm(range(len(cameras))):
+                for idx in tqdm(range(len(cameras)), desc=f"Block {block_id} / {block_num}"):
                     bg_color = [1,1,1] if args.white_background else [0, 0, 0]
                     background = torch.tensor(bg_color, dtype=torch.float32, device=xyz_org.device)
                     c = cameras[idx]
-                    viewpoint_cam = loadCam(args, idx, c, scale)
+                    viewpoint_cam = loadCam_woImage(args, idx, c, scale)
                     contract_cam_center = contract_to_unisphere(viewpoint_cam.camera_center, args.aabb, ord=torch.inf)
 
                     if simple_selection > 1.0:
