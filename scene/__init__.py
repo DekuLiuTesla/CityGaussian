@@ -203,7 +203,6 @@ class LargeScene(Scene):
     
     def save(self, iteration, args=None):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
-        self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
 
         if args.block_id >= 0:
             xyz_org = self.gaussians.get_xyz
@@ -240,6 +239,11 @@ class LargeScene(Scene):
 
             block_point_cloud_path = os.path.join(self.model_path, "point_cloud_blocks/scale_1.0/iteration_{}".format(iteration))
             masked_gaussians.save_ply(os.path.join(block_point_cloud_path, "point_cloud.ply"))
+
+            if args.save_block_only:
+                return
+            
+        self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
     
     def getTrainCameras(self):
         return self.train_cameras

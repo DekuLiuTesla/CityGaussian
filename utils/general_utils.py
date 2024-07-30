@@ -154,19 +154,24 @@ def get_default_lp():
     lp.sh_degree = 3
     lp.source_path = ""
     lp.model_path = ""
-    lp.pretrain_path = None
-    lp.partition_name = ""
-    lp.block_dim = None
-    lp.block_id = -1
-    lp.aabb = None
-    lp.lod_configs = None
-    lp.num_threshold = 25_000
-    lp.ssim_threshold = 0.08
     lp.images = "images"
     lp.resolution = -1
     lp.white_background = False
     lp.data_device = "cuda"
     lp.eval = False
+    # data partitioning
+    lp.pretrain_path = None  # path to coarse global model
+    lp.num_threshold = 25_000  # threshold of point number
+    lp.ssim_threshold = 0.08  # threshold of ssim difference
+    # finetuning
+    lp.partition_name = ""  # filename of .npy partition file
+    lp.block_dim = None  # block dimensions
+    lp.block_id = -1  # block id
+    lp.aabb = None  # foreground area in contraction
+    lp.save_block_only = True  # whether to only store gaussians in blocks
+    # lod rendering
+    lp.lod_configs = None  # list of paths to different detail levels, used only in LoD rendering
+    # others
     lp.add_background_sphere = False
     lp.logger_config = None
 
