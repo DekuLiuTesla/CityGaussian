@@ -136,11 +136,9 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--config', type=str, help='train config file path of fused model')
-    parser.add_argument('--lod_configs', type=list, help='configs of different detail levels, finest first')
     parser.add_argument('--model_path', type=str, help='model path of fused model')
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
-    parser.add_argument("--resolution", default=-1, type=int)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")
