@@ -128,101 +128,42 @@ def render_large(cam_info, pc : GaussianModel, pipe, bg_color : torch.Tensor, sc
 
     rasterizer = GaussianRasterizer(raster_settings=raster_settings)
 
-    if hasattr(pc, "apply_lod") and pc.apply_lod:
-        # obtain mask with no grad
-        with torch.no_grad():
-            assert len(pc.lod_threshold) == (pc.level_lookup.shape[1] + 1)
+    screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
+    try:
+        screenspace_points.retain_grad()
+    except:
+        pass
 
-            pc_xyz = pc.get_xyz
-            mask = torch.zeros(pc_xyz.shape[0], dtype=torch.bool, device="cuda")
-            
-            distance3D = torch.norm(pc_xyz - cam_info["camera_center"], dim=1)
-            if pc.lod_threshold[0] > 0:
-                mask[:pc.num_fine_pts] |= (distance3D <= pc.lod_threshold[0])[:pc.num_fine_pts]
-            for i in range(len(pc.lod_threshold) - 1):
-                if pc.lod_threshold[i] >= pc.lod_threshold[i+1] or pc.lod_threshold[i] > pc.max_distance:
-                    continue
-                mask_fine = (distance3D > pc.lod_threshold[i])[:pc.num_fine_pts] & (distance3D <= pc.lod_threshold[i+1])[:pc.num_fine_pts]
-                inds_coarse = pc.level_lookup[:pc.num_fine_pts, i][mask_fine]
-                inds_coarse = torch.unique(inds_coarse)
-                mask[inds_coarse] = True
-            
-            assert mask.sum() > 0, "No points were visible in the scene. Please check your LoD parameters."
+    means3D = pc.get_xyz
+    means2D = screenspace_points
+    opacity = pc.get_opacity
 
-        screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
-        try:
-            screenspace_points.retain_grad()
-        except:
-            pass
-
-        means3D = pc.get_xyz[mask]
-        means2D = screenspace_points[mask]
-        opacity = pc.get_opacity[mask]
-
-        # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
-        # scaling / rotation by the rasterizer.
-        scales = None
-        rotations = None
-        cov3D_precomp = None
-        if pipe.compute_cov3D_python:
-            cov3D_precomp = pc.get_covariance(scaling_modifier)[mask]
-        else:
-            scales = pc.get_scaling[mask]
-            rotations = pc.get_rotation[mask]
-
-        # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
-        # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
-        shs = None
-        colors_precomp = None
-        if override_color is None:
-            if pipe.convert_SHs_python:
-                shs_view = pc.get_features[mask].transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
-                dir_pp = (pc.get_xyz[mask] - cam_info["camera_center"].repeat(pc.get_features[mask].shape[0], 1))
-                dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
-                sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
-                colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
-            else:
-                shs = pc.get_features[mask]
-        else:
-            colors_precomp = override_color[mask]
-        
+    # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
+    # scaling / rotation by the rasterizer.
+    scales = None
+    rotations = None
+    cov3D_precomp = None
+    if pipe.compute_cov3D_python:
+        cov3D_precomp = pc.get_covariance(scaling_modifier)
     else:
-        screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True, device="cuda") + 0
-        try:
-            screenspace_points.retain_grad()
-        except:
-            pass
+        scales = pc.get_scaling
+        rotations = pc.get_rotation
 
-        means3D = pc.get_xyz
-        means2D = screenspace_points
-        opacity = pc.get_opacity
-
-        # If precomputed 3d covariance is provided, use it. If not, then it will be computed from
-        # scaling / rotation by the rasterizer.
-        scales = None
-        rotations = None
-        cov3D_precomp = None
-        if pipe.compute_cov3D_python:
-            cov3D_precomp = pc.get_covariance(scaling_modifier)
+    # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
+    # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
+    shs = None
+    colors_precomp = None
+    if override_color is None:
+        if pipe.convert_SHs_python:
+            shs_view = pc.get_features.transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
+            dir_pp = (pc.get_xyz - cam_info["camera_center"].repeat(pc.get_features.shape[0], 1))
+            dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
+            sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
+            colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
         else:
-            scales = pc.get_scaling
-            rotations = pc.get_rotation
-
-        # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
-        # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
-        shs = None
-        colors_precomp = None
-        if override_color is None:
-            if pipe.convert_SHs_python:
-                shs_view = pc.get_features.transpose(1, 2).view(-1, 3, (pc.max_sh_degree+1)**2)
-                dir_pp = (pc.get_xyz - cam_info["camera_center"].repeat(pc.get_features.shape[0], 1))
-                dir_pp_normalized = dir_pp/dir_pp.norm(dim=1, keepdim=True)
-                sh2rgb = eval_sh(pc.active_sh_degree, shs_view, dir_pp_normalized)
-                colors_precomp = torch.clamp_min(sh2rgb + 0.5, 0.0)
-            else:
-                shs = pc.get_features
-        else:
-            colors_precomp = override_color
+            shs = pc.get_features
+    else:
+        colors_precomp = override_color
 
     # Rasterize visible Gaussians to image, obtain their radii (on screen). 
     rendered_image, radii = rasterizer(

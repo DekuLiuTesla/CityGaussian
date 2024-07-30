@@ -25,7 +25,6 @@ model_params: {
 pipeline_params: {
     convert_SHs_python:  False,
     compute_cov3D_python:  False,
-    pre_load: False,
     debug:  False
 }
 

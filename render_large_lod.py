@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams
 from scene.gaussian_model import GatheredGaussian, BlockedGaussian
 from utils.camera_utils import loadCam
+from utils.general_utils import parse_cfg
 
 def load_gaussians(lp, iteration=30_000, load_vq=False, device='cuda'):
 
@@ -130,22 +131,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             if not skip_test:
                 render_set(dataset.model_path, "test", loaded_iter, test_cams, model, max_sh_degree, pipeline, background)
 
-def parse_cfg(cfg):
-    lp = GroupParams()
-    op = GroupParams()
-    pp = GroupParams()
-
-    for arg in cfg['model_params'].items():
-        setattr(lp, arg[0], arg[1])
-    
-    for arg in cfg['optim_params'].items():
-        setattr(op, arg[0], arg[1]) 
-
-    for arg in cfg['pipeline_params'].items():
-        setattr(pp, arg[0], arg[1])
-    
-    return lp, op, pp
-
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -171,12 +156,7 @@ if __name__ == "__main__":
     
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lp, op, pp = parse_cfg(cfg)
-        setattr(lp, 'config_path', args.config)
-        if args.resolution != -1:
-            setattr(lp, 'resolution', args.resolution)
-        print(f'Init with resolution {lp.resolution}\n')
-        if lp.model_path == '':
-            lp.model_path = args.model_path
+        lp, op, pp = parse_cfg(cfg, args)
+        print(f'Render with resolution {lp.resolution}\n')
 
     render_sets(lp, args.iteration, pp, args.load_vq, args.skip_train, args.skip_test, args.custom_test)

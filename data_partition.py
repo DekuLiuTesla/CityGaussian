@@ -28,8 +28,8 @@ def focus_point_fn(poses: np.ndarray) -> np.ndarray:
 def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, disable_inblock=False, simple_selection=False):
 
         xyz_org = gaussians.get_xyz
+        num_threshold = args.num_threshold
         block_num = args.block_dim[0] * args.block_dim[1] * args.block_dim[2]
-        num_threshold = args.num_threshold if hasattr(args, 'num_threshold') else 25000
 
         if args.aabb is None:
             torch.cuda.empty_cache()
@@ -59,21 +59,11 @@ def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, dis
                 block_id_y = (block_id % (args.block_dim[0] * args.block_dim[1])) // args.block_dim[0]
                 block_id_x = (block_id % (args.block_dim[0] * args.block_dim[1])) % args.block_dim[0]
 
-                if hasattr(args, 'xyz_limited') and args.xyz_limited:
-                    xyz = xyz_org
-                    min_x = args.aabb[0] + (args.aabb[3] - args.aabb[0]) * float(block_id_x) / args.block_dim[0]
-                    max_x = args.aabb[0] + (args.aabb[3] - args.aabb[0]) * float(block_id_x + 1) / args.block_dim[0]
-                    min_y = args.aabb[1] + (args.aabb[4] - args.aabb[1]) * float(block_id_y) / args.block_dim[1]
-                    max_y = args.aabb[1] + (args.aabb[4] - args.aabb[1]) * float(block_id_y + 1) / args.block_dim[1]
-                    min_z = args.aabb[2] + (args.aabb[5] - args.aabb[2]) * float(block_id_z) / args.block_dim[2]
-                    max_z = args.aabb[2] + (args.aabb[5] - args.aabb[2]) * float(block_id_z + 1) / args.block_dim[2]
-                else:
-                    xyz = contract_to_unisphere(xyz_org, args.aabb, ord=torch.inf)
-                    min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
-                    min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
-                    min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
+                xyz = contract_to_unisphere(xyz_org, args.aabb, ord=torch.inf)
+                min_x, max_x = float(block_id_x) / args.block_dim[0], float(block_id_x + 1) / args.block_dim[0]
+                min_y, max_y = float(block_id_y) / args.block_dim[1], float(block_id_y + 1) / args.block_dim[1]
+                min_z, max_z = float(block_id_z) / args.block_dim[2], float(block_id_z + 1) / args.block_dim[2]
 
-                
                 num_gs, org_min_x, org_max_x, org_min_y, org_max_y, org_min_z, org_max_z = 0, min_x, max_x, min_y, max_y, min_z, max_z
 
                 while num_gs < num_threshold:
@@ -156,13 +146,12 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lp, op, pp = parse_cfg(cfg)
-        setattr(lp, 'config_path', args.config)
+        lp, op, pp = parse_cfg(cfg, args)
 
     # Initialize system state (RNG)
     safe_state(args.quiet)
 
-    config_name = os.path.splitext(os.path.basename(lp.config_path))[0]
+    config_name = os.path.splitext(os.path.basename(lp.config))[0]
     if not lp.model_path:
         # time_stamp = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
         lp.model_path = os.path.join("./output/", config_name)

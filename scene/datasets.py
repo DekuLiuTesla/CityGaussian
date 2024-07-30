@@ -12,32 +12,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 class GSDataset(Dataset):
     def __init__(self, cameras, scene, args, pipe=None, scale=1):
-        self.pre_load = pipe.pre_load if hasattr(pipe, 'pre_load') else False
         self.cameras = cameras
         self.scale = scale
         self.args = args
 
           # initialise the linalg module for lazy loading
         torch.inverse(torch.ones((1, 1), device="cuda:0"))
-            
-        if len(self.cameras) > 300:
-            self.pre_load = False
-        
-        if self.pre_load:
-            camera_list = []
-            for id, c in enumerate(self.cameras):
-                camera_list.append(loadCam(args, id, c, self.scale))
-            self.cameras = camera_list
 
     def __len__(self):
         return len(self.cameras)
 
     def __getitem__(self, idx):
-        if self.pre_load:
-            viewpoint_cam = self.cameras[idx]
-        else:
-            c = self.cameras[idx]
-            viewpoint_cam = loadCam(self.args, idx, c, self.scale)
+        c = self.cameras[idx]
+        viewpoint_cam = loadCam(self.args, idx, c, self.scale)
         x = {
             "FoVx": viewpoint_cam.FoVx,
             "FoVy": viewpoint_cam.FoVy,

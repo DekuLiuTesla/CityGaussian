@@ -177,13 +177,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
-        config_name = os.path.splitext(os.path.basename(args.config_path))[0]
+        config_name = os.path.splitext(os.path.basename(args.config))[0]
         # time_stamp = time.strftime("%Y%m%d%H%M%S", time.localtime(time.time()))
         args.model_path = os.path.join("./output/", config_name)
         if args.block_id >= 0:
             if args.block_id < args.block_dim[0] * args.block_dim[1] * args.block_dim[2]:
                 args.model_path = f"{args.model_path}/cells/cell{args.block_id}"
-                if hasattr(args, "logger_config"):
+                if args.logger_config is not None:
                     args.logger_config['name'] = f"{args.logger_config['name']}_cell{args.block_id}"
             else:
                 raise ValueError("Invalid block_id: {}".format(args.block_id))
@@ -200,7 +200,7 @@ def prepare_output_and_logger(args):
     logger_args = {
         "save_dir": args.model_path
     }
-    if not hasattr(args, "logger_config") or args.logger_config['logger'] == "tensorboard":
+    if args.logger_config is None or args.logger_config['logger'] == "tensorboard":
         log_writer = TensorBoardLogger(**logger_args)
         image_logger = tensorboard_log_image
     elif args.logger_config['logger'] == "wandb":
@@ -294,9 +294,7 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lp, op, pp = parse_cfg(cfg)
-        setattr(lp, 'config_path', args.config)
-        setattr(lp, 'block_id', args.block_id)
+        lp, op, pp = parse_cfg(cfg, args)
         args.save_iterations.append(op.iterations)
     
     print("Optimizing " + lp.model_path)

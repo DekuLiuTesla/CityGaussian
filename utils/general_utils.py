@@ -148,19 +148,77 @@ def safe_state(silent):
     torch.manual_seed(0)
     torch.cuda.set_device(torch.device("cuda:0"))
 
-def parse_cfg(cfg):
+def get_default_lp():
     lp = GroupParams()
+    lp.config = None
+    lp.sh_degree = 3
+    lp.source_path = ""
+    lp.model_path = ""
+    lp.pretrain_path = None
+    lp.partition_name = ""
+    lp.block_dim = None
+    lp.block_id = -1
+    lp.aabb = None
+    lp.lod_configs = None
+    lp.num_threshold = 25_000
+    lp.ssim_threshold = 0.08
+    lp.images = "images"
+    lp.resolution = -1
+    lp.white_background = False
+    lp.data_device = "cuda"
+    lp.eval = False
+    lp.add_background_sphere = False
+    lp.logger_config = None
+
+    return lp
+
+def get_default_op():
     op = GroupParams()
+    op.iterations = 30_000
+    op.position_lr_init = 0.00016
+    op.position_lr_final = 0.0000016
+    op.position_lr_delay_mult = 0.01
+    op.position_lr_max_steps = 30_000
+    op.feature_lr = 0.0025
+    op.opacity_lr = 0.05
+    op.scaling_lr = 0.005
+    op.rotation_lr = 0.001
+    op.percent_dense = 0.01
+    op.lambda_dssim = 0.2
+    op.densification_interval = 100
+    op.opacity_reset_interval = 3000
+    op.densify_from_iter = 500
+    op.densify_until_iter = 15_000
+    op.densify_grad_threshold = 0.0002
+
+    return op
+
+def get_default_pp():
     pp = GroupParams()
+    pp.convert_SHs_python = False
+    pp.compute_cov3D_python = False
+    pp.debug = False
 
-    for arg in cfg['model_params'].items():
-        setattr(lp, arg[0], arg[1])
-    
-    for arg in cfg['optim_params'].items():
-        setattr(op, arg[0], arg[1]) 
+    return pp
 
-    for arg in cfg['pipeline_params'].items():
-        setattr(pp, arg[0], arg[1])
-    
+def extract_args(params, cfg, args=None):
+    for arg in cfg.items():
+        setattr(params, arg[0], arg[1])
+
+    if args is not None:
+        for arg in vars(args).items():
+            if arg[0] in vars(params):
+                setattr(params, arg[0], arg[1])
+
+
+def parse_cfg(cfg, args):
+    lp = get_default_lp()
+    op = get_default_op()
+    pp = get_default_pp()
+
+    extract_args(lp, cfg['model_params'], args)
+    extract_args(op, cfg['optim_params'], args)
+    extract_args(pp, cfg['pipeline_params'], args)
+
     return lp, op, pp
 

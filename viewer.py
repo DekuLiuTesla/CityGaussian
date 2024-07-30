@@ -260,7 +260,7 @@ class Viewer:
             with open(load_from) as f:
                 cfg = yaml.load(f, Loader=yaml.FullLoader)
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
-                lp, op, pp = parse_cfg(cfg)
+                lp, op, pp = parse_cfg(cfg, None)
                 lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
                 training_output_base_dir = lp.model_path
                 self.sh_degree = lp.sh_degree

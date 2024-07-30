@@ -29,22 +29,7 @@ from arguments import ModelParams, PipelineParams
 from gaussian_renderer import GaussianModel
 from arguments import ModelParams, PipelineParams, OptimizationParams, GroupParams
 from utils.loss_utils import l1_loss, ssim
-
-def parse_cfg(cfg):
-    lp = GroupParams()
-    op = GroupParams()
-    pp = GroupParams()
-
-    for arg in cfg['model_params'].items():
-        setattr(lp, arg[0], arg[1])
-    
-    for arg in cfg['optim_params'].items():
-        setattr(op, arg[0], arg[1]) 
-
-    for arg in cfg['pipeline_params'].items():
-        setattr(pp, arg[0], arg[1])
-    
-    return lp, op, pp
+from utils.general_utils import parse_cfg
 
 def readImages(renders_dir, gt_dir):
     renders = []
@@ -116,9 +101,6 @@ if __name__ == "__main__":
 
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lp, op, pp = parse_cfg(cfg)
-        setattr(lp, 'config_path', args.config)
-        if lp.model_path == '':
-            lp.model_path = args.model_path
+        lp, op, pp = parse_cfg(cfg, args)
 
     blockMerge(lp, args.iteration)

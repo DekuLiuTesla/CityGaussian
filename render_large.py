@@ -28,6 +28,7 @@ from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams, get_combined_args
 from gaussian_renderer import GaussianModel
 from torch.utils.data import DataLoader
+from utils.general_utils import parse_cfg
 
 def render_set(model_path, name, iteration, gs_dataset, gaussians, pipeline, background):
     avg_render_time = 0
@@ -108,22 +109,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
                 gs_dataset = GSDataset(scene.getTestCameras(), scene, dataset, pipeline)
                 render_set(dataset.model_path, "test", scene.loaded_iter, gs_dataset, gaussians, pipeline, background)
 
-def parse_cfg(cfg):
-    lp = GroupParams()
-    op = GroupParams()
-    pp = GroupParams()
-
-    for arg in cfg['model_params'].items():
-        setattr(lp, arg[0], arg[1])
-    
-    for arg in cfg['optim_params'].items():
-        setattr(op, arg[0], arg[1]) 
-
-    for arg in cfg['pipeline_params'].items():
-        setattr(pp, arg[0], arg[1])
-    
-    return lp, op, pp
-
 
 if __name__ == "__main__":
     # Set up command line argument parser
@@ -149,13 +134,6 @@ if __name__ == "__main__":
     
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
-        lp, op, pp = parse_cfg(cfg)
-        setattr(lp, 'config_path', args.config)
-        if args.resolution != -1:
-            setattr(lp, 'resolution', args.resolution)
-        if args.block_id != -1:
-            lp.block_id = args.block_id
-        if lp.model_path == '':
-            lp.model_path = args.model_path
+        lp, op, pp = parse_cfg(cfg, args)
 
     render_sets(lp, args.iteration, pp, args.load_vq, args.skip_train, args.skip_test, args.custom_test)

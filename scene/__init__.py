@@ -107,7 +107,7 @@ class LargeScene(Scene):
         self.loaded_iter = None
         self.load_vq = load_vq
         self.gaussians = gaussians
-        self.pretrain_path = args.pretrain_path if hasattr(args, "pretrain_path") else None
+        self.pretrain_path = args.pretrain_path
 
         if load_iteration:
             if load_iteration == -1:
@@ -119,7 +119,7 @@ class LargeScene(Scene):
         self.train_cameras = {}
         self.test_cameras = {}
 
-        if hasattr(args, 'block_id') and args.block_id >= 0:
+        if args.block_id >= 0:
             partition = np.load(os.path.join(args.source_path, "data_partitions", f"{args.partition_name}.npy"))[:, args.block_id]
             print(f"Using Partition File {args.partition_name}.npy")
         else:
@@ -166,7 +166,7 @@ class LargeScene(Scene):
             self.gaussians.load_ply(os.path.join(self.pretrain_path, "point_cloud.ply"))
             self.gaussians.spatial_lr_scale = self.cameras_extent
         else:
-            if hasattr(args, 'add_background_sphere') and args.add_background_sphere:
+            if args.add_background_sphere:
                 import math
                 scene_center = -scene_info.nerf_normalization['translate']
                 scene_radius = scene_info.nerf_normalization['radius']
@@ -205,7 +205,7 @@ class LargeScene(Scene):
         point_cloud_path = os.path.join(self.model_path, "point_cloud/iteration_{}".format(iteration))
         self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
 
-        if hasattr(args, 'block_id') and args.block_id >= 0:
+        if args.block_id >= 0:
             xyz_org = self.gaussians.get_xyz
             if len(args.aabb) == 4:
                 aabb = [args.aabb[0], args.aabb[1], xyz_org[:, -1].min(), 
