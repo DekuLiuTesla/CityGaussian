@@ -14,7 +14,7 @@ import os
 import torch
 import torchvision
 from random import randint
-from utils.loss_utils import l1_loss, opacity_loss, ssim, LapLoss, PELoss
+from utils.loss_utils import l1_loss, ssim
 from gaussian_renderer import render, render_large, network_gui
 import sys
 from lightning.pytorch.loggers import (
