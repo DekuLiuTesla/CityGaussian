@@ -31,6 +31,8 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 </div>
 
 ## 📰 News
+**[2024.08.01]** Our code is now available! Welcome to try it out!
+
 **[2024.07.18]** Camera Ready version now can be accessed through arXiv. More insights are included.
 
 ## 🥏 Model of CityGaussian
@@ -46,7 +48,7 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 
 ## 🔧 Usage
 
-Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder.
+Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md).
 
 ### Installation
 #### a. Clone the repository
@@ -54,6 +56,8 @@ Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building,
 # clone repository
 git clone --recursive https://github.com/DekuLiuTesla/CityGaussian.git
 cd CityGaussian
+mkdir data  # store your dataset here
+mkdir output  # store your output here
 ```
 
 #### b. Create virtual environment
@@ -77,11 +81,11 @@ conda activate citygs
 pip install -r requirements.txt
 ```
 
-#### e. Install tailored LightGaussian
+#### e. Install tailored LightGaussian for LoD
 ```bash
-git submodule add https://github.com/DekuLiuTesla/LargeLightGaussian
 cd LargeLightGaussian
 pip install submodules/compress-diff-gaussian-rasterization
+ln -s /path/to/data /path/to/LargeLightGaussian/data
 ln -s /path/to/output /path/to/LargeLightGaussian/output
 cd ..
 ```
@@ -89,13 +93,13 @@ cd ..
 ### Training and Vanilla Rendering
 To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
 ```bash
-bash run_citygs.sh
+bash scripts/run_citygs.sh
 ```
 This script will also render and evaluate the result without LoD.
 
 **Tips for adjusting the parameters on your own dataset:**
 - We recommend ssim_threshold as 0.08 as a good start point
-- For foreground area `aabb`, you can try our default setting first before adjusting it
+- For foreground area `aabb`, you can try our default setting (set `aabb` to None) first before adjusting it.
 
 ### Rendering with LoD
 First, the LoD generation is realized by the following command:
@@ -108,7 +112,7 @@ cd ..
 ```
 After that, configure the LoD setting in another yaml file. Then replace `CONFIG`, `TEST_PATH`, and `out_name` with yours in `run_citygs_lod.sh`. Then you can render the scene with LoD by using:
 ```bash
-bash run_citygs_lod.sh
+bash scripts/run_citygs_lod.sh
 ```
 Note that the LoD selection is now based on Nyquist sampling rate instead of manually defined distance threshold for better generalization and anti-aliasing performance.
 
@@ -127,7 +131,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 ## 📝 TODO List
 
 - \[x\] First Release.
-- \[ \] Release CityGaussian code.
+- \[x\] Release CityGaussian code.
 
 ## 📄 License
 
