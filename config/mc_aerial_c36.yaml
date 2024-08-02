@@ -11,7 +11,7 @@ model_params: {
     model_path: "",
     images: "images",
     block_dim: [6, 6, 1],
-    aabb: [-3.5, -4, 4.5, 2],
+    aabb: [-3.5, -4, -10, 4.5, 2, 10],
     ssim_threshold: 0.05,
     resolution: -1,
     white_background: False,

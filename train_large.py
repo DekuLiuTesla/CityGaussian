@@ -42,7 +42,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
     gaussians = getattr(modules, model_config['name'])(dataset.sh_degree, **model_config['kwargs'])
     scene = LargeScene(dataset, gaussians)
     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
-    data_loader = CacheDataLoader(gs_dataset, max_cache_num=1024, seed=42, batch_size=1, shuffle=True, num_workers=8)
+    if len(gs_dataset) > 0:
+        data_loader = CacheDataLoader(gs_dataset, max_cache_num=1024, seed=42, batch_size=1, shuffle=True, num_workers=8)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
