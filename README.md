@@ -36,6 +36,8 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 **[2024.07.18]** Camera Ready version now can be accessed through arXiv. More insights are included.
 
 ## 🥏 Model of CityGaussian
+
+This repository contains the official implementation of the paper ["CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians"](https://arxiv.org/pdf/2404.01133). Star ⭐ us if you like it!
 ### Training Pipeline
 <p align="center">
   <img src="assets/Train.png" align="center" width="100%">
@@ -48,7 +50,7 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 
 ## 🔧 Usage
 
-Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md).
+Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md). We will soon release the ColMap results of these datasets as well.
 
 ### Installation
 #### a. Clone the repository
@@ -99,7 +101,7 @@ This script will also render and evaluate the result without LoD.
 
 **Tips for adjusting the parameters on your own dataset:**
 - We recommend ssim_threshold as 0.08 as a good start point
-- For foreground area `aabb`, you can try our default setting (set `aabb` to None) first before adjusting it.
+- For foreground area `aabb`, you can try our default setting (do not set `aabb` in config file) first before adjusting it.
 
 ### Rendering with LoD
 First, the LoD generation is realized by the following command:

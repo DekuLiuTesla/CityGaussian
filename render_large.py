@@ -118,7 +118,6 @@ if __name__ == "__main__":
     parser.add_argument("--custom_test", type=str, help="appointed test path")
     parser.add_argument("--load_vq", action="store_true")
     parser.add_argument('--block_id', type=int, default=-1)
-    parser.add_argument("--resolution", default=-1, type=int)
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument("--skip_train", action="store_true")
     parser.add_argument("--skip_test", action="store_true")

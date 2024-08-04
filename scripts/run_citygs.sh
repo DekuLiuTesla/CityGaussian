@@ -23,7 +23,6 @@ CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config conf
 
 # optimize each block, please adjust block number according to config
 for num in $(seq 0 $num_blocks); do
-    echo "GPU $gpu_id is available. Starting training block '$num'"
     while true; do
         gpu_id=$(get_available_gpu)
         if [[ -n $gpu_id ]]; then

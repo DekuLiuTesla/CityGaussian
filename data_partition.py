@@ -12,18 +12,10 @@ from scene import LargeScene
 from scene.gaussian_model import GaussianModel
 from gaussian_renderer import render
 from utils.general_utils import safe_state, parse_cfg
-from utils.large_utils import contract_to_unisphere
+from utils.large_utils import contract_to_unisphere, get_default_aabb
 from utils.loss_utils import ssim
 from utils.camera_utils import loadCam_woImage
 from arguments import GroupParams
-
-def focus_point_fn(poses: np.ndarray) -> np.ndarray:
-    """Calculate nearest point to all focal axes in poses."""
-    directions, origins = poses[:, :3, 2:3], poses[:, :3, 3:4]
-    m = np.eye(3) - directions * np.transpose(directions, [0, 2, 1])
-    mt_m = np.transpose(m, [0, 2, 1]) @ m
-    focus_pt = np.linalg.inv(mt_m.mean(0)) @ (mt_m @ origins).mean(0)[:, 0]
-    return focus_pt
 
 def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, disable_inblock=False, simple_selection=False):
 
@@ -33,17 +25,9 @@ def block_partitioning(cameras, gaussians, args, pp, scale=1.0, quiet=False, dis
 
         if args.aabb is None:
             torch.cuda.empty_cache()
-            c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in cameras])
-            poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
-            center = (focus_point_fn(poses))
-            radius = torch.tensor(np.median(np.abs(c2ws[:,:3,3] - center), axis=0), device=xyz_org.device)
-            center = torch.from_numpy(center).float().to(xyz_org.device)
-            if radius.min() / radius.max() < 0.02:
-                # If the radius is too small, we don't contract in this dimension
-                radius[torch.argmin(radius)] = 0.5 * (xyz_org[:, torch.argmin(radius)].max() - xyz_org[:, torch.argmin(radius)].min())
-            args.aabb = torch.zeros(6, device=xyz_org.device)
-            args.aabb[:3] = center - radius
-            args.aabb[3:] = center + radius
+            args.aabb = get_default_aabb(args, cameras, xyz_org, scale)
+            config_name = os.path.splitext(os.path.basename(args.config))[0]
+            np.save(os.path.join(args.source_path, "data_partitions", f"{config_name}_aabb.npy"), np.array(args.aabb.detach().cpu()))
         else:
             assert len(args.aabb) == 6, "Unknown args.aabb format!"
             args.aabb = torch.tensor(args.aabb, dtype=torch.float32, device=xyz_org.device)
