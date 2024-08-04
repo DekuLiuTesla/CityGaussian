@@ -68,8 +68,8 @@ def render_set(model_path, name, iteration, views, model, max_sh_degree, pipelin
         avg_memory += forward_max_memory_allocated
         max_memory = max(max_memory, forward_max_memory_allocated)
         # data saving
-        # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+        torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
     
     with open(model_path + "/costs.json", 'w') as fp:
         json.dump({
@@ -105,31 +105,21 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         
         num_cell, max_sh_degree = lod_gs_list[-1].num_cell, lod_gs_list[-1].max_sh_degree
         loaded_iter, train_cams, test_cams = scene.loaded_iter, scene.getTrainCameras(), scene.getTestCameras()
-        model = GatheredGaussian(
-            gs_xyz=torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0),
-            gs_feats=torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half(),
-            gs_ids=torch.cat([lod_gs.cell_ids+idx*num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8),
-            block_scalings=torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0),
-            cell_corners=lod_gs_list[-1].cell_corners,
-            aabb=lod_gs_list[-1].aabb,
-            block_dim=lod_gs_list[-1].block_dim,
-            max_sh_degree=max_sh_degree,
-        )
-        del lod_gs_list, lod_gs, scene
+        del lod_gs, scene
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
         
         if custom_test:
             views = train_cams + test_cams
-            render_set(dataset.model_path, filename, loaded_iter, views, model, max_sh_degree, pipeline, background)
+            render_set(dataset.model_path, filename, loaded_iter, views, lod_gs_list, max_sh_degree, pipeline, background)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", loaded_iter, train_cams, model, max_sh_degree, pipeline, background)
+                render_set(dataset.model_path, "train", loaded_iter, train_cams, lod_gs_list, max_sh_degree, pipeline, background)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", loaded_iter, test_cams, model, max_sh_degree, pipeline, background)
+                render_set(dataset.model_path, "test", loaded_iter, test_cams, lod_gs_list, max_sh_degree, pipeline, background)
 
 
 if __name__ == "__main__":

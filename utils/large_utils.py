@@ -66,6 +66,7 @@ def block_filtering(block_id, xyz_org, aabb, block_dim, scale=1.0, mask_only=Tru
         return mask_only, xyz, [min_x, max_x, min_y, max_y, min_z, max_z]
 
 def which_block(xyz_org, aabb, block_dim):
+
     if len(aabb) == 4:
         aabb = [aabb[0], aabb[1], xyz_org[:, -1].min(), 
                 aabb[2], aabb[3], xyz_org[:, -1].max()]
@@ -74,16 +75,16 @@ def which_block(xyz_org, aabb, block_dim):
     else:
         assert False, "Unknown aabb format!"
 
-    aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
+    xyz_tensor = torch.tensor(xyz_org)
+    aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_tensor.device)
 
-    xyz = contract_to_unisphere(xyz_org.clone().detach(), aabb, ord=torch.inf)
-    block_id = torch.zeros(xyz.shape[0], dtype=torch.int32, device=xyz.device)
+    xyz = contract_to_unisphere(xyz_tensor, aabb, ord=torch.inf)
 
-    block_id_x = (xyz[:, 0] * block_dim[0]).floor_().clamp_(0, block_dim[0] - 1).int()
-    block_id_y = (xyz[:, 1] * block_dim[1]).floor_().clamp_(0, block_dim[1] - 1).int()
-    block_id_z = (xyz[:, 2] * block_dim[2]).floor_().clamp_(0, block_dim[2] - 1).int()
+    block_id_x = torch.floor((xyz[:, 0] * block_dim[0]).clamp(0, block_dim[0] - 1)).long()
+    block_id_y = torch.floor((xyz[:, 1] * block_dim[1]).clamp(0, block_dim[1] - 1)).long()
+    block_id_z = torch.floor((xyz[:, 2] * block_dim[2]).clamp(0, block_dim[2] - 1)).long()
 
-    block_id = block_id_z * (block_dim[0] * block_dim[1]) + block_id_y * block_dim[0] + block_id_x
+    block_id = block_id_z * block_dim[0] * block_dim[1] + block_id_y * block_dim[0] + block_id_x
 
     return block_id
 
@@ -92,23 +93,28 @@ def in_frustum(viewpoint_cam, cell_corners, aabb, block_dim):
     device = cell_corners.device
 
     cell_corners = torch.cat([cell_corners, torch.ones_like(cell_corners[..., [0]])], dim=-1)
-    cam_center = viewpoint_cam.camera_center
     full_proj_transform = viewpoint_cam.full_proj_transform.repeat(num_cell, 1, 1)
     viewmatrix = viewpoint_cam.world_view_transform.repeat(num_cell, 1, 1)
     cell_corners_screen = cell_corners.bmm(full_proj_transform)
     cell_corners_screen = cell_corners_screen / cell_corners_screen[..., [-1]]
-    cell_corners_screen = cell_corners_screen[..., :-1]
+    cell_corners_screen = cell_corners_screen[..., :-1].reshape(-1, 3)
 
     cell_corners_cam = cell_corners.bmm(viewmatrix)
+    dist = torch.norm(cell_corners_cam[:, :, :3], dim=-1)
+    dist_min = torch.min(dist, dim=-1)[0]
+    cam_center_id = torch.argmin(dist_min)
     mask = (cell_corners_cam[..., 2] > 0.2)
 
-    cell_corners_screen[~mask] = torch.inf
-    cell_corners_screen_min = cell_corners_screen.reshape(num_cell, -1, 3).min(dim=1).values
-    cell_corners_screen_min[torch.isinf(cell_corners_screen_min)] = 0.0
+    mask_ = mask.reshape(-1)
+    cell_corners_screen_ = cell_corners_screen.clone().reshape(-1, 3)
+    cell_corners_screen_[~mask_] = torch.inf
+    cell_corners_screen_min = cell_corners_screen_.reshape(num_cell, -1, 3).min(dim=1).values
+    cell_corners_screen_min[cell_corners_screen_min==torch.inf] = 0.0
 
-    cell_corners_screen[~mask] = -torch.inf
-    cell_corners_screen_max = cell_corners_screen.reshape(num_cell, -1, 3).max(dim=1).values
-    cell_corners_screen_max[torch.isinf(cell_corners_screen_max)] = 0.0
+    cell_corners_screen_ = cell_corners_screen.clone().reshape(-1, 3)
+    cell_corners_screen_[~mask_] = -torch.inf
+    cell_corners_screen_max = cell_corners_screen_.reshape(num_cell, -1, 3).max(dim=1).values
+    cell_corners_screen_max[cell_corners_screen_max==-torch.inf] = 0.0
 
     box_a = torch.cat([cell_corners_screen_min[:, :2], cell_corners_screen_max[:, :2]], dim=1)
     box_b = torch.tensor([[-1, -1, 1, 1]], dtype=torch.float32, device=device)
@@ -120,8 +126,6 @@ def in_frustum(viewpoint_cam, cell_corners, aabb, block_dim):
                     box_b[:, :2].unsqueeze(0).expand(A, B, 2))
     inter = torch.clamp((max_xy - min_xy), min=0)
     mask = (inter[:, 0, 0] * inter[:, 0, 1]) > 0
-
-    cam_center_id = which_block(cam_center[None, :], aabb, block_dim)[0]
     mask[cam_center_id] = True
-
-    return mask
+    
+    return mask, dist_min[mask]

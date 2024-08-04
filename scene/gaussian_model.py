@@ -424,20 +424,21 @@ class BlockedGaussian:
 
     gaussians : GaussianModel
 
-    def __init__(self, gaussians, lp, scale=1.0, compute_cov3D_python=False):
+    def __init__(self, gaussians, lp, range=[0, 1], scale=1.0, compute_cov3D_python=False):
         self.cell_corners = []
         self.avg_scalings = []
         self.feats = None
         self.max_sh_degree = lp.sh_degree
         self.device = gaussians.get_xyz.device
         self.compute_cov3D_python = compute_cov3D_python
-        self.cell_ids = torch.zeros(gaussians.get_opacity.shape[0], dtype=torch.long, device=self.device)
+        self.cell_idxs = [0]
         self.mask = torch.zeros(gaussians.get_opacity.shape[0], dtype=torch.bool, device=self.device)
 
         self.block_dim = lp.block_dim
         self.num_cell = lp.block_dim[0] * lp.block_dim[1] * lp.block_dim[2]
         self.aabb = lp.aabb
         self.scale = scale
+        self.range = range
 
         self.cell_divider(gaussians)
         self.cell_corners = torch.stack(self.cell_corners, dim=0)
@@ -456,9 +457,11 @@ class BlockedGaussian:
 
             xyz = gaussians.get_xyz
             scaling = gaussians.get_scaling
+            feat_list = []
             for cell_idx in range(self.num_cell):
                 cell_mask = block_filtering(cell_idx, self.feats[:, :3], self.aabb, self.block_dim, self.scale)
-                self.cell_ids[cell_mask] = cell_idx
+                self.cell_idxs.append(self.cell_idxs[-1] + cell_mask.sum())
+                feat_list.append(self.feats[cell_mask])
                 # MAD to eliminate influence of outsiders
                 xyz_median = torch.median(xyz[cell_mask], dim=0)[0]
                 delta_median = torch.median(torch.abs(xyz[cell_mask] - xyz_median), dim=0)[0]
@@ -477,13 +480,14 @@ class BlockedGaussian:
                 self.cell_corners.append(corners)
                 self.avg_scalings.append(torch.mean(scaling[cell_mask], dim=0))
             
+            self.feats = torch.cat(feat_list, dim=0)
             self.avg_scalings = torch.max(torch.stack(self.avg_scalings, dim=0), dim=-1).values
     
     def get_feats(self, indices):
-        out = torch.tensor([], device=self.device, dtype=self.feats.dtype)
+        out = []
         if len(indices) > 0:
-            self.mask = torch.isin(self.cell_ids, indices.to(self.device))
-            out = self.feats[self.mask]
+            for idx in indices:
+                out.append(self.feats[self.cell_idxs[idx]:self.cell_idxs[idx+1]])
         return out
 
 class GaussianModelLOD(GaussianModel):
