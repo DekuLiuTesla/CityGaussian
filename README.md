@@ -31,7 +31,7 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 </div>
 
 ## 📰 News
-**[2024.08.04]** Our code is now available! Welcome to try it out!
+**[2024.08.05]** Our code is now available! Welcome to try it out!
 
 **[2024.07.18]** Camera Ready version now can be accessed through arXiv. More insights are included.
 
