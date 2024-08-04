@@ -68,8 +68,8 @@ def render_set(model_path, name, iteration, views, model, max_sh_degree, pipelin
         avg_memory += forward_max_memory_allocated
         max_memory = max(max_memory, forward_max_memory_allocated)
         # data saving
-        torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-        torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
+        # torchvision.utils.save_image(rendering, os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
+        # torchvision.utils.save_image(viewpoint_cam.original_image[0:3, :, :], os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
     
     with open(model_path + "/costs.json", 'w') as fp:
         json.dump({
@@ -98,7 +98,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         for i in range(len(dataset.lod_configs)):
             lp.model_path = dataset.lod_configs[i]
             lod_gs, scene = load_gaussians(lp, iteration, load_vq)
-            print(f"Init LoD {i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
+            print(f"Init LoD {len(dataset.lod_configs)-i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
             lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         dataset.model_path = org_model_path
