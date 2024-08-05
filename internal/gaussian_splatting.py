@@ -24,6 +24,7 @@ from internal.configs.light_gaussian import LightGaussian
 from internal.models.gaussian_model import GaussianModel
 # from internal.models.appearance_model import AppearanceModel
 from internal.renderers import Renderer, VanillaRenderer
+from internal.renderers.vanilla_2dgs_renderer import Vanilla2DGSRenderer
 from internal.utils.ssim import ssim
 from internal.utils.psnr import color_correct
 from jsonargparse import lazy_instance
@@ -59,7 +60,8 @@ class GaussianSplatting(LightningModule):
         self.save_hyperparameters()
 
         # setup models
-        self.gaussian_model = GaussianModel(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims)
+        apply_2dgs = isinstance(renderer, Vanilla2DGSRenderer)
+        self.gaussian_model = GaussianModel(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims, apply_2dgs=apply_2dgs)
         # self.appearance_model = None if enable_appearance_model is False else AppearanceModel(
         #     n_input_dims=1,
         #     n_grayscale_factors=appearance.n_grayscale_factors,

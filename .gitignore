@@ -8,6 +8,8 @@ edited
 **/__pycache__
 submodules/simple-knn
 submodules/tiny-cuda-nn-fp32
+submodules/diff-surfel-rasterization
+submodules/diff-surfel-rasterization_debug
 internal/dataparsers/colmap_cluster_dataparser.py
 internal/utils/data_sampler.py
 sh_run_large_app2.sh

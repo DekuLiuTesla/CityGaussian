@@ -34,12 +34,13 @@ class GaussianModel(nn.Module):
 
         self.rotation_activation = torch.nn.functional.normalize
 
-    def __init__(self, sh_degree: int, extra_feature_dims: int = 0):
+    def __init__(self, sh_degree: int, extra_feature_dims: int = 0, apply_2dgs: bool = False):
         super().__init__()
 
         self.active_sh_degree = 0
         self.max_sh_degree = sh_degree
         self.extra_feature_dims = extra_feature_dims
+        self.apply_2dgs = apply_2dgs
 
         self._xyz = torch.empty(0)
         self._features_dc = torch.empty(0)
@@ -454,12 +455,16 @@ class GaussianModel(nn.Module):
             (selected_pts_mask, torch.zeros(N * selected_pts_mask.sum(), device=self._xyz.device, dtype=bool)))
         self.prune_points(prune_filter)
 
-    def densify_and_clone(self, grads, grad_threshold, scene_extent):
+    def densify_and_clone(self, grads, grad_threshold, scene_extent, axis_ratio_threshold=0.01):
         # Extract points that satisfy the gradient condition
         selected_pts_mask = torch.where(torch.norm(grads, dim=-1) >= grad_threshold, True, False)
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling,
                                                         dim=1).values <= self.percent_dense * scene_extent)
+        if self.apply_2dgs:
+            # stop densifying points that are too elongated for stability
+            axis_ratio = self.get_scaling.min(dim=1).values / self.get_scaling.max(dim=1).values
+            selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > axis_ratio_threshold)
 
         new_xyz = self._xyz[selected_pts_mask]
         new_features_dc = self._features_dc[selected_pts_mask]
