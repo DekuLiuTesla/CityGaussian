@@ -11,7 +11,7 @@ COARSE_CONFIG="rubble_coarse"
 CONFIG="rubble_c9_r4"
 
 out_name="val_4"  # 4 denotes resolution 
-num_blocks=8
+max_block_id=8
 port=4041
 
 # train coarse global gaussian model
@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES=$(get_available_gpu) python train_large.py --config config/
 CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config config/$CONFIG.yaml
 
 # optimize each block, please adjust block number according to config
-for num in $(seq 0 $num_blocks); do
+for num in $(seq 0 $max_block_id); do
     while true; do
         gpu_id=$(get_available_gpu)
         if [[ -n $gpu_id ]]; then
