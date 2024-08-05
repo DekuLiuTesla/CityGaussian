@@ -50,7 +50,10 @@ This repository contains the official implementation of the paper ["CityGaussian
 
 ## 🔧 Usage
 
-Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md). We will soon release the ColMap results of these datasets as well.
+Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md). For COLMAP, we recommend to directly use our generated results:
+
+- **Google Drive**: https://drive.google.com/file/d/1Uz1pSTIpkagTml2jzkkzJ_rglS_z34p7/view?usp=sharing
+- **Baidu Netdisk**: https://pan.baidu.com/s/1zX34zftxj07dCM1x5bzmbA?pwd=1t6r
 
 ### Installation
 #### a. Clone the repository
@@ -93,7 +96,7 @@ cd ..
 ```
 
 ### Training and Vanilla Rendering
-To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `num_blocks`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
+To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `max_block_id`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
 ```bash
 bash scripts/run_citygs.sh
 ```
@@ -116,7 +119,7 @@ After that, configure the LoD setting in another yaml file. Then replace `CONFIG
 ```bash
 bash scripts/run_citygs_lod.sh
 ```
-Note that the LoD selection is now based on Nyquist sampling rate instead of manually defined distance threshold for better generalization and anti-aliasing performance.
+Note that the LoD selection is now based on Nyquist sampling rate instead of manually defined distance threshold. This modification enables better generalization and anti-aliasing performance.
 
 ### Viewer
 We borrowed Web viewer from [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning). Take the scene Rubble as an example. To render the scene with no LoD, you can use the following command:
@@ -134,7 +137,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 
 - \[x\] First Release.
 - \[x\] Release CityGaussian code.
-- \[ \] Release ColMap results of main datasets.
+- \[x\] Release ColMap results of main datasets.
 - \[ \] Release checkpoints on main datasets.
 
 ## 📄 License
@@ -143,6 +146,17 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 <br />
 This work is under the <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
 
+## Citation
+If you find this repository useful, please use the following BibTeX entry for citation.
+```latex
+@article{liu2024citygaussian,
+  title={Citygaussian: Real-time high-quality large-scale scene rendering with gaussians},
+  author={Liu, Yang and Guan, He and Luo, Chuanchen and Fan, Lue and Wang, Naiyan and Peng, Junran and Zhang, Zhaoxiang},
+  journal={arXiv preprint arXiv:2404.01133},
+  year={2024}
+}
+```
+
 ## 👏 Acknowledgements
 
-This repo benefits from [3DGS](https://github.com/graphdeco-inria/gaussian-splatting), [LightGaussian](https://github.com/VITA-Group/LightGaussian), [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning). 
+This repo benefits from [3DGS](https://github.com/graphdeco-inria/gaussian-splatting), [LightGaussian](https://github.com/VITA-Group/LightGaussian), [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning). Thanks for their great work!
