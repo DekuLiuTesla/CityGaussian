@@ -15,6 +15,14 @@ from datetime import datetime
 import numpy as np
 import random
 
+from argparse import ArgumentParser, Namespace
+
+def parse(data):
+    data = Namespace(**data)
+    for arg in vars(data):
+        if isinstance(getattr(data, arg), dict):
+            setattr(data, arg, parse(getattr(data, arg)))
+    return data
 
 def inverse_sigmoid(x):
     return torch.log(x / (1 - x))

@@ -12,15 +12,9 @@ from internal.utils.ssim import ssim
 from internal.utils.blocking import contract_to_unisphere
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.utils.mesh_utils import focus_point_fn
+from internal.utils.general_utils import parse
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
 from internal.models.simplified_gaussian_model_manager import SimplifiedGaussianModelManager
-
-def parse(data):
-    data = Namespace(**data)
-    for arg in vars(data):
-        if isinstance(getattr(data, arg), dict):
-            setattr(data, arg, parse(getattr(data, arg)))
-    return data
 
 def block_merging(coarse_model, 
                   ckpt_path,

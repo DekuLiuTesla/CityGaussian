@@ -10,16 +10,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 from internal.utils.ssim import ssim
 from internal.utils.blocking import contract_to_unisphere
 from internal.utils.mesh_utils import focus_point_fn
+from internal.utils.general_utils import parse
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
-
-def parse(data):
-    data = Namespace(**data)
-    for arg in vars(data):
-        if isinstance(getattr(data, arg), dict):
-            setattr(data, arg, parse(getattr(data, arg)))
-    return data
 
 def contract(x):
     mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
