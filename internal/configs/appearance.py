@@ -31,3 +31,12 @@ class SwagAppearanceModelParams:
     n_neurons: int = 64
     n_hidden_layers: int = 3
     color_activation: str = "Sigmoid"
+
+@dataclass
+class VastAppearanceModelParams:
+    optimization: AppearanceModelOptimizationParams
+
+    n_appearance_count: int=6000
+    n_appearance_dims: int = 64
+    n_rgb_dims: int = 3
+    std: float = 1e-4
