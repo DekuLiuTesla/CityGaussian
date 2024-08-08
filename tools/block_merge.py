@@ -113,7 +113,9 @@ def block_merging(coarse_model,
         checkpoint["state_dict"]["gaussian_model._scaling"] = merged_model.scales
         checkpoint["state_dict"]["gaussian_model._rotation"] = merged_model.rotations
         checkpoint["state_dict"]["gaussian_model._features_extra"] = merged_model.real_features_extra
-        torch.save(checkpoint, os.path.join(save_path, "merged.ckpt"))
+        
+        ckpt_name = ckpt_path.split('/')[-1].split('.')[0]
+        torch.save(checkpoint, os.path.join(save_path, f"merged_{ckpt_name}.ckpt"))
 
         # save_path = os.path.join(output_path, "point_cloud/iteration_30000")
         # if not os.path.exists(save_path):
