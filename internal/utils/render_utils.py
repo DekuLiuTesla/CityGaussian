@@ -121,6 +121,7 @@ def transform_poses_pca(poses: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 
 def generate_ellipse_path(poses: np.ndarray,
                           n_frames: int = 120,
+                          scale_percentile: int = 90,
                           const_speed: bool = True,
                           z_variation: float = 0.,
                           z_phase: float = 0.) -> np.ndarray:
@@ -131,13 +132,13 @@ def generate_ellipse_path(poses: np.ndarray,
   offset = np.array([center[0], center[1], 0])
 
   # Calculate scaling for ellipse axes based on input camera positions.
-  sc = np.percentile(np.abs(poses[:, :3, 3] - offset), 90, axis=0)
+  sc = np.percentile(np.abs(poses[:, :3, 3] - offset), scale_percentile, axis=0)
   # Use ellipse that is symmetric about the focal point in xy.
   low = -sc + offset
   high = sc + offset
   # Optional height variation need not be symmetric
-  z_low = np.percentile((poses[:, :3, 3]), 10, axis=0)
-  z_high = np.percentile((poses[:, :3, 3]), 90, axis=0)
+  z_low = np.percentile((poses[:, :3, 3]), 100 - scale_percentile, axis=0)
+  z_high = np.percentile((poses[:, :3, 3]), scale_percentile, axis=0)
 
   def get_positions(theta):
     # Interpolate between bounds with trig functions to get ellipse in x-y.
@@ -171,13 +172,13 @@ def generate_ellipse_path(poses: np.ndarray,
   return np.stack([viewmatrix(p - center, up, p) for p in positions])
 
 
-def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480):
+def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90):
   c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
   pose = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
   pose_recenter, colmap_to_world_transform = transform_poses_pca(pose)
 
   # generate new poses
-  new_poses = generate_ellipse_path(poses=pose_recenter, n_frames=n_frames)
+  new_poses = generate_ellipse_path(poses=pose_recenter, n_frames=n_frames, scale_percentile=scale_percentile)
   # warp back to orignal scale
   new_poses = np.linalg.inv(colmap_to_world_transform) @ pad_poses(new_poses)
 

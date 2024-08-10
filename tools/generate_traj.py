@@ -19,6 +19,7 @@ if __name__ == "__main__":
     parser.add_argument('--config_path', type=str, help='path of config', default=None)
     parser.add_argument('--mesh_path', type=str, help='path of reconstructed mesh')
     parser.add_argument("--n_fames", type=int, help="number of frames", default=240)
+    parser.add_argument("--scale_percentile", type=int, help="trajectory radius percentile", default=99)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--disable_inblock", action="store_true")
     args = parser.parse_args(sys.argv[1:])
@@ -39,6 +40,7 @@ if __name__ == "__main__":
     
     traj_dir = os.path.join(args.mesh_path, 'traj')
     os.makedirs(traj_dir, exist_ok=True)
-    cam_traj = generate_path(dataparser_outputs.train_set.cameras, traj_dir, n_frames=args.n_fames)
+    cam_traj = generate_path(dataparser_outputs.train_set.cameras, traj_dir, 
+                             n_frames=args.n_fames, scale_percentile=args.scale_percentile)
 
     print("Camera trajectory generated")
