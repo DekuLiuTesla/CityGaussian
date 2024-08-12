@@ -15,11 +15,15 @@ max_block_id=8
 port=4041
 
 # train coarse global gaussian model
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python train_large.py --config config/$COARSE_CONFIG.yaml
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python train_large.py --config config/$COARSE_CONFIG.yaml
 
 # train CityGaussian
 # obtain data partitioning
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python data_partition.py --config config/$CONFIG.yaml
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python data_partition.py --config config/$CONFIG.yaml
 
 # optimize each block, please adjust block number according to config
 for num in $(seq 0 $max_block_id); do
@@ -42,8 +46,15 @@ done
 wait
 
 # merge the blocks
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python merge.py --config config/$CONFIG.yaml
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python merge.py --config config/$CONFIG.yaml
 
 # rendering and evaluation, add --load_vq in rendering if you want to load compressed model
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python render_large.py --config config/$CONFIG.yaml --custom_test $TEST_PATH
-CUDA_VISIBLE_DEVICES=$(get_available_gpu) python metrics_large.py -m output/$CONFIG -t $out_name
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python render_large.py --config config/$CONFIG.yaml --custom_test $TEST_PATH
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python metrics_large.py -m output/$CONFIG -t $out_name

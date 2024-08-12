@@ -91,6 +91,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             if dataset.resolution > 0:
                 filename += "_{}".format(dataset.resolution)
         scene = LargeScene(dataset, gaussians, load_iteration=iteration, load_vq=load_vq, shuffle=False)
+        print(f"Number of Gaussians: {gaussians.get_xyz.shape[0]}")
 
         bg_color = [1,1,1] if dataset.white_background else [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")

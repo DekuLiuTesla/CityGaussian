@@ -138,6 +138,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 - \[x\] First Release.
 - \[x\] Release CityGaussian code.
 - \[x\] Release ColMap results of main datasets.
+- \[ \] Release detailed instruction for custom dataset usage.
 - \[ \] Release checkpoints on main datasets.
 
 ## 📄 License
@@ -146,7 +147,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 <br />
 This work is under the <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/">Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License</a>.
 
-## Citation
+## 🤗 Citation
 If you find this repository useful, please use the following BibTeX entry for citation.
 ```latex
 @article{liu2024citygaussian,
