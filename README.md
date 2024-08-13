@@ -19,6 +19,8 @@
 
 [![](https://img.shields.io/badge/Paper-%F0%9F%93%96-blue)](https://arxiv.org/pdf/2404.01133)
 [![](https://img.shields.io/badge/Project-%F0%9F%9A%80-blue)](https://dekuliutesla.github.io/citygs/)
+![GitHub Repo stars](https://img.shields.io/github/stars/DekuLiuTesla/CityGaussian)
+
 
 </div>
 

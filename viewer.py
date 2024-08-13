@@ -273,16 +273,8 @@ class Viewer:
                     lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
                     lod_gs_list.append(lod_gs)
                 
-                model = GatheredGaussian(
-                    gs_xyz=torch.cat([lod_gs.feats[:, :3] for lod_gs in lod_gs_list], dim=0),
-                    gs_feats=torch.cat([lod_gs.feats[:, 3:] for lod_gs in lod_gs_list], dim=0).half(),
-                    gs_ids=torch.cat([lod_gs.cell_ids+idx*lod_gs_list[-1].num_cell for idx, lod_gs in enumerate(lod_gs_list)], dim=0).to(torch.uint8),
-                    block_scalings=torch.stack([lod_gs_list[i].avg_scalings for i in range(len(lod_gs_list))], dim=0),
-                    cell_corners=lod_gs_list[-1].cell_corners,
-                    aabb=lod_gs_list[-1].aabb,
-                    block_dim=lod_gs_list[-1].block_dim,
-                    max_sh_degree=self.sh_degree,
-                )
+                model = lod_gs_list
+                
                 del lod_gs_list, lod_gs
             
         elif load_from.endswith(".ply") is True:
