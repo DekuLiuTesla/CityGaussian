@@ -61,7 +61,7 @@ Suppose that you have downloaded and unzip the COLMAP results to `./data` folder
     bash scripts/data_proc_mill19.sh
     ``` 
 
-3. [Optional] Run following command to prepare data of Mill19 (The COLMAP step make take a long time for large amount of images ).
+3. [Optional] Run following command to prepare data of Mill19 from scratch (The COLMAP step make take a long time for large amount of images ).
     ```bash
     bash scripts/data_proc_mill19_scratch.sh
     ``` 
