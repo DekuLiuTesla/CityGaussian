@@ -1,19 +1,13 @@
 # Mill19, Building, Rubble
-ln -s data/mill19/building-pixsfm/train/rgbs data/mill19/building-pixsfm/train/input
-ln -s data/mill19/building-pixsfm/val/rgbs data/mill19/building-pixsfm/val/input
+ln -s data/mill19/building-pixsfm/train/rgbs data/mill19/building-pixsfm/train/images
+ln -s data/mill19/building-pixsfm/val/rgbs data/mill19/building-pixsfm/val/images
 
-ln -s data/mill19/rubble-pixsfm/train/rgbs data/mill19/rubble-pixsfm/train/input
-ln -s data/mill19/rubble-pixsfm/val/rgbs data/mill19/rubble-pixsfm/val/input
+ln -s data/mill19/rubble-pixsfm/train/rgbs data/mill19/rubble-pixsfm/train/images
+ln -s data/mill19/rubble-pixsfm/val/rgbs data/mill19/rubble-pixsfm/val/images
 
-rm -rf data/mill19/building-pixsfm/train/sparse
-rm -rf data/mill19/building-pixsfm/val/sparse
-python tools/transform_pt2txt.py --source_path data/mill19/building-pixsfm
-python convert_cam.py -s data/mill19/building-pixsfm/train
-python convert_cam.py -s data/mill19/building-pixsfm/val
+mv data/colmap_results/building/train/sparse data/mill19/building-pixsfm/train
+mv data/colmap_results/building/val/sparse data/mill19/building-pixsfm/val
 
-rm -rf data/mill19/rubble-pixsfm/train/sparse
-rm -rf data/mill19/rubble-pixsfm/val/sparse
-python tools/transform_pt2txt.py --source_path data/mill19/rubble-pixsfm
-python convert_cam.py -s data/mill19/rubble-pixsfm/train
-python convert_cam.py -s data/mill19/rubble-pixsfm/val
+mv data/colmap_results/rubble/train/sparse data/mill19/rubble-pixsfm/train
+mv data/colmap_results/rubble/val/sparse data/mill19/rubble-pixsfm/val
 
