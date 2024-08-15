@@ -4,3 +4,6 @@
 [submodule "submodules/simple-knn"]
 	path = submodules/simple-knn
 	url = https://gitlab.inria.fr/bkerbl/simple-knn.git
+[submodule "diff-trim-gaussian-rasterization"]
+	path = submodules/diff-trim-gaussian-rasterization
+	url = https://github.com/Abyssaledge/diff-gaussian-rasterization
