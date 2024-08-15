@@ -122,6 +122,7 @@ def transform_poses_pca(poses: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 def generate_ellipse_path(poses: np.ndarray,
                           n_frames: int = 120,
                           scale_percentile: int = 90,
+                          pitch: float = None,
                           const_speed: bool = True,
                           z_variation: float = 0.,
                           z_phase: float = 0.) -> np.ndarray:
@@ -169,16 +170,23 @@ def generate_ellipse_path(poses: np.ndarray,
   ind_up = np.argmax(np.abs(avg_up))
   up = np.eye(3)[ind_up] * np.sign(avg_up[ind_up])
 
-  return np.stack([viewmatrix(p - center, up, p) for p in positions])
+  lookdir = positions - center[None, :]
+  if pitch is not None:
+    pitch = np.deg2rad(pitch)
+    # construct rotation matrix according to ind_up and pitch
+    lookdir[:, ind_up] = np.linalg.norm(lookdir[:, ind_up-2:ind_up], axis=-1) * np.tan(pitch)
+
+  return np.stack([viewmatrix(lookdir[i], up, positions[i]) for i in range(positions.shape[0])])
 
 
-def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90):
+def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90, pitch=None):
   c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
   pose = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
   pose_recenter, colmap_to_world_transform = transform_poses_pca(pose)
 
   # generate new poses
-  new_poses = generate_ellipse_path(poses=pose_recenter, n_frames=n_frames, scale_percentile=scale_percentile)
+  new_poses = generate_ellipse_path(poses=pose_recenter, pitch=pitch, 
+                                    n_frames=n_frames, scale_percentile=scale_percentile)
   # warp back to orignal scale
   new_poses = np.linalg.inv(colmap_to_world_transform) @ pad_poses(new_poses)
 

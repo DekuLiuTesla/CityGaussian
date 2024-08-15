@@ -34,6 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("--sdf_trunc", default=-1.0, type=float, help='Mesh: truncation value for TSDF')
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
+    parser.add_argument('--mesh_name', type=str, default="fuse", help='name of output mesh')
     parser.add_argument("--mesh_res", default=1024, type=int, help='Mesh: resolution for unbounded mesh extraction')
     args = parser.parse_args(sys.argv[1:])
     print("Rendering " + args.model_path)
@@ -69,10 +70,10 @@ if __name__ == "__main__":
     gaussExtractor.reconstruction(dataparser_outputs.train_set.cameras)
     # extract the mesh and save
     if args.unbounded:
-        name = 'fuse_unbounded.ply'
+        name = args.mesh_name + '_unbounded.ply'
         mesh = gaussExtractor.extract_mesh_unbounded(resolution=args.mesh_res)
     else:
-        name = 'fuse.ply'
+        name = args.mesh_name + '.ply'
         depth_trunc = (gaussExtractor.radius * 2.0) if args.depth_trunc < 0  else args.depth_trunc
         voxel_size = (depth_trunc / args.mesh_res) if args.voxel_size < 0 else args.voxel_size
         sdf_trunc = 5.0 * voxel_size if args.sdf_trunc < 0 else args.sdf_trunc

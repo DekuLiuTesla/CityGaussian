@@ -241,7 +241,7 @@ class GaussianExtractor(object):
         print(f'depth_truc: {depth_trunc}')
 
         volume = o3d.pipelines.integration.ScalableTSDFVolume(
-            voxel_length= voxel_size,
+            voxel_length=voxel_size,
             sdf_trunc=sdf_trunc,
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )
