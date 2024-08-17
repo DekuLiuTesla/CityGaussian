@@ -86,7 +86,9 @@ class ColmapBlockParams:
 
     image_list: Optional[str] = None
 
-    down_sample_factor: int = 1
+    down_sample_factor: float = 1
+
+    down_sample_rounding_model: Literal["floor", "round", "ceil"] = "round"
 
     block_id: int = None
 

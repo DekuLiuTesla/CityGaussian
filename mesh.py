@@ -30,12 +30,13 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, help='path of 2DGS model')
     parser.add_argument('--config_path', type=str, default=None, help='path of configs')
     parser.add_argument("--iteration", default=-1, type=int)
+    parser.add_argument('--skip_mesh', action="store_true", help='Mesh: if directly apply post processing')
     parser.add_argument("--voxel_size", default=-1.0, type=float, help='Mesh: voxel size for TSDF')
     parser.add_argument("--depth_trunc", default=-1.0, type=float, help='Mesh: Max depth range for TSDF')
     parser.add_argument("--sdf_trunc", default=-1.0, type=float, help='Mesh: truncation value for TSDF')
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
-    parser.add_argument('--mesh_name', type=str, default="fuse", help='name of output mesh')
+    parser.add_argument('--mesh_name', type=str, default="fuse", help='Mesh: name of output mesh')
     parser.add_argument("--mesh_res", default=1024, type=int, help='Mesh: resolution for unbounded mesh extraction')
     args = parser.parse_args(sys.argv[1:])
     print("Rendering " + args.model_path)
@@ -67,24 +68,28 @@ if __name__ == "__main__":
     mesh_dir = os.path.join(args.model_path, 'mesh', load_from.split('/')[-1].split('.')[0])
     gaussExtractor = GaussianExtractor(gaussians, renderer, bg_color=config.model.background_color)
 
-    print("export mesh ...")
-    os.makedirs(mesh_dir, exist_ok=True)
-    # set the active_sh to 0 to export only diffuse texture
-    gaussExtractor.gaussians.active_sh_degree = 0
-    gaussExtractor.reconstruction(dataparser_outputs.train_set.cameras)
-    # extract the mesh and save
-    if args.unbounded:
-        name = args.mesh_name + '_unbounded.ply'
-        mesh = gaussExtractor.extract_mesh_unbounded(resolution=args.mesh_res)
+    if not args.skip_mesh:
+        print("export mesh ...")
+        os.makedirs(mesh_dir, exist_ok=True)
+        # set the active_sh to 0 to export only diffuse texture
+        gaussExtractor.gaussians.active_sh_degree = 0
+        gaussExtractor.reconstruction(dataparser_outputs.train_set.cameras)
+        # extract the mesh and save
+        if args.unbounded:
+            name = args.mesh_name + '_unbounded.ply'
+            mesh = gaussExtractor.extract_mesh_unbounded(resolution=args.mesh_res)
+        else:
+            name = args.mesh_name + '.ply'
+            depth_trunc = (gaussExtractor.radius * 2.0) if args.depth_trunc < 0  else args.depth_trunc
+            voxel_size = (depth_trunc / args.mesh_res) if args.voxel_size < 0 else args.voxel_size
+            sdf_trunc = 5.0 * voxel_size if args.sdf_trunc < 0 else args.sdf_trunc
+            mesh = gaussExtractor.extract_mesh_bounded(voxel_size=voxel_size, sdf_trunc=sdf_trunc, depth_trunc=depth_trunc)
+        
+        o3d.io.write_triangle_mesh(os.path.join(mesh_dir, name), mesh)
+        print("mesh saved at {}".format(os.path.join(mesh_dir, name)))
     else:
-        name = args.mesh_name + '.ply'
-        depth_trunc = (gaussExtractor.radius * 2.0) if args.depth_trunc < 0  else args.depth_trunc
-        voxel_size = (depth_trunc / args.mesh_res) if args.voxel_size < 0 else args.voxel_size
-        sdf_trunc = 5.0 * voxel_size if args.sdf_trunc < 0 else args.sdf_trunc
-        mesh = gaussExtractor.extract_mesh_bounded(voxel_size=voxel_size, sdf_trunc=sdf_trunc, depth_trunc=depth_trunc)
-    
-    o3d.io.write_triangle_mesh(os.path.join(mesh_dir, name), mesh)
-    print("mesh saved at {}".format(os.path.join(mesh_dir, name)))
+        name = args.mesh_name + '.ply' if not args.unbounded else args.mesh_name + '_unbounded.ply'
+        mesh = o3d.io.read_triangle_mesh(os.path.join(mesh_dir, args.mesh_name + '.ply'))
     # post-process the mesh and save, saving the largest N clusters
     mesh_post = post_process_mesh(mesh, cluster_to_keep=args.num_cluster)
     o3d.io.write_triangle_mesh(os.path.join(mesh_dir, name.replace('.ply', '_post.ply')), mesh_post)
