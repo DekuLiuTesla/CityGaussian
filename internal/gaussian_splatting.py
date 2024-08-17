@@ -22,6 +22,7 @@ from internal.configs.model import ModelParams
 from internal.configs.light_gaussian import LightGaussian
 
 from internal.models.gaussian_model import GaussianModel
+from internal.models.flatten_gaussian_model import FlattenGaussianModel
 # from internal.models.appearance_model import AppearanceModel
 from internal.renderers import Renderer, VanillaRenderer
 from internal.renderers.vanilla_2dgs_renderer import Vanilla2DGSRenderer
@@ -52,6 +53,7 @@ class GaussianSplatting(LightningModule):
             max_save_val_output: int = -1,
             renderer: Renderer = lazy_instance(VanillaRenderer),
             absgrad: bool = False,
+            flatten_3dgs: bool = False,
             save_ply: bool = False,
             web_viewer: bool = False,
     ) -> None:
@@ -61,18 +63,8 @@ class GaussianSplatting(LightningModule):
 
         # setup models
         apply_2dgs = isinstance(renderer, Vanilla2DGSRenderer)
-        self.gaussian_model = GaussianModel(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims, apply_2dgs=apply_2dgs)
-        # self.appearance_model = None if enable_appearance_model is False else AppearanceModel(
-        #     n_input_dims=1,
-        #     n_grayscale_factors=appearance.n_grayscale_factors,
-        #     n_gammas=appearance.n_gammas,
-        #     n_neurons=appearance.n_neurons,
-        #     n_hidden_layers=appearance.n_hidden_layers,
-        #     n_frequencies=appearance.n_frequencies,
-        #     grayscale_factors_activation=appearance.grayscale_factors_activation,
-        #     gamma_activation=appearance.gamma_activation,
-        # )
-
+        Model = FlattenGaussianModel if self.hparams["flatten_3dgs"] else GaussianModel
+        self.gaussian_model = Model(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims, apply_2dgs=apply_2dgs)
         self.optimization_hparams = self.hparams["gaussian"].optimization
         self.light_gaussian_hparams = light_gaussian
 

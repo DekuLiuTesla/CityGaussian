@@ -14,6 +14,7 @@ from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.utils.mesh_utils import focus_point_fn
 from internal.utils.general_utils import parse
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 from internal.models.simplified_gaussian_model_manager import SimplifiedGaussianModelManager
 
 def block_merging(coarse_model, 
@@ -21,7 +22,8 @@ def block_merging(coarse_model,
                   output_path,
                   block_dim, 
                   aabb,
-                  corr_matrix):
+                  corr_matrix,
+                  flatten_gs):
 
         xyz_coarse = coarse_model.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
@@ -99,6 +101,8 @@ def block_merging(coarse_model,
             print(f"Merged block {block_id} with {model.get_xyz.shape[0]} gaussians.")
 
         merged_model = SimplifiedGaussianModelManager(block_model_list, enable_transform=False, device="cuda")
+        if flatten_gs:
+            merged_model._scaling = merged_model._scaling[:, :2]
         print(f"Total {merged_model.get_xyz.shape[0]} gaussians to be saved.")
 
         save_path = os.path.join(output_path, "checkpoints")
@@ -142,12 +146,12 @@ if __name__ == "__main__":
         if args.aabb is None and hasattr(config.data.params.colmap_block, "aabb"):
             args.aabb = config.data.params.colmap_block.aabb
     
-    coarse_model, _ = GaussianModelLoader.search_and_load(
+    coarse_model, renderer = GaussianModelLoader.search_and_load(
         config.model.init_from,
         sh_degree=3,
         device="cuda",
     )
-
+    flatten_gs = True if isinstance(renderer, VanillaTrimRenderer) else False
 
     txt_dict = {}
     image_list = config.data.params.colmap_block.image_list
@@ -166,7 +170,7 @@ if __name__ == "__main__":
     output_path = os.path.join(args.output, config.name)
     ckpt_path = GaussianModelLoader.search_load_file(config.model.init_from.split("/point_cloud/")[0])
 
-    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb, corr_matrix)
+    block_merging(coarse_model, ckpt_path, output_path, args.block_dim, args.aabb, corr_matrix, flatten_gs)
 
     # All done
     print("Merging complete.")

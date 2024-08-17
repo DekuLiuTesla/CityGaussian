@@ -14,6 +14,7 @@ from internal.utils.general_utils import parse
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 def contract(x):
     mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
@@ -162,6 +163,9 @@ if __name__ == "__main__":
         device="cuda",
     )
     print("Gaussian count: {}".format(model.get_xyz.shape[0]))
+
+    if isinstance(renderer, VanillaTrimRenderer):
+        model._scaling = torch.cat((torch.ones_like(model._scaling[:, :1]) * 1e-8, model._scaling[:, [-2, -1]]), dim=1)
 
     config_path = os.path.join(args.model_path, "config.yaml")
     with open(config_path, 'r') as f:

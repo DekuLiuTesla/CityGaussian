@@ -18,8 +18,9 @@ from os import makedirs
 from argparse import ArgumentParser
 from internal.utils.common import parse_cfg_yaml
 from internal.utils.gaussian_model_loader import GaussianModelLoader
-from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
 from internal.utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh
+from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 import open3d as o3d
 
@@ -44,6 +45,9 @@ if __name__ == "__main__":
         sh_degree=3,
         device="cuda",
     )
+
+    if isinstance(renderer, VanillaTrimRenderer):
+        gaussians._scaling = torch.cat((torch.ones_like(gaussians._scaling[:, :1]) * 1e-8, gaussians._scaling[:, [-2, -1]]), dim=1)
 
     if args.config_path is None:
         config_path = os.path.join(args.model_path, "config.yaml")

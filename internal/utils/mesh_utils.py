@@ -194,20 +194,12 @@ class GaussianExtractor(object):
         for i, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="reconstruct radiance fields"):
             render_pkg = self.renderer(viewpoint_cam.to_device("cuda"), self.gaussians, bg_color=self.bg_color)
             rgb = render_pkg['render']
-            alpha = render_pkg['rend_alpha']
-            normal = torch.nn.functional.normalize(render_pkg['rend_normal'], dim=0)
-            depth = render_pkg['surf_depth']
-            depth_normal = render_pkg['surf_normal']
+            depth = render_pkg['surf_depth'] if 'surf_depth' in render_pkg else render_pkg['median_depth']
             self.rgbmaps.append(rgb.cpu())
             self.depthmaps.append(depth.cpu())
-            # self.alphamaps.append(alpha.cpu())
-            # self.normals.append(normal.cpu())
-            # self.depth_normals.append(depth_normal.cpu())
         
         self.rgbmaps = torch.stack(self.rgbmaps, dim=0)
         self.depthmaps = torch.stack(self.depthmaps, dim=0)
-        # self.alphamaps = torch.stack(self.alphamaps, dim=0)
-        # self.depth_normals = torch.stack(self.depth_normals, dim=0)
         self.estimate_bounding_sphere()
 
     def estimate_bounding_sphere(self):
