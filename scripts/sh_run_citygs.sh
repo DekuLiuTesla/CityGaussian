@@ -1,6 +1,6 @@
 # Function to get the id of an available GPU
 get_available_gpu() {
-  local mem_threshold=10000
+  local mem_threshold=500
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
