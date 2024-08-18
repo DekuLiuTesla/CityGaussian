@@ -425,7 +425,7 @@ class GaussianSplatting(LightningModule):
             )
 
         # backward
-        self.manual_backward(metrics["loss"])
+        self.manual_backward(metrics["loss"], retain_graph=("extra_loss" in metrics.keys()))
 
         # before gradient descend
         with torch.no_grad():
@@ -468,6 +468,20 @@ class GaussianSplatting(LightningModule):
                             "gaussian"].optimization.densify_from_iter
                         ):
                     gaussians.reset_opacity()
+                
+            if self.trainer.global_step % 100 == 0:
+                abs_grad = viewspace_point_tensor.grad.abs()
+                metrics_to_log = {
+                    "trainer/grad_mean":abs_grad[abs_grad > 0.].mean(),
+                    "trainer/grad_std":abs_grad[abs_grad > 0.].std(),
+                }
+                self.logger.log_metrics(
+                    metrics_to_log,
+                    step=self.trainer.global_step,
+                )
+        
+        if "extra_loss" in metrics.keys():
+            self.manual_backward(metrics["extra_loss"])
 
         # optimize
         for optimizer in optimizers:
