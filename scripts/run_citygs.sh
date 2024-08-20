@@ -11,7 +11,7 @@ COARSE_CONFIG="rubble_coarse"
 CONFIG="rubble_c9_r4"
 
 out_name="val"  # i.e. TEST_PATH.split('/')[-1]
-max_block_id=8
+max_block_id=8  # i.e. x_dim * y_dim * z_dim - 1
 port=4041
 
 # train coarse global gaussian model

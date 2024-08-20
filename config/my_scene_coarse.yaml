@@ -1,0 +1,46 @@
+# Model Parameters
+model_params: {
+    model_config: {
+        name: "GaussianModel",
+        kwargs: {}
+    },
+    sh_degree: 3,
+    source_path: "data/my_scene/train",  # adjust it to your own dataset
+    model_path: "",  # leave it blank
+    images: "images",
+    resolution: -1,  # adjust it to your downsample factor. -1 means downsampling longest side of image to 1,600 pixels
+    white_background: False,
+    data_device: "cuda",
+    eval: False,
+}
+
+# Pipeline Parameters
+pipeline_params: {
+    convert_SHs_python:  False,
+    compute_cov3D_python:  False,
+    debug:  False
+}
+
+
+# Optimization Parameters
+# Adjust the parameters according to your dataset
+optim_params: {
+    iterations: 30_000,
+    position_lr_init: 0.00016,
+    position_lr_final: 0.0000016,
+    position_lr_delay_mult: 0.01,
+    position_lr_max_steps: 30_000,
+    feature_lr: 0.0025,
+    opacity_lr: 0.05,
+    scaling_lr: 0.005,
+    rotation_lr: 0.001,
+    percent_dense: 0.01,
+    lambda_dssim: 0.2,
+    densification_interval: 100,
+    opacity_reset_interval: 3000,
+    densify_from_iter: 500,
+    densify_until_iter: 15_000,
+    densify_grad_threshold: 0.0002
+}
+
+

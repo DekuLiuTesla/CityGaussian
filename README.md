@@ -32,6 +32,8 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 </div>
 
 ## 📰 News
+**[2024.08.20]** Updates [Custom Dataset Instructions](doc/custom_dataset.md)! 
+
 **[2024.08.05]** Our code is now available! Welcome to try it out!
 
 **[2024.07.18]** Camera Ready version now can be accessed through arXiv. More insights are included.
@@ -95,6 +97,8 @@ ln -s /path/to/data /path/to/LargeLightGaussian/data
 ln -s /path/to/output /path/to/LargeLightGaussian/output
 cd ..
 ```
+### Prepare Config Files
+If you use your own dataset, please follow instruction in [Custom Dataset Instructions](doc/custom_dataset.md) to prepare. We also prepared templates in `./config` and `LargeLightGaussian/scripts`.
 
 ### Training and Vanilla Rendering
 To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `max_block_id`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
@@ -102,10 +106,6 @@ To train a scene, config the hyperparameters of pretraining and finetuning stage
 bash scripts/run_citygs.sh
 ```
 This script will also render and evaluate the result without LoD.
-
-**Tips for adjusting the parameters on your own dataset:**
-- We recommend ssim_threshold as 0.08 as a good start point
-- For foreground area `aabb`, you can try our default setting (do not set `aabb` in config file) first before adjusting it.
 
 ### Rendering with LoD
 First, the LoD generation is realized by the following command:
@@ -139,7 +139,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 - \[x\] First Release.
 - \[x\] Release CityGaussian code.
 - \[x\] Release ColMap results of main datasets.
-- \[ \] Release detailed instruction for custom dataset usage.
+- \[x\] Release detailed instruction for custom dataset usage.
 - \[ \] Release checkpoints on main datasets.
 
 ## 📄 License
