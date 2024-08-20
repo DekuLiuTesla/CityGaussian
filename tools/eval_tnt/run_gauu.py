@@ -103,10 +103,14 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     gt_pcd = o3d.io.read_point_cloud(gt_filen)
 
     # Rotate pcd and gt_pcd with coord_transform
-    pcd.rotate(coord_transform[:3, :3].T, center=(0, 0, 0))
-    gt_pcd.rotate(coord_transform[:3, :3].T, center=(0, 0, 0))
+    pcd.transform(np.linalg.inv(coord_transform))
+    gt_pcd.transform(np.linalg.inv(coord_transform))
 
-    dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 2.0  # around 5e-4 of scene size
+    # save pcd and gt_pcd
+    # o3d.io.write_point_cloud(os.path.join(out_dir, "pcd.ply"), pcd)
+    # o3d.io.write_point_cloud(os.path.join(out_dir, "gt_pcd.ply"), gt_pcd)
+
+    dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 2.5  # around 5e-4 of scene size
     
     # big pointclouds will be downlsampled to this number to speed up alignment
     dist_threshold = dTau

@@ -469,16 +469,18 @@ class GaussianSplatting(LightningModule):
                         ):
                     gaussians.reset_opacity()
                 
-            if self.trainer.global_step % 100 == 0:
-                abs_grad = viewspace_point_tensor.grad.abs()
-                metrics_to_log = {
-                    "trainer/grad_mean":abs_grad[abs_grad > 0.].mean(),
-                    "trainer/grad_std":abs_grad[abs_grad > 0.].std(),
-                }
-                self.logger.log_metrics(
-                    metrics_to_log,
-                    step=self.trainer.global_step,
-                )
+                if self.trainer.global_step % 100 == 0:
+                    grad_accum = gaussians.xyz_gradient_accum[gaussians.denom > 0.]
+                    denom = gaussians.denom[gaussians.denom > 0.]
+                    metrics_to_log = {
+                        "trainer/grad_accum_mean":grad_accum.mean(),
+                        "trainer/denom_mean":denom.mean(),
+                        "trainer/grad_avg":(grad_accum / denom).mean(),
+                    }
+                    self.logger.log_metrics(
+                        metrics_to_log,
+                        step=self.trainer.global_step,
+                    )
         
         if "extra_loss" in metrics.keys():
             self.manual_backward(metrics["extra_loss"])
