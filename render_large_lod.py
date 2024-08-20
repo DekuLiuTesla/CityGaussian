@@ -90,8 +90,6 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
-            if dataset.resolution > 0:
-                filename += "_{}".format(dataset.resolution)
 
         lod_gs_list = []
         org_model_path = dataset.model_path

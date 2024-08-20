@@ -8,7 +8,7 @@ get_available_gpu() {
 CONFIG="rubble_c9_r4_lod"
 TEST_PATH="data/mill19/rubble-pixsfm/val"
 
-out_name="val_4"  # 4 denotes resolution
+out_name="val"  # i.e. TEST_PATH.split('/')[-1]
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
