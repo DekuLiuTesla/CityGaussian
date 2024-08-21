@@ -16,4 +16,5 @@ sh_run_large_app2.sh
 sh_run1.sh
 sh_run2.sh
 sh_run3.sh
+sh_run4.sh
 tools/merge_new_img.py

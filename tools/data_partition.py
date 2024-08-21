@@ -29,6 +29,7 @@ def uncontract(y):
 
 def block_filtering(gaussians, 
                     renderer, 
+                    ckpt_path,
                     dataset, 
                     save_dir, 
                     block_dim, 
@@ -38,6 +39,11 @@ def block_filtering(gaussians,
                     background_color, 
                     quiet=False, 
                     disable_inblock=False):
+
+        checkpoint = torch.load(ckpt_path, map_location='cpu')
+        max_radii2D = checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"].clone()
+        xyz_gradient_accum = checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"].clone()
+        denom = checkpoint["gaussian_model_extra_state_dict"]["denom"].clone()
 
         xyz_org = gaussians.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
@@ -92,28 +98,50 @@ def block_filtering(gaussians,
                     min_z -= 0.01
                     max_z += 0.01
                 
+                block_output_mask = block_mask.clone()
+
                 print(f"\nStart filtering block {block_id} with {num_gs} gaussians.")
                 with open(os.path.join(save_dir, f"block_{block_id}.txt"), "w") as f:
                     for idx in tqdm(range(len(dataset.cameras))):
                         camera = dataset.cameras[idx].to_device("cuda")
                         contract_cam_center = contract_to_unisphere(camera.camera_center, aabb, ord=torch.inf)
 
+                        output = renderer(camera, gaussians, bg_color=bg_color)
+
                         if (not disable_inblock) and contract_cam_center[0] > org_min_x and contract_cam_center[0] < org_max_x \
                             and contract_cam_center[1] > org_min_y and contract_cam_center[1] < org_max_y \
                             and contract_cam_center[2] > org_min_z and contract_cam_center[2] < org_max_z :
                             f.write(f"{dataset.image_names[idx]}\n")
                             block_image_list[block_id].append(dataset.image_names[idx])
-                            continue
+                        else:
+                            img_org_gs = output["render"]
+                            gaussians.select(block_mask)  # disable gaussians within block
+                            img_masked_gs = renderer(camera, gaussians, bg_color=bg_color)["render"]
+                            gaussians._opacity = gaussians._opacity_origin  # recover opacity
 
-                        img_org_gs = renderer(camera, gaussians, bg_color=bg_color)["render"]
-                        gaussians.select(block_mask)  # disable gaussians within block
-                        img_masked_gs = renderer(camera, gaussians, bg_color=bg_color)["render"]
-                        gaussians._opacity = gaussians._opacity_origin  # recover opacity
+                            loss = 1.0 - ssim(img_masked_gs, img_org_gs)
+                            if loss > content_threshold:
+                                f.write(f"{dataset.image_names[idx]}\n")
+                                block_image_list[block_id].append(dataset.image_names[idx])
+                        
+                        if dataset.image_names[idx] in block_image_list[block_id]:
+                            block_output_mask = block_output_mask | output['visibility_filter']
+                    
+                    # save filtered gaussians
+                    block_output_mask = block_output_mask.cpu()
+                    gaussians_params = gaussians.to_parameter_structure()
 
-                        loss = 1.0 - ssim(img_masked_gs, img_org_gs)
-                        if loss > content_threshold:
-                            f.write(f"{dataset.image_names[idx]}\n")
-                            block_image_list[block_id].append(dataset.image_names[idx])
+                    checkpoint["state_dict"]["gaussian_model._xyz"] = gaussians_params.xyz[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._opacity"] = gaussians_params.opacities[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._features_dc"] = gaussians_params.features_dc[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._features_rest"] = gaussians_params.features_rest[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._scaling"] = gaussians_params.scales[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._rotation"] = gaussians_params.rotations[block_output_mask]
+                    checkpoint["state_dict"]["gaussian_model._features_extra"] = gaussians_params.real_features_extra[block_output_mask]
+                    checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"] = max_radii2D[block_output_mask].clone()
+                    checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"] = xyz_gradient_accum[block_output_mask].clone()
+                    checkpoint["gaussian_model_extra_state_dict"]["denom"] = denom[block_output_mask].clone()
+                    torch.save(checkpoint, ckpt_path.replace(".ckpt", f"_block_{block_id}.ckpt"))
         
         if not quiet:
             for block_id in range(block_num):
@@ -179,11 +207,12 @@ if __name__ == "__main__":
         params=config.data.params.colmap_block,
     ).get_outputs()
     
+    ckpt_path = GaussianModelLoader.search_load_file(args.model_path)
     
     # assert save_dir contains no files and avoid duplicated partitioning
     assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
 
-    block_filtering(model, renderer, 
+    block_filtering(model, renderer, ckpt_path,
                     dataparser_outputs.train_set, 
                     save_dir, args.block_dim, args.aabb, 
                     args.num_threshold, args.content_threshold,
