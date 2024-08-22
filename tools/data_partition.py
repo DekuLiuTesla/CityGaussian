@@ -38,12 +38,14 @@ def block_filtering(gaussians,
                     content_threshold, 
                     background_color, 
                     quiet=False, 
+                    flatten_gs=False,
                     disable_inblock=False):
 
-        checkpoint = torch.load(ckpt_path, map_location='cpu')
+        checkpoint = torch.load(ckpt_path)
         max_radii2D = checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"].clone()
         xyz_gradient_accum = checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"].clone()
         denom = checkpoint["gaussian_model_extra_state_dict"]["denom"].clone()
+        device = denom.device
 
         xyz_org = gaussians.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
@@ -128,8 +130,10 @@ def block_filtering(gaussians,
                             block_output_mask = block_output_mask | output['visibility_filter']
                     
                     # save filtered gaussians
-                    block_output_mask = block_output_mask.cpu()
-                    gaussians_params = gaussians.to_parameter_structure()
+                    block_output_mask = block_output_mask
+                    gaussians_params = gaussians.to_parameter_structure(device)
+                    if flatten_gs:
+                        gaussians_params.scales = gaussians_params.scales[:, :2]
 
                     checkpoint["state_dict"]["gaussian_model._xyz"] = gaussians_params.xyz[block_output_mask]
                     checkpoint["state_dict"]["gaussian_model._opacity"] = gaussians_params.opacities[block_output_mask]
@@ -194,6 +198,7 @@ if __name__ == "__main__":
 
     if isinstance(renderer, VanillaTrimRenderer):
         model._scaling = torch.cat((torch.ones_like(model._scaling[:, :1]) * 1e-8, model._scaling[:, [-2, -1]]), dim=1)
+    flatten_gs = True if isinstance(renderer, VanillaTrimRenderer) else False
 
     config_path = os.path.join(args.model_path, "config.yaml")
     with open(config_path, 'r') as f:
@@ -210,14 +215,14 @@ if __name__ == "__main__":
     ckpt_path = GaussianModelLoader.search_load_file(args.model_path)
     
     # assert save_dir contains no files and avoid duplicated partitioning
-    assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
+    # assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
 
     block_filtering(model, renderer, ckpt_path,
                     dataparser_outputs.train_set, 
                     save_dir, args.block_dim, args.aabb, 
                     args.num_threshold, args.content_threshold,
                     config.model.background_color, 
-                    disable_inblock=False)
+                    flatten_gs=flatten_gs, disable_inblock=False)
 
     # All done
     print("Partition complete.")

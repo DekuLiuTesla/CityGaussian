@@ -133,14 +133,14 @@ class GaussianModelSimplified(nn.Module):
         self._features = self._features[gaussians_to_be_preserved]
         self._features_extra = self._features_extra[gaussians_to_be_preserved]
 
-    def to_parameter_structure(self) -> gaussian_utils.Gaussian:
-        xyz = self._xyz.cpu()
-        features_dc = self._features[:, :1, :].cpu()
-        features_rest = self._features[:, 1:, :].cpu()
-        scaling = torch.log(self._scaling).cpu()
-        rotation = self._rotation.cpu()
-        opacity = inverse_sigmoid(self._opacity).cpu()
-        features_extra = self._features_extra.cpu()
+    def to_parameter_structure(self, device='cpu') -> gaussian_utils.Gaussian:
+        xyz = self._xyz.to(device)
+        features_dc = self._features[:, :1, :].to(device)
+        features_rest = self._features[:, 1:, :].to(device)
+        scaling = torch.log(self._scaling).to(device)
+        rotation = self._rotation.to(device)
+        opacity = inverse_sigmoid(self._opacity).to(device)
+        features_extra = self._features_extra.to(device)
 
         return gaussian_utils.Gaussian(
             sh_degrees=self.max_sh_degree,
