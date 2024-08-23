@@ -27,7 +27,6 @@ from internal.models.flatten_gaussian_model import FlattenGaussianModel
 from internal.renderers import Renderer, VanillaRenderer
 from internal.renderers.vanilla_2dgs_renderer import Vanilla2DGSRenderer
 from internal.utils.ssim import ssim
-from internal.utils.psnr import color_correct
 from jsonargparse import lazy_instance
 
 from internal.utils.sh_utils import eval_sh
@@ -566,10 +565,10 @@ class GaussianSplatting(LightningModule):
         
         self.log(f"{name}/loss", loss, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
         if self.hparams["correct_color"]:
-            render_np = np.array(outputs["render"][None, ...].cpu(), dtype=np.float64).transpose(0, 2, 3, 1)
-            gt_np = np.array(gt_image[None, ...].cpu(), dtype=np.float64).transpose(0, 2, 3, 1)
-            outputs["render"] = torch.from_numpy(np.array(color_correct(render_np, gt_np), dtype=np.float32).transpose(0, 3, 1, 2)).contiguous().to(gt_image.device)[0]
-        
+            from internal.utils.psnr import color_correct
+            outputs["render"] = color_correct(outputs["render"][None, ...].permute(0, 2, 3, 1), 
+                                              gt_image[None, ...].permute(0, 2, 3, 1)).permute(0, 3, 1, 2).contiguous()[0]
+            
         self.log(f"{name}/ssim", ssim(outputs["render"], gt_image), on_epoch=True, prog_bar=False, batch_size=self.batch_size)
         self.log(f"{name}/psnr", self.psnr(outputs["render"], gt_image), on_epoch=True, prog_bar=True,
                  batch_size=self.batch_size)
