@@ -7,3 +7,6 @@
 [submodule "diff-trim-gaussian-rasterization"]
 	path = submodules/diff-trim-gaussian-rasterization
 	url = https://github.com/Abyssaledge/diff-gaussian-rasterization
+[submodule "submodules/diff-trim-surfel-rasterization"]
+	path = submodules/diff-trim-surfel-rasterization
+	url = https://github.com/YuxueYang1204/diff-surfel-rasterization
