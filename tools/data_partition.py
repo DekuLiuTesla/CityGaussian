@@ -133,7 +133,7 @@ def block_filtering(gaussians,
                     block_output_mask = block_output_mask
                     gaussians_params = gaussians.to_parameter_structure(device)
                     if flatten_gs:
-                        gaussians_params.scales = gaussians_params.scales[:, :2]
+                        gaussians_params.scales = gaussians_params.scales[:, 1:]
 
                     checkpoint["state_dict"]["gaussian_model._xyz"] = gaussians_params.xyz[block_output_mask]
                     checkpoint["state_dict"]["gaussian_model._opacity"] = gaussians_params.opacities[block_output_mask]
@@ -198,7 +198,9 @@ if __name__ == "__main__":
 
     if isinstance(renderer, VanillaTrimRenderer):
         model._scaling = torch.cat((torch.ones_like(model._scaling[:, :1]) * 1e-8, model._scaling[:, [-2, -1]]), dim=1)
-    flatten_gs = True if isinstance(renderer, VanillaTrimRenderer) else False
+        flatten_gs = True
+    else:
+        flatten_gs = False
 
     config_path = os.path.join(args.model_path, "config.yaml")
     with open(config_path, 'r') as f:
