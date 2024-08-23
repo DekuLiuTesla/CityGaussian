@@ -62,7 +62,7 @@ class GaussianSplatting(LightningModule):
         self.save_hyperparameters()
 
         # setup models
-        apply_2dgs = isinstance(renderer, Vanilla2DGSRenderer)
+        apply_2dgs = "2DGS" in type(renderer).__name__.upper()
         Model = FlattenGaussianModel if self.hparams["flatten_3dgs"] else GaussianModel
         self.gaussian_model = Model(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims, apply_2dgs=apply_2dgs)
         self.optimization_hparams = self.hparams["gaussian"].optimization
