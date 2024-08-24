@@ -427,7 +427,7 @@ class GaussianModel(nn.Module):
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device=self._xyz.device)
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=self._xyz.device)
 
-    def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):
+    def densify_and_split(self, grads, grad_threshold, scene_extent, N=2, axis_ratio_threshold=0.01):
         n_init_points = self.get_xyz.shape[0]
         # Extract points that satisfy the gradient condition
         padded_grad = torch.zeros((n_init_points), device=self._xyz.device)
@@ -436,6 +436,11 @@ class GaussianModel(nn.Module):
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling,
                                                         dim=1).values > self.percent_dense * scene_extent)
+        
+        if self.apply_2dgs:
+            # stop densifying points that are too elongated for stability
+            axis_ratio = self.get_scaling[..., :2].min(dim=1).values / self.get_scaling[..., :2].max(dim=1).values
+            selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > axis_ratio_threshold)
 
         stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
         means = torch.zeros((stds.size(0), 3), device=self._xyz.device)
@@ -463,7 +468,7 @@ class GaussianModel(nn.Module):
                                                         dim=1).values <= self.percent_dense * scene_extent)
         if self.apply_2dgs:
             # stop densifying points that are too elongated for stability
-            axis_ratio = self.get_scaling.min(dim=1).values / self.get_scaling.max(dim=1).values
+            axis_ratio = self.get_scaling[..., :2].min(dim=1).values / self.get_scaling[..., :2].max(dim=1).values
             selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > axis_ratio_threshold)
 
         new_xyz = self._xyz[selected_pts_mask]
