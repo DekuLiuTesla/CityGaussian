@@ -14,6 +14,7 @@ from internal.utils.general_utils import parse
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
 from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 def contract(x):
@@ -171,13 +172,17 @@ if __name__ == "__main__":
         print(f"Loading parameters according to config file {args.config_path}")
         with open(args.config_path, 'r') as f:
             config = parse(yaml.load(f, Loader=yaml.FullLoader))
-        args.block_dim = config.data.params.colmap_block.block_dim
-        args.aabb = config.data.params.colmap_block.aabb
-        args.num_threshold = config.data.params.colmap_block.num_threshold
-        args.content_threshold = config.data.params.colmap_block.content_threshold
+            if config.data.type == "estimated_depth_colmap_block":
+                params = config.data.params.estimated_depth_colmap_block
+            else:
+                params = config.data.params.colmap_block
+        args.block_dim = params.block_dim
+        args.aabb = params.aabb
+        args.num_threshold = params.num_threshold
+        args.content_threshold = params.content_threshold
 
         if args.save_dir is None:
-            save_dir = config.data.params.colmap_block.image_list
+            save_dir = params.image_list
         else:
             save_dir = args.save_dir
         
@@ -207,12 +212,20 @@ if __name__ == "__main__":
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
     
     # TODO: support other data parser
-    dataparser_outputs = ColmapBlockDataParser(
-        os.path.expanduser(config.data.path),
-        os.path.abspath(""),
-        global_rank=0,
-        params=config.data.params.colmap_block,
-    ).get_outputs()
+    if config.data.type == "estimated_depth_colmap_block":
+        dataparser_outputs = EstimatedDepthColmapDataParser(
+            os.path.expanduser(config.data.path),
+            os.path.abspath(""),
+            global_rank=0,
+            params=config.data.params.estimated_depth_colmap_block,
+        ).get_outputs()
+    else:
+        dataparser_outputs = ColmapBlockDataParser(
+            os.path.expanduser(config.data.path),
+            os.path.abspath(""),
+            global_rank=0,
+            params=config.data.params.colmap_block,
+        ).get_outputs()
     
     ckpt_path = GaussianModelLoader.search_load_file(args.model_path)
     

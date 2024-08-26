@@ -61,9 +61,13 @@ class CLI(LightningCLI):
         output_path = os.path.join(config.output, config.name)
         if config.version is not None:
             output_path = os.path.join(output_path, config.version)
-        if config.data.type == "colmap_block" and config.data.params.colmap_block.block_id is not None:
-            output_path = os.path.join(output_path, "blocks", "block_{}".format(config.data.params.colmap_block.block_id))
-            config.model.init_from = config.model.init_from.replace(".ckpt", f"_block_{config.data.params.colmap_block.block_id}.ckpt")
+        if config.data.type == "estimated_depth_colmap_block":
+            params = config.data.params.estimated_depth_colmap_block
+        else:
+            params = config.data.params.colmap_block
+        if "block" in config.data.type and params.block_id is not None:
+            output_path = os.path.join(output_path, "blocks", "block_{}".format(params.block_id))
+            config.model.init_from = config.model.init_from.replace(".ckpt", f"_block_{params.block_id}.ckpt")
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
         config.model.output_path = output_path

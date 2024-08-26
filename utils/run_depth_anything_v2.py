@@ -3,6 +3,8 @@ import os
 import sys
 import argparse
 import torch
+import numpy as np
+from PIL import Image
 from tqdm import tqdm
 from typing import Literal
 import matplotlib
@@ -14,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("image_dir")
 parser.add_argument("--input_size", "-s", type=int, default=518)
 parser.add_argument("--output", "-o", default=None)
+parser.add_argument("--downsample_factor", "-d", type=float, default=1)
 parser.add_argument("--encoder", default="vitl")
 parser.add_argument("--extensions", "-e", default=["jpg", "JPG", "jpeg", "JPEG"])
 parser.add_argument("--preview", "-p", action="store_true", default=False)
@@ -88,6 +91,10 @@ try:
             depth = depth_anything.infer_image(raw_image, args.input_size)
             normalized_depth = (depth - depth.min()) / (depth.max() - depth.min())
 
+            if args.downsample_factor != 1:
+                height, width = normalized_depth.shape
+                resized_height, resized_width = round(height / args.downsample_factor), round(width / args.downsample_factor)
+                normalized_depth = np.array(Image.fromarray(normalized_depth).resize((resized_width, resized_height)))
             output_filename = os.path.join(args.output, "{}.npy".format(image_name))
             ndarray_saver.save(normalized_depth, output_filename)
 

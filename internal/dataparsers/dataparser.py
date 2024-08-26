@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,6 +23,10 @@ class ImageSet:
     mask_paths: Optional[list] = None
     """ Full path to the mask file """
 
+    extra_data: Optional[list] = None
+
+    extra_data_processor: Optional[Callable] = None
+
     def __len__(self):
         return len(self.image_names)
 
@@ -36,7 +40,16 @@ class ImageSet:
     def __post_init__(self):
         if self.mask_paths is None:
             self.mask_paths = [None for _ in range(len(self.image_paths))]
+        
+        if self.extra_data is None:
+            self.extra_data = [None for _ in range(len(self.image_paths))]
 
+        if self.extra_data_processor is None:
+            self.extra_data_processor = ImageSet._return_input
+
+    @staticmethod
+    def _return_input(i):
+        return i
 
 @dataclass
 class PointCloud:

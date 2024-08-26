@@ -6,7 +6,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from rich.progress import track
 import random
-from typing import Literal, Tuple, Optional
+from typing import Literal, Tuple, Optional, Any
 from PIL import Image
 import numpy as np
 import cv2
@@ -20,6 +20,7 @@ from internal.configs.dataset import DatasetParams
 from internal.dataparsers.colmap_dataparser import ColmapDataParser
 from internal.dataparsers.colmap_joint_dataparser import ColmapJointDataParser
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
 from internal.dataparsers.blender_dataparser import BlenderDataParser
 from internal.dataparsers.nsvf_dataparser import NSVFDataParser
 from internal.dataparsers.nerfies_dataparser import NerfiesDataparser
@@ -116,8 +117,11 @@ class Dataset(torch.utils.data.Dataset):
 
         return self.image_set.image_names[index], image, mask
 
-    def __getitem__(self, index) -> Tuple[Camera, Tuple]:
-        return self.image_cameras[index], self.get_image(index)
+    def get_extra_data(self, index):
+        return self.image_set.extra_data_processor(self.image_set.extra_data[index])
+
+    def __getitem__(self, index) -> Tuple[Camera, Tuple, Any]:
+        return self.image_cameras[index], self.get_image(index), self.get_extra_data(index)
 
 
 class CacheDataLoader(torch.utils.data.DataLoader):
@@ -250,7 +254,7 @@ class DataModule(LightningDataModule):
             self,
             path: str,
             params: DatasetParams,
-            type: Literal["colmap", "colmap_joint", "colmap_block", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
+            type: Literal["colmap", "colmap_joint", "colmap_block", "estimated_depth_colmap_block", "blender", "nsvf", "nerfies", "matrixcity", "phototourism"] = None,
             distributed: bool = False,
             undistort_image: bool = False,
             val_on_train: bool = False,
@@ -300,6 +304,8 @@ class DataModule(LightningDataModule):
             dataparser = ColmapJointDataParser(params=self.hparams["params"].colmap_joint, **dataparser_params)
         elif self.hparams["type"] == "colmap_block":
             dataparser = ColmapBlockDataParser(params=self.hparams["params"].colmap_block, **dataparser_params)
+        elif self.hparams["type"] == "estimated_depth_colmap_block":
+            dataparser = EstimatedDepthColmapDataParser(params=self.hparams["params"].estimated_depth_colmap_block, **dataparser_params)
         elif self.hparams["type"] == "blender":
             dataparser = BlenderDataParser(params=self.hparams["params"].blender, **dataparser_params)
         elif self.hparams["type"] == "nsvf":

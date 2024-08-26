@@ -20,6 +20,7 @@ from internal.utils.common import parse_cfg_yaml
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
 from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 import open3d as o3d
@@ -58,12 +59,20 @@ if __name__ == "__main__":
     with open(config_path, 'r') as f:
         config = parse_cfg_yaml(yaml.load(f, Loader=yaml.FullLoader))
     
-    dataparser_outputs = ColmapBlockDataParser(
-        os.path.expanduser(config.data.path),
-        os.path.abspath(""),
-        global_rank=0,
-        params=config.data.params.colmap_block,
-    ).get_outputs()
+    if config.data.type == "estimated_depth_colmap_block":
+        dataparser_outputs = EstimatedDepthColmapDataParser(
+            os.path.expanduser(config.data.path),
+            os.path.abspath(""),
+            global_rank=0,
+            params=config.data.params.estimated_depth_colmap_block,
+        ).get_outputs()
+    else:
+        dataparser_outputs = ColmapBlockDataParser(
+            os.path.expanduser(config.data.path),
+            os.path.abspath(""),
+            global_rank=0,
+            params=config.data.params.colmap_block,
+        ).get_outputs()
     
     mesh_dir = os.path.join(args.model_path, 'mesh', load_from.split('/')[-1].split('.')[0])
     gaussExtractor = GaussianExtractor(gaussians, renderer, bg_color=config.model.background_color)

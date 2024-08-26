@@ -14,6 +14,7 @@ from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.utils.mesh_utils import focus_point_fn
 from internal.utils.general_utils import parse
 from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
+from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
 from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 from internal.models.simplified_gaussian_model_manager import SimplifiedGaussianModelManager
 
@@ -35,14 +36,20 @@ def block_merging(coarse_model,
             coarse_config_path = os.path.join(ckpt_path.split('checkpoints')[0], "config.yaml")
             with open(coarse_config_path, 'r') as f:
                 coarse_config = parse(yaml.load(f, Loader=yaml.FullLoader))
-
-            # TODO: support other data parser
-            dataset = ColmapBlockDataParser(
-                os.path.expanduser(coarse_config.data.path),
-                os.path.abspath(""),
-                global_rank=0,
-                params=coarse_config.data.params.colmap_block,
-            ).get_outputs().train_set
+            if coarse_config.data.type == "estimated_depth_colmap_block":
+                dataset = EstimatedDepthColmapDataParser(
+                    os.path.expanduser(coarse_config.data.path),
+                    os.path.abspath(""),
+                    global_rank=0,
+                    params=coarse_config.data.params.estimated_depth_colmap_block,
+                ).get_outputs().train_set
+            else:
+                dataset = ColmapBlockDataParser(
+                    os.path.expanduser(coarse_config.data.path),
+                    os.path.abspath(""),
+                    global_rank=0,
+                    params=coarse_config.data.params.colmap_block,
+                ).get_outputs().train_set
 
             torch.cuda.empty_cache()
             c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in dataset.cameras])
@@ -142,9 +149,13 @@ if __name__ == "__main__":
     with open(args.config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
         config.name = os.path.basename(args.config_path).split(".")[0]
-        args.block_dim = config.data.params.colmap_block.block_dim if args.block_dim is None else args.block_dim
-        if args.aabb is None and hasattr(config.data.params.colmap_block, "aabb"):
-            args.aabb = config.data.params.colmap_block.aabb
+        if config.data.type == "estimated_depth_colmap_block":
+            params = config.data.params.estimated_depth_colmap_block
+        else:
+            params = config.data.params.colmap_block
+        args.block_dim = params.block_dim if args.block_dim is None else args.block_dim
+        if args.aabb is None and hasattr(params, "aabb"):
+            args.aabb = params.aabb
     
     coarse_model, renderer = GaussianModelLoader.search_and_load(
         config.model.init_from,
@@ -154,7 +165,7 @@ if __name__ == "__main__":
     flatten_gs = True if isinstance(renderer, VanillaTrimRenderer) else False
 
     txt_dict = {}
-    image_list = config.data.params.colmap_block.image_list
+    image_list = params.image_list
     for block_id in range(args.block_dim[0] * args.block_dim[1] * args.block_dim[2]):
         with open(os.path.join(image_list, f"block_{block_id}.txt"), 'r') as f:
             txt_dict[block_id] = f.readlines()
