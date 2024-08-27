@@ -71,8 +71,7 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
             depth_loss = self._get_depth_loss(gt_inverse_depth, inverse_depth) * d_reg_weight
 
         # update metrics
-        if step < pl_module.hparams["gaussian"].optimization.densify_until_iter and \
-           step > min(self.normal_regularization_from_iter, self.dist_regularization_from_iter):
+        if step < pl_module.hparams["gaussian"].optimization.densify_until_iter:
             
             metrics["loss"] = pl_module.lambda_dssim * (1. - metrics["ssim"])
             metrics["extra_loss"] = dist_loss + normal_loss + depth_loss + (1.0 - pl_module.lambda_dssim) * metrics["rgb_diff"]
