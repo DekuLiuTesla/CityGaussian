@@ -9,3 +9,5 @@
 !deform_model.py
 !vanilla_deform_model.py
 !swag_model.py
+!flatten_gaussian_model.py
+!vast_model.py
