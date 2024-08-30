@@ -146,7 +146,7 @@ def block_filtering(gaussians,
                     checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"] = max_radii2D[block_output_mask].clone()
                     checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"] = xyz_gradient_accum[block_output_mask].clone()
                     checkpoint["gaussian_model_extra_state_dict"]["denom"] = denom[block_output_mask].clone()
-                    torch.save(checkpoint, ckpt_path.replace(".ckpt", f"_block_{block_id}.ckpt"))
+                    # torch.save(checkpoint, ckpt_path.replace(".ckpt", f"_block_{block_id}.ckpt"))
         
         if not quiet:
             for block_id in range(block_num):
