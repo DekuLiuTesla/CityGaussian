@@ -186,6 +186,7 @@ if __name__ == "__main__":
         else:
             save_dir = args.save_dir
         
+        ckpt_path = config.model.init_from
         if 'point_cloud' in config.model.init_from:
             args.model_path = config.model.init_from.split("/point_cloud/")[0]
         elif 'checkpoints' in config.model.init_from:
@@ -194,11 +195,7 @@ if __name__ == "__main__":
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     
-    model, renderer = GaussianModelLoader.search_and_load(
-        args.model_path,
-        sh_degree=3,
-        device="cuda",
-    )
+    model, renderer, _ = GaussianModelLoader.initialize_simplified_model_from_checkpoint(ckpt_path, device="cuda")
     print("Gaussian count: {}".format(model.get_xyz.shape[0]))
 
     if isinstance(renderer, VanillaTrimRenderer):
@@ -227,7 +224,6 @@ if __name__ == "__main__":
             params=config.data.params.colmap_block,
         ).get_outputs()
     
-    ckpt_path = GaussianModelLoader.search_load_file(args.model_path)
     
     # assert save_dir contains no files and avoid duplicated partitioning
     # assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"

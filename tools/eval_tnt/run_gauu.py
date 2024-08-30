@@ -124,6 +124,7 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
                              dTau * 20, 20)
     r = registration_unif(pcd, gt_pcd, r3.transformation, vol, 2 * dTau, 20)
     trajectory_transform = r.transformation
+    # transform_path.replace('.txt', '_traj.txt')
     
     # Histogramms and P/R/F1
     plot_stretch = 5
