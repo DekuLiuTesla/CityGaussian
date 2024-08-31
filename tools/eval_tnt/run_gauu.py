@@ -110,7 +110,7 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     # o3d.io.write_point_cloud(os.path.join(out_dir, "pcd.ply"), pcd)
     # o3d.io.write_point_cloud(os.path.join(out_dir, "gt_pcd.ply"), gt_pcd)
 
-    dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 2.5  # around 5e-4 of scene size
+    dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 1.5  # around 5e-4 of scene size
     
     # big pointclouds will be downlsampled to this number to speed up alignment
     dist_threshold = dTau
