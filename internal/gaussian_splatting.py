@@ -168,7 +168,7 @@ class GaussianSplatting(LightningModule):
             if self.hparams["init_from"] is None:
                 self.gaussian_model.create_from_pcd(
                     self.trainer.datamodule.point_cloud,
-                    deivce=self.device,
+                    device=self.device,
                 )
                 self.training = True
             else:

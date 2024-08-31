@@ -97,22 +97,22 @@ class GaussianModel(nn.Module):
         if self.active_sh_degree < self.max_sh_degree:
             self.active_sh_degree += 1
 
-    def create_from_pcd(self, pcd: BasicPointCloud, deivce):
-        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().to(deivce)
-        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().to(deivce))
-        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().to(deivce)
+    def create_from_pcd(self, pcd: BasicPointCloud, device):
+        fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().to(device)
+        fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().to(device))
+        features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().to(device)
         features[:, :3, 0] = fused_color
         features[:, 3:, 1:] = 0.0
 
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
         # the parameter device may be "cpu", so tensor must move to cuda before calling distCUDA2()
-        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001).to(deivce)
+        dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001).to(device)
         scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
-        rots = torch.zeros((fused_point_cloud.shape[0], 4), device=deivce)
+        rots = torch.zeros((fused_point_cloud.shape[0], 4), device=device)
         rots[:, 0] = 1
 
-        opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device=deivce))
+        opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device=device))
 
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
         self._features_dc = nn.Parameter(features[:, :, 0:1].transpose(1, 2).contiguous().requires_grad_(True))
@@ -121,7 +121,7 @@ class GaussianModel(nn.Module):
         self._rotation = nn.Parameter(rots.requires_grad_(True))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
 
-        features_extra = torch.zeros((fused_point_cloud.shape[0], self.extra_feature_dims), dtype=torch.float, device=deivce)
+        features_extra = torch.zeros((fused_point_cloud.shape[0], self.extra_feature_dims), dtype=torch.float, device=device)
         self._features_extra = nn.Parameter(features_extra.requires_grad_(True))
 
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=self._xyz.device)
