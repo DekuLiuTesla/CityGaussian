@@ -96,7 +96,7 @@ class Quantization():
                         top_list = [trans.clone() for _ in range(renderer.K)]
 
                 self.importance = torch.stack(top_list, dim=-1).mean(-1).cpu().numpy()
-                np.savez(os.path.join(opt.save_path, "imp_score"), self.importance)
+                
                 
             # tile = torch.quantile(contribution, self.prune_ratio)
 
@@ -218,6 +218,8 @@ class Quantization():
             xyz = self.feats_bak[:, 0:3]
             np.savez_compressed(f'{save_path}/extreme_saving/xyz.npz', xyz)  
             
+            # =========================================== save importance score ====================================
+            np.savez(os.path.join(opt.save_path, "imp_score"), self.importance)
 
         # zip everything together to get final size
         os.system(f"zip -r {save_path}/extreme_saving.zip {save_path}/extreme_saving")
