@@ -36,3 +36,7 @@ ckpt = torch.load(load_file)
 print("Converting...")
 model = Gaussian.load_from_state_dict(ckpt["hyper_parameters"]["gaussian"].sh_degree, ckpt["state_dict"]).to_ply_format().save_to_ply(args.output, args.colored)
 print(f"Saved to '{args.output}'")
+
+size = os.path.getsize(args.output)
+size_MB = size / 1024.0 / 1024.0
+print("Size = {:.2f} MB".format(size_MB))

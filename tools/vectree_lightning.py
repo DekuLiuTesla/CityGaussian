@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument("--save_path", type=str, default=None)  
     parser.add_argument("--no_load_data", action='store_true')
     parser.add_argument("--no_save_ply", action='store_true')
+    parser.add_argument("--skip_quantize", action='store_true')
     parser.add_argument("--sh_degree", type=int, default=3)
 
     parser.add_argument("--iteration_num", type=float, default=1000)
@@ -96,6 +97,7 @@ class Quantization():
 
                 self.importance = torch.stack(top_list, dim=-1).mean(-1).cpu().numpy()
                 np.savez(os.path.join(opt.save_path, "imp_score"), self.importance)
+                
             # tile = torch.quantile(contribution, self.prune_ratio)
 
         model = model.to_ply_structure()
@@ -295,7 +297,8 @@ if __name__=='__main__':
     device = torch.device('cuda')
     vq = Quantization(opt)
 
-    # vq.quantize()
+    if not opt.skip_quantize:
+        vq.quantize()
     vq.dequantize()
     
     print("All done!")
