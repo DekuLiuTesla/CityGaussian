@@ -106,10 +106,6 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     pcd.transform(np.linalg.inv(coord_transform))
     gt_pcd.transform(np.linalg.inv(coord_transform))
 
-    # save pcd and gt_pcd
-    # o3d.io.write_point_cloud(os.path.join(out_dir, "pcd.ply"), pcd)
-    # o3d.io.write_point_cloud(os.path.join(out_dir, "gt_pcd.ply"), gt_pcd)
-
     dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 1.5  # around 5e-4 of scene size
     
     # big pointclouds will be downlsampled to this number to speed up alignment
@@ -126,6 +122,10 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     trajectory_transform = r.transformation
     # transform_path.replace('.txt', '_traj.txt')
     
+    # save pcd and gt_pcd
+    # o3d.io.write_point_cloud(os.path.join(out_dir, "pcd.ply"), pcd.transform(trajectory_transform))
+    # o3d.io.write_point_cloud(os.path.join(out_dir, "gt_pcd.ply"), gt_pcd)
+
     # Histogramms and P/R/F1
     plot_stretch = 5
     [
