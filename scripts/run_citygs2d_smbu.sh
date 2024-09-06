@@ -6,13 +6,13 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_lfls_coarse_lnorm4_wo_vast_sep_depth_init_5_sh2
-NAME=citygs2d_lfls_lnorm4_wo_vast_sep_depth_trim_sh2
-DATA_PATH=data/GauU_Scene/LFLS
-max_block_id=7
+COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_depth_init_5
+NAME=citygs2d_smbu_lnorm4_wo_vast_sep_depth_trim
+DATA_PATH=data/GauU_Scene/SMBU
+max_block_id=8
 
 # ============================================= downsample images =============================================
-# python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
+# python utils/image_downsample.py data/GauU_Scene/SMBU/images --factor 3.4175
 
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
@@ -35,9 +35,9 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene LFLS_ds_35 \
-                                    --dataset-dir data/GauU_Scene/LFLS \
-                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
+                                    --scene SMBU_ds_35 \
+                                    --dataset-dir data/GauU_Scene/SMBU \
+                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
                                     --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
@@ -78,7 +78,7 @@ for num in $(seq 0 $max_block_id); do
 done
 wait
 
-# merge blocks
+merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$NAME.yaml \
@@ -101,15 +101,15 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
                                     --config_path outputs/$COARSE_NAME/config.yaml \
                                     --voxel_size 0.01 \
                                     --sdf_trunc 0.04 \
-                                    --depth_trunc 7.5
+                                    --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene LFLS_ds_35 \
-                                    --dataset-dir data/GauU_Scene/LFLS \
-                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
-                                    --ply-path "outputs/$NAME/mesh/epoch=32-step=30000/fuse_post.ply"
+                                    --scene SMBU_ds_35 \
+                                    --dataset-dir data/GauU_Scene/SMBU \
+                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
+                                    --ply-path "outputs/$NAME/mesh/epoch=60-step=30000/fuse_post.ply"
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do
