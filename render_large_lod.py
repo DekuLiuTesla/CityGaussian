@@ -25,6 +25,7 @@ from utils.general_utils import safe_state
 from argparse import ArgumentParser
 from arguments import ModelParams, PipelineParams
 from scene.gaussian_model import GatheredGaussian, BlockedGaussian
+from utils.large_utils import contract_to_unisphere, get_default_aabb
 from utils.camera_utils import loadCam
 from utils.general_utils import parse_cfg
 
@@ -97,6 +98,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             lp.model_path = dataset.lod_configs[i]
             lod_gs, scene = load_gaussians(lp, iteration, load_vq)
             print(f"Init LoD {len(dataset.lod_configs)-i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
+            if lp.aabb is None:
+                lp.aabb = get_default_aabb(lp, scene.getTrainCameras(), lod_gs.get_xyz, scale=1.0)
             lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         dataset.model_path = org_model_path
