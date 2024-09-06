@@ -37,6 +37,7 @@ if __name__ == "__main__":
     parser.add_argument("--sdf_trunc", default=-1.0, type=float, help='Mesh: truncation value for TSDF')
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
+    parser.add_argument("--use_trim_renderer", action="store_true", help='Mesh: whether to use trim renderer, suitable for original 3DGS')
     parser.add_argument('--mesh_name', type=str, default="fuse", help='Mesh: name of output mesh')
     parser.add_argument("--mesh_res", default=1024, type=int, help='Mesh: resolution for unbounded mesh extraction')
     args = parser.parse_args(sys.argv[1:])
@@ -50,6 +51,9 @@ if __name__ == "__main__":
 
     if isinstance(renderer, VanillaTrimRenderer):
         gaussians._scaling = torch.cat((torch.ones_like(gaussians._scaling[:, :1]) * 1e-8, gaussians._scaling[:, [-2, -1]]), dim=1)
+
+    if args.use_trim_renderer and not isinstance(renderer, VanillaTrimRenderer):
+        renderer = VanillaTrimRenderer(renderer.compute_cov3D_python, renderer.convert_SHs_python)
 
     if args.config_path is None:
         config_path = os.path.join(args.model_path, "config.yaml")
