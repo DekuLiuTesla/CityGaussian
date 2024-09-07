@@ -6,14 +6,12 @@ get_available_gpu() {
   '
 }
 
-SCENE=SMBU
-COARSE_NAME=citygs_smbu_coarse
-NAME=citygs_smbu
-DATA_PATH=data/GauU_Scene/$SCENE
+COARSE_NAME=citygs_upper_coarse
+NAME=citygs_upper
 max_block_id=8
 
 # downsample images
-# python utils/image_downsample.py data/GauU_Scene/SMBU/images --factor 3.4175
+# python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
 
 # train and eval coarse model
 gpu_id=$(get_available_gpu)
@@ -36,10 +34,10 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene SMBU_ds_35 \
-                                    --dataset-dir data/GauU_Scene/SMBU \
-                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
+                                    --scene LFLS_ds_35 \
+                                    --dataset-dir data/GauU_Scene/LFLS \
+                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
+                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -93,9 +91,9 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene SMBU_ds_35 \
-                                    --dataset-dir data/GauU_Scene/SMBU \
-                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
+                                    --scene LFLS_ds_35 \
+                                    --dataset-dir data/GauU_Scene/LFLS \
+                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
                                     --ply-path "outputs/$NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
