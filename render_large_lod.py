@@ -100,6 +100,8 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             print(f"Init LoD {len(dataset.lod_configs)-i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
             if lp.aabb is None:
                 lp.aabb = get_default_aabb(lp, scene.getTrainCameras(), lod_gs.get_xyz, scale=1.0)
+                aabb_list = [round(x, 2) for x in lp.aabb.data.cpu().numpy().tolist()]
+                print(f"Use default AABB of {aabb_list}")
             lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         dataset.model_path = org_model_path
