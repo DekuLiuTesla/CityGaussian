@@ -38,7 +38,7 @@ def load_gaussians(lp, iteration=30_000, load_vq=False, device='cuda'):
         scene = LargeScene(lp, gaussians, load_iteration=iteration, load_vq=load_vq, shuffle=False)
     return gaussians, scene
 
-def render_set(model_path, name, iteration, views, model, max_sh_degree, pipeline, background):
+def render_set(lp, model_path, name, iteration, views, model, max_sh_degree, pipeline, background):
     avg_render_time = 0
     max_render_time = 0
     avg_memory = 0
@@ -88,6 +88,11 @@ def render_set(model_path, name, iteration, views, model, max_sh_degree, pipelin
 def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParams, load_vq : bool, skip_train : bool, skip_test : bool, custom_test : bool):
 
     with torch.no_grad():
+        if dataset.aabb is None:
+            import numpy as np
+            dataset.aabb = np.load(os.path.join(dataset.source_path, "data_partitions", f"{dataset.partition_name}_aabb.npy")).tolist()
+            print(f"Use default AABB of {[round(x, 2) for x in dataset.aabb]}")
+
         if custom_test:
             dataset.source_path = custom_test
             filename = os.path.basename(dataset.source_path)
@@ -95,14 +100,10 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         lod_gs_list = []
         org_model_path = dataset.model_path
         for i in range(len(dataset.lod_configs)):
-            lp.model_path = dataset.lod_configs[i]
-            lod_gs, scene = load_gaussians(lp, iteration, load_vq)
-            print(f"Init LoD {len(dataset.lod_configs)-i} with {lod_gs.get_xyz.shape[0]} points from {lp.model_path}")
-            if lp.aabb is None:
-                lp.aabb = get_default_aabb(lp, scene.getTrainCameras(), lod_gs.get_xyz, scale=1.0)
-                aabb_list = [round(x, 2) for x in lp.aabb.data.cpu().numpy().tolist()]
-                print(f"Use default AABB of {aabb_list}")
-            lod_gs = BlockedGaussian(lod_gs, lp, compute_cov3D_python=pp.compute_cov3D_python)
+            dataset.model_path = dataset.lod_configs[i]
+            lod_gs, scene = load_gaussians(dataset, iteration, load_vq)
+            print(f"Init LoD {len(dataset.lod_configs)-i} with {lod_gs.get_xyz.shape[0]} points from {dataset.model_path}")
+            lod_gs = BlockedGaussian(lod_gs, dataset, compute_cov3D_python=pp.compute_cov3D_python)
             lod_gs_list.append(lod_gs)
         dataset.model_path = org_model_path
         
@@ -115,7 +116,7 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
         
         if custom_test:
             views = train_cams + test_cams
-            render_set(dataset.model_path, filename, loaded_iter, views, lod_gs_list, max_sh_degree, pipeline, background)
+            render_set(dataset, dataset.model_path, filename, loaded_iter, views, lod_gs_list, max_sh_degree, pipeline, background)
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
