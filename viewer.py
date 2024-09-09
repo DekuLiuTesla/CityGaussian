@@ -262,6 +262,10 @@ class Viewer:
                 config_name = os.path.splitext(os.path.basename(load_from))[0]
                 lp, op, pp = parse_cfg(cfg, None)
                 lp.model_path = os.path.join("output/", config_name) if lp.model_path == '' else lp.model_path
+                if lp.aabb is None:
+                    lp.aabb = np.load(os.path.join(lp.source_path, "data_partitions", f"{lp.partition_name}_aabb.npy")).tolist()
+                    print(f"Use default AABB of {[round(x, 2) for x in lp.aabb]}")
+
                 training_output_base_dir = lp.model_path
                 self.sh_degree = lp.sh_degree
                 
