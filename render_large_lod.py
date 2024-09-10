@@ -120,10 +120,10 @@ def render_sets(dataset : ModelParams, iteration : int, pipeline : PipelineParam
             print("Skip both train and test, render all views")
         else:
             if not skip_train:
-                render_set(dataset.model_path, "train", loaded_iter, train_cams, lod_gs_list, max_sh_degree, pipeline, background)
+                render_set(dataset, dataset.model_path, "train", loaded_iter, train_cams, lod_gs_list, max_sh_degree, pipeline, background)
 
             if not skip_test:
-                render_set(dataset.model_path, "test", loaded_iter, test_cams, lod_gs_list, max_sh_degree, pipeline, background)
+                render_set(dataset, dataset.model_path, "test", loaded_iter, test_cams, lod_gs_list, max_sh_degree, pipeline, background)
 
 
 if __name__ == "__main__":
