@@ -109,6 +109,8 @@ class GaussianModel(nn.Module):
         # the parameter device may be "cpu", so tensor must move to cuda before calling distCUDA2()
         dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001).to(device)
         scales = torch.log(torch.sqrt(dist2))[..., None].repeat(1, 3)
+        if self.apply_2dgs:
+            scales[:, -1] = torch.log(torch.ones_like(scales[:, -1]) * 1e-8)
         rots = torch.zeros((fused_point_cloud.shape[0], 4), device=device)
         rots[:, 0] = 1
 
@@ -288,6 +290,8 @@ class GaussianModel(nn.Module):
         scales = gaussians.scales
         rots = gaussians.rotations
         features_extra = gaussians.real_features_extra
+        if self.apply_2dgs:
+            scales[:, -1] = torch.log(torch.ones_like(scales[:, -1]) * 1e-8)
 
         self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device=device).requires_grad_(True))
         self._features_dc = nn.Parameter(
@@ -313,6 +317,8 @@ class GaussianModel(nn.Module):
         scales = gaussians.scales
         rots = gaussians.rotations
         features_extra = gaussians.real_features_extra
+        if self.apply_2dgs:
+            scales[:, -1] = torch.log(torch.ones_like(scales[:, -1]) * 1e-8)
 
         self._xyz = nn.Parameter(torch.tensor(xyz, dtype=torch.float, device=device).requires_grad_(True))
         self._features_dc = nn.Parameter(
