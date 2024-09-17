@@ -447,8 +447,10 @@ class GaussianModel(nn.Module):
             # stop densifying points that are too elongated for stability
             axis_ratio = self.get_scaling[..., :2].min(dim=1).values / self.get_scaling[..., :2].max(dim=1).values
             selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > axis_ratio_threshold)
-
-        stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
+            stds = self.get_scaling[selected_pts_mask, :2].repeat(N,1)
+            stds = torch.cat([stds, 0 * torch.ones_like(stds[:,:1])], dim=-1)
+        else:
+            stds = self.get_scaling[selected_pts_mask].repeat(N, 1)
         means = torch.zeros((stds.size(0), 3), device=self._xyz.device)
         samples = torch.normal(mean=means, std=stds)
         rots = build_rotation(self._rotation[selected_pts_mask]).repeat(N, 1, 1)
