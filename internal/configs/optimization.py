@@ -25,6 +25,7 @@ class OptimizationParams:
     densify_from_iter: int = 500
     densify_until_iter: int = 15_000
     densify_grad_threshold: float = 0.0002
+    densify_grad_scaler: float = 0.9
 
     cull_opacity_threshold: float = 0.005
     """threshold of opacity for culling gaussians."""
