@@ -35,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--voxel_size", default=-1.0, type=float, help='Mesh: voxel size for TSDF')
     parser.add_argument("--depth_trunc", default=-1.0, type=float, help='Mesh: Max depth range for TSDF')
     parser.add_argument("--sdf_trunc", default=-1.0, type=float, help='Mesh: truncation value for TSDF')
+    parser.add_argument("--sh_degree", default=3, type=int, help='Mesh: SH degree')
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
     parser.add_argument("--use_trim_renderer", action="store_true", help='Mesh: whether to use trim renderer, suitable for original 3DGS')
@@ -45,7 +46,7 @@ if __name__ == "__main__":
 
     gaussians, renderer = GaussianModelLoader.search_and_load(
         args.model_path,
-        sh_degree=3,
+        sh_degree=args.sh_degree,
         device="cuda",
     )
 
