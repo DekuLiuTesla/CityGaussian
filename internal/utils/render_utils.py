@@ -212,6 +212,35 @@ def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percenti
 
   return traj
 
+def record_path(viewpoint_cameras, traj_dir=None):
+  c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
+  pose = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
+  pose_recenter, colmap_to_world_transform = transform_poses_pca(pose)
+
+  new_poses = np.linalg.inv(colmap_to_world_transform) @ pad_poses(pose_recenter)
+
+  traj = []
+  for idx, c2w in enumerate(tqdm(new_poses, desc="Generating trajectory")):
+      c2w = c2w @ np.diag([1, -1, -1, 1])
+      cam = copy.deepcopy(viewpoint_cameras[0]).to_device("cuda")
+      cam.height = int(cam.height / 2) * 2
+      cam.width = int(cam.width / 2) * 2
+      cam.world_to_camera = torch.from_numpy(np.linalg.inv(c2w).T).float().cuda()
+      cam.full_proj_transform = (cam.world_to_camera.unsqueeze(0).bmm(cam.projection.unsqueeze(0))).squeeze(0)
+      cam.camera_center = cam.world_to_camera.inverse()[3, :3]
+      traj.append(cam)
+      if traj_dir is not None:
+          # save as pickle with name like 00000.pkl
+          with open(os.path.join(traj_dir, f"{str(idx).zfill(5)}.pkl"), "wb") as f:
+              pickle.dump({
+                  "world_view_transform": cam.world_to_camera.cpu().numpy(),
+                  "image_height": cam.height,
+                  "image_width": cam.width,
+                  "FoVx": cam.fov_x.item(),
+              }, f)
+
+  return traj
+
 def load_img(pth: str) -> np.ndarray:
   """Load an image and cast to float32."""
   with open(pth, 'rb') as f:
