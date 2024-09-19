@@ -1,0 +1,14 @@
+exclude: '^$'
+repos:
+  - repo: local
+    hooks:
+      - id: isort
+        entry: isort --profile black
+        name: isort (python)
+        language: system
+        types: [python]
+      - id: black
+        entry: black --line-length 120
+        name: black
+        language: system
+        types: [python]
