@@ -85,7 +85,7 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     import trimesh
     mesh = trimesh.load_mesh(ply_path)
     # add center points
-    sampled_vertices = mesh.vertices[mesh.faces].mean(axis=1)
+    # sampled_vertices = mesh.vertices[mesh.faces].mean(axis=1)
     # add 4 points based on the face vertices
     # face_vertices = mesh.vertices[mesh.faces]# .mean(axis=1)
     # weights = np.array([[3, 3, 3],
@@ -94,7 +94,8 @@ def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_c
     #                     [1, 4, 4]],dtype=np.float32) / 9.0
     # sampled_vertices = np.sum(face_vertices.reshape(-1, 1, 3, 3) * weights.reshape(1, 4, 3, 1), axis=2).reshape(-1, 3)
     
-    vertices = np.concatenate([mesh.vertices, sampled_vertices], axis=0)
+    # vertices = np.concatenate([mesh.vertices, sampled_vertices], axis=0)
+    vertices = trimesh.sample.sample_surface_even(mesh, mesh.vertices.shape[0]+mesh.faces.shape[0])[0]
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(vertices)
     ### end add center points
