@@ -18,6 +18,9 @@ from functools import partial
 from skimage import measure
 import open3d as o3d
 import trimesh
+from tetranerf.utils.extension import cpp
+from internal.utils.tetmesh_utils import marching_tetrahedra
+from internal.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
 
 def focus_point_fn(poses: np.ndarray) -> np.ndarray:
     """Calculate nearest point to all focal axes in poses."""
@@ -356,3 +359,164 @@ class GaussianExtractor(object):
         _, rgbs = compute_unbounded_tsdf(torch.tensor(np.asarray(mesh.vertices)).float().cuda(), inv_contraction=None, voxel_size=voxel_size, return_rgb=True)
         mesh.vertex_colors = o3d.utility.Vector3dVector(rgbs.cpu().numpy())
         return mesh
+
+    @torch.no_grad()
+    def get_tetra_points(self, downsample_factor=1):
+        M = trimesh.creation.box()
+        M.vertices *= 2
+        
+        rots = build_rotation(self.gaussians._rotation)
+        xyz = self.gaussians.get_xyz
+        scale = self.gaussians.get_scaling * 3. # TODO test
+        # filter points with small opacity for bicycle scene
+        # opacity = self.get_opacity_with_3D_filter
+        # mask = (opacity > 0.1).squeeze(-1)
+        # xyz = xyz[mask]
+        # scale = scale[mask]
+        # rots = rots[mask]
+        
+        vertices = M.vertices.T    
+        vertices = torch.from_numpy(vertices).float().cuda().unsqueeze(0).repeat(xyz.shape[0], 1, 1)
+        # scale vertices first
+        vertices = vertices * scale.unsqueeze(-1)
+        vertices = torch.bmm(rots, vertices).squeeze(-1) + xyz.unsqueeze(-1)
+        vertices = vertices.permute(0, 2, 1).reshape(-1, 3).contiguous()
+        # concat center points
+        vertices = torch.cat([vertices, xyz], dim=0)
+        
+        # scale is not a good solution but use it for now
+        scale = scale.max(dim=-1, keepdim=True)[0]
+        scale_corner = scale.repeat(1, 8).reshape(-1, 1)
+        vertices_scale = torch.cat([scale_corner, scale], dim=0)
+        
+        return vertices[::downsample_factor], vertices_scale[::downsample_factor]
+
+    @torch.no_grad()
+    def extract_tetrahedra_mesh_unbounded(self, mesh_dir, ds_factor=1, resolution=1024):
+        """
+        Experimental features, extracting meshes from unbounded scenes, not fully test across datasets. 
+        return o3d.mesh
+        """
+        def contract(x):
+            mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
+            return torch.where(mag < 1, x, (2 - (1 / mag)) * (x / mag))
+        
+        def uncontract(y):
+            mag = torch.linalg.norm(y, ord=2, dim=-1)[..., None]
+            return torch.where(mag < 1, y, (1 / (2-mag) * (y/mag)))
+
+        def compute_sdf_perframe(i, points, depthmap, rgbmap, viewpoint_cam):
+            """
+                compute per frame sdf
+            """
+            new_points = torch.cat([points, torch.ones_like(points[...,:1])], dim=-1) @ viewpoint_cam.full_projection
+            z = new_points[..., -1:]
+            pix_coords = (new_points[..., :2] / new_points[..., -1:])
+            mask_proj = ((pix_coords > -1. ) & (pix_coords < 1.) & (z > 0)).all(dim=-1)
+            sampled_depth = torch.nn.functional.grid_sample(depthmap.cuda()[None], pix_coords[None, None], mode='bilinear', padding_mode='border', align_corners=True).reshape(-1, 1)
+            sampled_rgb = torch.nn.functional.grid_sample(rgbmap.cuda()[None], pix_coords[None, None], mode='bilinear', padding_mode='border', align_corners=True).reshape(3,-1).T
+            sdf = (sampled_depth-z)
+            return sdf, sampled_rgb, mask_proj
+
+        def compute_unbounded_tsdf(samples, inv_contraction, voxel_size, return_rgb=False):
+            """
+                Fusion all frames, perform adaptive sdf_funcation on the contract spaces.
+            """
+            if inv_contraction is not None:
+                mask = torch.linalg.norm(samples, dim=-1) > 1
+                # adaptive sdf_truncation
+                sdf_trunc = 10 * voxel_size * torch.ones_like(samples[:, 0])
+                sdf_trunc[mask] *= 1/(2-torch.linalg.norm(samples, dim=-1)[mask].clamp(max=1.9))
+                samples = inv_contraction(samples)
+            else:
+                sdf_trunc = 10 * voxel_size
+
+            tsdfs = torch.ones_like(samples[:,0]) *+ 1
+            rgbs = torch.zeros((samples.shape[0], 3)).cuda()
+
+            weights = torch.ones_like(samples[:,0])
+            for i, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="TSDF integration progress"):
+                sdf, rgb, mask_proj = compute_sdf_perframe(i, samples,
+                    depthmap = self.depthmaps[i],
+                    rgbmap = self.rgbmaps[i],
+                    viewpoint_cam=viewpoint_cam.to_device("cuda"),
+                )
+
+                # volume integration with Cumulative Moving Average
+                sdf = sdf.flatten()
+                mask_proj = mask_proj & (sdf > -sdf_trunc)
+                sdf = torch.clamp(sdf / sdf_trunc, min=-1.0, max=1.0)[mask_proj]
+                w = weights[mask_proj]
+                wp = w + 1
+                tsdfs[mask_proj] = (tsdfs[mask_proj] * w + sdf) / wp
+                rgbs[mask_proj] = (rgbs[mask_proj] * w[:,None] + rgb[mask_proj]) / wp[:,None]
+                # update weight
+                weights[mask_proj] = wp
+            
+            if return_rgb:
+                return tsdfs, rgbs
+
+            return tsdfs
+
+        N = resolution
+        voxel_size = (self.radius * 2 / N)
+        print(f"Computing sdf gird resolution {N} x {N} x {N}")
+        print(f"Define the voxel_size as {voxel_size}")
+        sdf_function = lambda x: compute_unbounded_tsdf(x, None, voxel_size, return_rgb=True)
+
+        points, points_scale = self.get_tetra_points(ds_factor)
+
+        #  load cell if exists
+        if os.path.exists(os.path.join(mesh_dir, "cells.pt")):
+            print("load existing cells")
+            cells = torch.load(os.path.join(mesh_dir, "cells.pt"))
+        else:
+            # create cell and save cells
+            print("create cells and save")
+            cells = cpp.triangulate(points)
+            # we should filter the cell if it is larger than the gaussians
+            torch.save(cells, os.path.join(mesh_dir, "cells.pt"))
+
+        vertices = points.cuda()[None]
+        tets = cells.cuda().long()
+        points_sdf, _ = sdf_function(points)
+        points_sdf = points_sdf.clamp(-0.5, 0.5)
+
+        print(vertices.shape, tets.shape, points_sdf.shape)
+
+        torch.cuda.empty_cache()
+        verts_list, _, faces_list, _ = marching_tetrahedra(vertices, tets, points_sdf[None], points_scale[None])
+        torch.cuda.empty_cache()
+
+        end_points, end_sdf = verts_list[0]
+        
+        faces=faces_list[0].cpu().numpy()
+        points = (end_points[:, 0, :] + end_points[:, 1, :]) / 2.
+            
+        left_points = end_points[:, 0, :]
+        right_points = end_points[:, 1, :]
+        left_sdf = end_sdf[:, 0, :]
+        right_sdf = end_sdf[:, 1, :]
+
+        n_binary_steps = 8
+        for step in range(n_binary_steps):
+            print("binary search in step {}".format(step))
+            mid_points = (left_points + right_points) / 2
+            mid_sdf, color = sdf_function(mid_points)
+            mid_sdf = mid_sdf.clamp(-0.5, 0.5)
+            mid_sdf = mid_sdf.squeeze().unsqueeze(-1)
+            
+            ind_low = ((mid_sdf < 0) & (left_sdf < 0)) | ((mid_sdf > 0) & (left_sdf > 0))
+
+            left_sdf[ind_low] = mid_sdf[ind_low]
+            right_sdf[~ind_low] = mid_sdf[~ind_low]
+            left_points[ind_low.flatten()] = mid_points[ind_low.flatten()]
+            right_points[~ind_low.flatten()] = mid_points[~ind_low.flatten()]
+        
+            points = (left_points + right_points) / 2
+            if step not in [7]:
+                continue
+            
+            vertex_colors=(color.cpu().numpy() * 255).astype(np.uint8)
+            mesh = trimesh.Trimesh(vertices=points.cpu().numpy(), faces=faces, vertex_colors=vertex_colors, process=False)
+        return mesh.as_open3d

@@ -38,6 +38,8 @@ if __name__ == "__main__":
     parser.add_argument("--sh_degree", default=3, type=int, help='Mesh: SH degree')
     parser.add_argument("--num_cluster", default=50, type=int, help='Mesh: number of connected clusters to export')
     parser.add_argument("--unbounded", action="store_true", help='Mesh: using unbounded mode for meshing')
+    parser.add_argument("--tetrahedra", action="store_true", help='Mesh: whether use tetrahedra marching for unbounded scene')
+    parser.add_argument("--downsample_factor", default=1, type=int, help='Mesh: downsample factor for tetrahedra marching')
     parser.add_argument("--use_trim_renderer", action="store_true", help='Mesh: whether to use trim renderer, suitable for original 3DGS')
     parser.add_argument('--mesh_name', type=str, default="fuse", help='Mesh: name of output mesh')
     parser.add_argument("--mesh_res", default=1024, type=int, help='Mesh: resolution for unbounded mesh extraction')
@@ -91,7 +93,10 @@ if __name__ == "__main__":
         # extract the mesh and save
         if args.unbounded:
             name = args.mesh_name + '_unbounded.ply'
-            mesh = gaussExtractor.extract_mesh_unbounded(resolution=args.mesh_res)
+            if args.tetrahedra:
+                mesh = gaussExtractor.extract_tetrahedra_mesh_unbounded(mesh_dir, ds_factor=args.downsample_factor, resolution=args.mesh_res)
+            else:
+                mesh = gaussExtractor.extract_mesh_unbounded(resolution=args.mesh_res)
         else:
             name = args.mesh_name + '.ply'
             depth_trunc = (gaussExtractor.radius * 2.0) if args.depth_trunc < 0  else args.depth_trunc
