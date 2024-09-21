@@ -18,7 +18,6 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--config_path', type=str, help='path of config', default=None)
-    parser.add_argument('--mesh_path', type=str, help='path of reconstructed mesh')
     parser.add_argument('--data_path', type=str, help='path of data', default=None)
     parser.add_argument("--n_fames", type=int, help="number of frames", default=240)
     parser.add_argument("--scale_percentile", type=int, help="trajectory radius percentile", default=99)
@@ -57,11 +56,13 @@ if __name__ == "__main__":
     else:
         cameras = dataparser_outputs.test_set.cameras
     
-    traj_dir = os.path.join(args.mesh_path, 'traj')
-    os.makedirs(traj_dir, exist_ok=True)
+    traj_dir = os.path.join(config.data.path, 'traj')
     if args.ellipse:
+        traj_dir = traj_dir + '_ellipse'
+        os.makedirs(traj_dir, exist_ok=True)
         cam_traj = generate_path(cameras, traj_dir, n_frames=args.n_fames, scale_percentile=args.scale_percentile)
     else:
+        os.makedirs(traj_dir, exist_ok=True)
         cam_traj = record_path(cameras, traj_dir)
 
     print(f"Camera trajectory saved to {traj_dir}")
