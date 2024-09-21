@@ -78,34 +78,23 @@ def block_merging(coarse_model,
 
             try:
                 block_path = os.path.join(output_path, "blocks", "block_{}".format(block_id))
+                model_path = GaussianModelLoader.search_load_file(block_path)
                 model, _ = GaussianModelLoader.search_and_load(
                     block_path,
                     sh_degree=3,
                     device="cuda",
                 )
             except:
-                if -corr_matrix[block_id, block_id] < 50:
-                    correlated_block = trained_block_idx[torch.argmax(corr_matrix[block_id, trained_block_mask])]
-                    if corr_matrix[block_id, correlated_block] > 0:
-                        print(f"Block {block_id} has no enough training data. Merging from block {correlated_block}")
-                        block_path = os.path.join(output_path, "blocks", "block_{}".format(correlated_block))
-                        model, _ = GaussianModelLoader.search_and_load(
-                            block_path,
-                            sh_degree=3,
-                            device="cuda",
-                        )
-                    else:
-                        print(f"Block {block_id} not trained. Using coarse Global Model")
-                        model = copy.deepcopy(coarse_model)
-                else:
-                    raise FileNotFoundError
+                print(f"Block {block_id} not trained. Using coarse Global Model")
+                model_path = ckpt_path
+                model = copy.deepcopy(coarse_model)
             xyz_block = contract_to_unisphere(model.get_xyz, aabb, ord=torch.inf)
             mask_preserved = (xyz_block[:, 0] >= min_x) & (xyz_block[:, 0] < max_x)  \
                             & (xyz_block[:, 1] >= min_y) & (xyz_block[:, 1] < max_y) \
                             & (xyz_block[:, 2] >= min_z) & (xyz_block[:, 2] < max_z)
             model.delete_gaussians(~mask_preserved)
             block_model_list.append(model)
-            print(f"Merged block {block_id} with {model.get_xyz.shape[0]} gaussians.")
+            print(f"Merged block {block_id} with {model.get_xyz.shape[0]} gaussians from {model_path}.")
 
         merged_model = SimplifiedGaussianModelManager(block_model_list, enable_transform=False, device="cuda")
         if flatten_gs:
