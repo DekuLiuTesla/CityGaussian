@@ -37,7 +37,8 @@ for i in "${!run_args[@]}"; do
                      --traj_path $traj_path \
                      --save_dir ./output/${NAME}_smbu \
                      --config_dir render_cfgs/gauu \
-                     --image_only
+                     --image_only \
+                     --write_cover
 
         break
       else

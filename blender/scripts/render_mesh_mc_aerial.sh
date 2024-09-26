@@ -6,35 +6,43 @@ get_available_gpu() {
   '
 }
 
+traj_path="/home/yang_liu/python_workspace/gaussian-splatting-lightning/data/matrix_city/aerial/test/block_all_test/traj"
 
-COARSE_NAME=citygs2d_mc_aerial_coarse_lnorm4_wo_vast_sep_depth_init_5
-NAME=citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth
+declare -a run_args=(
+    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/mc_aerial_c36/mesh/point_cloud/fuse_post.ply"
+    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_aerial_coarse_lnorm4_wo_vast_6w/mesh/epoch=11-step=60000/fuse_post.ply"
+    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth/mesh/epoch=6-step=30000/fuse_post.ply"
+    "/home/yang_liu/python_workspace/gaussian-opacity-fields/outputs/mc_aerial/test/ours_60000/fusion/mesh_binary_search_7.ply"
+)
 
+declare -a names=(
+  "mc_aerial_c36"
+  "citygs2d_mc_aerial_coarse_lnorm4_wo_vast_6w"
+  "citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth"
+  "gof_mesh_binary_search_7"
+)
 
-# python tools/generate_traj.py --config outputs/$COARSE_NAME/config.yaml \
-#                               --mesh_path "outputs/$NAME/mesh/epoch=6-step=30000" \
-#                               --data_path data/matrix_city/aerial/test/block_all_test \
-#                               --train
+for i in "${!run_args[@]}"; do
+  load_path=${run_args[$i]}
+  NAME=${names[$i]}
+  while true; do
+      gpu_id=$(get_available_gpu)
+      if [[ -n $gpu_id ]]; then
+        echo "GPU $gpu_id is available."
 
-# cd blender
-# conda activate blender34
+        CUDA_VISIBLE_DEVICES=gpu_id python render_sun.py \
+                     --load_path $load_path \
+                     --traj_path $traj_path \
+                     --save_dir ./output/${NAME}_mc_aerial \
+                     --config_dir render_cfgs/mc \
+                     --image_only
 
-# CityGSV2
-# load_dir="/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth/mesh/epoch=6-step=30000"
-# mesh_file="fuse_post.ply"
-
-# GoF
-load_dir="/home/yang_liu/python_workspace/gaussian-opacity-fields/outputs/mc_aerial/test/ours_60000/fusion"
-mesh_file="mesh_binary_search_7.ply"
-name="gof"
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-rm -rf ./output/${name}_mc_aerial
-CUDA_VISIBLE_DEVICES=3 python render_sun.py \
-                     --load_dir $load_dir \
-                     --mesh_file $mesh_file \
-                     --save_dir ./output/${name}_mc_aerial \
-                     --config_dir render_cfgs/mc
+        break
+      else
+        echo "No GPU available at the moment. Retrying in 2 minute."
+        sleep 120
+      fi
+  done
+done
 
 # cd ..

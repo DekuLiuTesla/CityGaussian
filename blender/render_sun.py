@@ -12,7 +12,8 @@ from generate_video import generate_video
 
 parser = ArgumentParser(description='bpy arg parser')
 parser.add_argument("--cuda_id", type=int, default=0)
-parser.add_argument("--load_dir", type=str, default='data/mesh_data/mesh_dtu/scan24')
+parser.add_argument("--load_path", type=str, default='data/mesh_data/mesh_dtu/scan24')
+parser.add_argument("--traj_path", type=str, default=None)
 parser.add_argument("--config_dir", type=str, default='render_cfgs/dtu')
 parser.add_argument("--mesh_file", type=str, default='mesh.ply')
 parser.add_argument("--save_dir", type=str, default='')
@@ -28,8 +29,8 @@ parser.add_argument('--fov_scale', type=float, default=1.0)
 args = parser.parse_args()
 
 if args.save_dir == '':
-    unique_str = str(uuid.uuid4())
-    args.save_dir = os.path.join("./output/", unique_str[0:10])
+    # unique_str = str(uuid.uuid4())
+    args.save_dir = os.path.join("./output/", args.load_path.split('/')[-1])
 
 # load config files
 cfg_dir = args.config_dir
@@ -37,6 +38,29 @@ with open(os.path.join(cfg_dir, "light.json")) as f1:
     light_cfg = json.load(f1)
 with open(os.path.join(cfg_dir, "background.json")) as f2:
     back_sphere_radius = json.load(f2)
+
+if args.load_path.endswith('.ply'):
+    bpy.ops.import_mesh.ply(filepath=args.load_path)
+elif args.load_path.endswith('.obj'):
+    bpy.ops.wm.obj_import(filepath=args.load_path)
+    file_name = args.load_path.split('/')[-1].split('.')[0][:63]
+    bpy.data.objects[file_name].rotation_euler[0] = 0.0
+
+    mat = bpy.data.materials.new(name='obj_material')
+    mat.use_nodes = True
+    if mat.node_tree:
+        mat.node_tree.links.clear()
+        mat.node_tree.nodes.clear()
+
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    output = nodes.new(type='ShaderNodeOutputMaterial')
+    shader = nodes.new(type='ShaderNodeBsdfPrincipled')
+    links.new(shader.outputs[0], output.inputs[0])
+
+    bpy.context.object.active_material = bpy.data.materials['obj_material']
+else:
+    assert False, 'Unsupported file format.'
 
 if args.is_texture:
     light_cfg = light_cfg['texture']
@@ -80,9 +104,6 @@ for idx, d in enumerate(bpy.context.preferences.addons["cycles"].preferences.dev
 
 bpy.data.objects.remove(bpy.data.objects['Cube'])
 
-mesh_dir = args.load_dir
-
-bpy.ops.import_mesh.ply(filepath=os.path.join(mesh_dir, args.mesh_file))
 if args.is_texture:
     texture_allocator.init_texture()
     texture_allocator.set_texture()
@@ -91,7 +112,7 @@ bpy.data.objects['Camera'].rotation_mode = 'QUATERNION'
 bpy.data.cameras['Camera'].lens_unit = 'FOV'
 bpy.data.cameras['Camera'].clip_end = args.clip_end
 
-cam_infos = readPklSceneInfo(os.path.join(args.load_dir, "traj"))
+cam_infos = readPklSceneInfo(args.traj_path)
 # render all the image
 for cam_id, cam_info in enumerate(cam_infos):
     if args.debug_mode > 0 and cam_id % args.debug_video_step != 0:

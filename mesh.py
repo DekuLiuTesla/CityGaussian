@@ -81,11 +81,14 @@ if __name__ == "__main__":
             params=config.data.params.colmap_block,
         ).get_outputs()
     
-    mesh_dir = os.path.join(args.model_path, 'mesh', load_from.split('/')[-1].split('.')[0])
+    if args.model_path.endswith('.ckpt'):
+        mesh_dir = os.path.join(args.model_path.split('/checkpoints')[0], 'mesh', load_from.split('/')[-1].split('.')[0])
+    else:
+        mesh_dir = os.path.join(args.model_path, 'mesh', load_from.split('/')[-1].split('.')[0])
     gaussExtractor = GaussianExtractor(gaussians, renderer, bg_color=config.model.background_color)
 
     if not args.skip_mesh:
-        print("export mesh ...")
+        print(f"export mesh to {mesh_dir} ...")
         os.makedirs(mesh_dir, exist_ok=True)
         # set the active_sh to 0 to export only diffuse texture
         gaussExtractor.gaussians.active_sh_degree = 0

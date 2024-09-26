@@ -1,0 +1,13 @@
+{
+"mesh": {
+    "pose": [[0, 100, 100]], 
+    "energy": [2.5], 
+    "type": ["SUN"], 
+    "scale": [1], 
+    "rotation": [[0, 0.0, 1.571]]}, 
+"texture": {
+    "pose": [[0, 100, 100]], 
+    "energy": [5], 
+    "type": ["SUN"], 
+    "scale": [1], 
+    "rotation": [[0, 0.0, 1.571]]}}
