@@ -9,7 +9,7 @@ from ..cameras import Camera
 from ..models.gaussian_model import GaussianModel
 
 from diff_surfel_rasterization import GaussianRasterizationSettings, GaussianRasterizer
-
+from internal.utils.ssim import ssim
 
 class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
     def __init__(
@@ -44,6 +44,8 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
             self._get_depth_loss = self._depth_l1_loss
         elif self.config["depth_loss_type"] == "l2":
             self._get_depth_loss = self._depth_l2_loss
+        elif self.config["depth_loss_type"] == "ssim":
+            self._get_depth_loss = self._depth_ssim_loss
         else:
             raise NotImplementedError()
 
@@ -96,3 +98,7 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
 
     def _depth_l2_loss(self, a, b):
         return ((a - b) ** 2).mean()
+
+    def _depth_ssim_loss(self, a, b):
+        from internal.utils.ssim import ssim
+        return 1. - ssim(a[None], b[None])
