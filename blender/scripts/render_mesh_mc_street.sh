@@ -11,7 +11,7 @@ traj_path="/home/yang_liu/python_workspace/gaussian-splatting-lightning/data/mat
 declare -a run_args=(
     "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/block_mc_street_block_all_lr_c36_simple_selection_lr2/mesh/point_cloud/fuse_post.ply"
     "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_street_coarse_lnorm4_wo_vast_6w/mesh/epoch=15-step=60000/fuse_post.ply"
-    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_street_1lnorm_wo_vast_sep_depth_init_5_ubd1e1_no_trim_r0/mesh/epoch=8-step=30000/fuse_post.ply"
+    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_mc_street_lnorm4_wo_vast_sep_depth_rgb_only_norm_ubd1e1_no_trim/mesh/epoch=8-step=30000/fuse_post.ply"
     "/home/yang_liu/python_workspace/gaussian-opacity-fields/outputs/mc_street/test/ours_60000/fusion/mesh_binary_search_7.ply"
     "/home/yang_liu/python_workspace/SuGaR/output/refined_mesh/block_A/sugarfine_3Dgs14000_sdfestim02_sdfnorm02_level03_decim2000000_normalconsistency01_gaussperface1.obj"
 )
@@ -19,7 +19,7 @@ declare -a run_args=(
 declare -a names=(
   "block_mc_street_block_all_lr_c36_simple_selection_lr2"
   "citygs2d_mc_street_coarse_lnorm4_wo_vast_6w"
-  "citygs2d_mc_street_1lnorm_wo_vast_sep_depth_init_5_ubd1e1_no_trim_r0"
+  "citygs2d_mc_street_lnorm4_wo_vast_sep_depth_rgb_only_norm_ubd1e1_no_trim"
   "gof_mesh_binary_search_7"
   "sugarfine_3Dgs14000_sdfestim02_sdfnorm02_level03_decim2000000_normalconsistency01_gaussperface1"
 )

@@ -5,6 +5,8 @@ import traceback
 from typing import Tuple, List, Dict, Union, Any
 from typing_extensions import Self
 
+import time
+import torch
 import torch.optim
 import torchvision
 import wandb
@@ -53,6 +55,7 @@ class GaussianSplatting(LightningModule):
             renderer: Renderer = lazy_instance(VanillaRenderer),
             absgrad: bool = False,
             flatten_3dgs: bool = False,
+            test_speed: bool = False,
             save_ply: bool = False,
             web_viewer: bool = False,
     ) -> None:
@@ -563,7 +566,16 @@ class GaussianSplatting(LightningModule):
         gt_image = image_info[1]
 
         # forward
-        outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
+        if self.hparams["test_speed"]:
+            torch.cuda.reset_peak_memory_stats()
+            torch.cuda.synchronize()
+            start = time.time()
+            outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
+            torch.cuda.synchronize()
+            end = time.time()
+            self.log(f"{name}/time", end - start, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
+        else:
+            outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
 
         self.log(f"{name}/rgb_diff", rgb_diff_loss, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
         

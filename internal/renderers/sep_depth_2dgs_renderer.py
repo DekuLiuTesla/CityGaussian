@@ -23,6 +23,7 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
             final_factor: float = 0.002,
             max_steps: int = 30_000,
             depth_loss_type: str = "l1",
+            depth_norm: bool = False,
     ):
         super().__init__(
             depth_ratio=depth_ratio,
@@ -38,7 +39,11 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
                 "max_steps": max_steps,
             },
             "depth_loss_type": depth_loss_type,
+            "depth_norm": depth_norm,
         }
+
+        if self.config["depth_norm"]:
+            print("depth normalization is enabled")
 
         if self.config["depth_loss_type"] == "l1":
             self._get_depth_loss = self._depth_l1_loss
@@ -70,9 +75,15 @@ class SepDepth2DGSRenderer(Vanilla2DGSRenderer):
         else:
             inverse_depth = 1. / (outputs["surf_depth"].clamp_min(0.).squeeze() + 1e-8)
             d_reg_weight = self.get_weight(step)
+            if self.config["depth_norm"]:
+                clamp_val = (inverse_depth.mean() + 2 * inverse_depth.std()).item()
+                inverse_depth = inverse_depth.clamp(0, clamp_val) / clamp_val
+                gt_inverse_depth = gt_inverse_depth.clamp(0, clamp_val) / clamp_val
+
             depth_loss = self._get_depth_loss(gt_inverse_depth, inverse_depth) * d_reg_weight
 
         # update metrics
+            
         if step < pl_module.hparams["gaussian"].optimization.densify_until_iter:
             
             metrics["loss"] = pl_module.lambda_dssim * (1. - metrics["ssim"])
