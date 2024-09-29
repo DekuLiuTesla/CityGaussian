@@ -302,6 +302,26 @@ class GaussianSplatting(LightningModule):
 
         return outputs, loss, rgb_diff_loss, ssim_metric
 
+    def forward_with_time_loss_calculation(self, camera, image_info):
+        image_name, gt_image, masked_pixels = image_info
+
+        # forward
+        torch.cuda.synchronize()
+        start = time.time()
+        outputs = self(camera)
+        torch.cuda.synchronize()
+        end = time.time()
+        image = outputs["render"]
+
+        # calculate loss
+        if masked_pixels is not None:
+            gt_image[masked_pixels] = image.detach()[masked_pixels]  # copy masked pixels from prediction to G.T.
+        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render"], gt_image)
+        ssim_metric = ssim(outputs["render_org"] if "render_org" in outputs else outputs["render"], gt_image)
+        loss = (1.0 - self.lambda_dssim) * rgb_diff_loss + self.lambda_dssim * (1. - ssim_metric)
+
+        return outputs, loss, rgb_diff_loss, ssim_metric, end-start
+
     def optimizers(self, use_pl_optimizer: bool = True):
         optimizers = super().optimizers(use_pl_optimizer=use_pl_optimizer)
 
@@ -567,13 +587,8 @@ class GaussianSplatting(LightningModule):
 
         # forward
         if self.hparams["test_speed"]:
-            torch.cuda.reset_peak_memory_stats()
-            torch.cuda.synchronize()
-            start = time.time()
-            outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
-            torch.cuda.synchronize()
-            end = time.time()
-            self.log(f"{name}/time", end - start, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
+            outputs, loss, rgb_diff_loss, ssim_metric, time = self.forward_with_time_loss_calculation(camera, image_info)
+            self.log(f"{name}/time(s)", time, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
         else:
             outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
 
