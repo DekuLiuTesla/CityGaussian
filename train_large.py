@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser, Namespace
 from arguments import GroupParams
 
-def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter_iterations, checkpoint_iterations, checkpoint, debug_from):
+def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter_iterations, checkpoint_iterations, checkpoint, max_cache_num, debug_from):
     first_iter = 0
     log_writer, image_logger = prepare_output_and_logger(dataset)
 
@@ -43,7 +43,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, refilter
     scene = LargeScene(dataset, gaussians)
     gs_dataset = GSDataset(scene.getTrainCameras(), scene, dataset, pipe)
     if len(gs_dataset) > 0:
-        data_loader = CacheDataLoader(gs_dataset, max_cache_num=1024, seed=42, batch_size=1, shuffle=True, num_workers=8)
+        print(f"Using maximum cache size of {max_cache_num} for {len(gs_dataset)} training images")
+        data_loader = CacheDataLoader(gs_dataset, max_cache_num=max_cache_num, seed=42, batch_size=1, shuffle=True, num_workers=8)
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -291,7 +292,8 @@ if __name__ == "__main__":
     parser.add_argument("--refilter_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
-    parser.add_argument("--start_checkpoint", type=str, default = None)
+    parser.add_argument("--start_checkpoint", type=str, default=None)
+    parser.add_argument("--max_cache_num", type=int, default=512)
     args = parser.parse_args(sys.argv[1:])
     with open(args.config) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
@@ -306,7 +308,7 @@ if __name__ == "__main__":
     # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
-    training(lp, op, pp, args.test_iterations, args.save_iterations, args.refilter_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    training(lp, op, pp, args.test_iterations, args.save_iterations, args.refilter_iterations, args.checkpoint_iterations, args.start_checkpoint, args.max_cache_num, args.debug_from)
 
     # All done
     print("\nTraining complete.")

@@ -129,7 +129,7 @@ def storePly(path, xyz, rgb):
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
 
-def readColmapSceneInfo(path, images, eval, llffhold=8, partition=None):
+def readColmapSceneInfo(path, images, eval, llffhold=None, partition=None):
     try:
         cameras_extrinsic_file = os.path.join(path, "sparse/0", "images.bin")
         cameras_intrinsic_file = os.path.join(path, "sparse/0", "cameras.bin")
@@ -156,8 +156,9 @@ def readColmapSceneInfo(path, images, eval, llffhold=8, partition=None):
     
     if eval:
         import math
-        eval_image_num = max(math.ceil(0.05 * len(cam_infos)), 1)
-        llffhold = max(len(cam_infos) // eval_image_num, llffhold)
+        if llffhold is None:
+            eval_image_num = max(math.ceil(0.05 * len(cam_infos)), 1)
+            llffhold = max(len(cam_infos) // eval_image_num, 8)
         train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
         test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
     else:

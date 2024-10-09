@@ -159,6 +159,7 @@ def get_default_lp():
     lp.white_background = False
     lp.data_device = "cuda"
     lp.eval = False
+    lp.llffhold = 8
     # data partitioning
     lp.pretrain_path = None  # path to coarse global model
     lp.num_threshold = 25_000  # threshold of point number
@@ -195,6 +196,7 @@ def get_default_op():
     op.densify_from_iter = 500
     op.densify_until_iter = 15_000
     op.densify_grad_threshold = 0.0002
+    op.max_cache_num = 512
 
     return op
 
