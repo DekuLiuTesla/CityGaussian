@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_depth_init_5
-NAME=citygs2d_smbu_lnorm4_wo_vast_sep_depth_trim
+COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5
+NAME=citygs2d_smbu_lnorm4_wo_vast_sep_ssim_depth_trim
 DATA_PATH=data/GauU_Scene/SMBU
 max_block_id=8
 
@@ -38,15 +38,13 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --scene SMBU_ds_35 \
                                     --dataset-dir data/GauU_Scene/SMBU \
                                     --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
+                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config outputs/$COARSE_NAME/config.yaml \
     --save_val \
-    # --model.correct_color true \
-
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
@@ -78,7 +76,7 @@ for num in $(seq 0 $max_block_id); do
 done
 wait
 
-merge blocks
+# merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$NAME.yaml \
@@ -92,7 +90,6 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
     -n $NAME \
     --save_val \
-    # --model.correct_color true \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."

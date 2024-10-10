@@ -92,7 +92,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
     -n $NAME \
     --save_val \
-    # --model.correct_color true \
+#     --ckpt_path "outputs/$NAME/checkpoints/epoch=7-step=6999.ckpt" \
+#     --test_speed
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -101,7 +102,7 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
                                     --config_path outputs/$COARSE_NAME/config.yaml \
                                     --voxel_size 0.01 \
                                     --sdf_trunc 0.04 \
-                                    --depth_trunc 7.5
+                                    --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -122,8 +123,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
 # echo "GPU $gpu_id is available."
 # CUDA_VISIBLE_DEVICES=$gpu_id python tools/vectree_lightning.py \
 #                                     --coarse_config outputs/$COARSE_NAME/config.yaml \
-#                                     --input_path outputs/$NAME/checkpoints/epoch=32-step=30000.ckpt \
+#                                     --input_path "outputs/$NAME/checkpoints/epoch=7-step=6999.ckpt" \
 #                                     --save_path outputs/$NAME/vectree \
 #                                     --sh_degree 2 \
-#                                     --skip_quantize \
-#                                     --no_save_ply \
+                                    # --skip_quantize \
+                                    # --no_save_ply \

@@ -7,8 +7,8 @@ get_available_gpu() {
 }
 
 SCENE=LFLS
-COARSE_NAME=citygs_flatten_lfls_coarse
-NAME=citygs_flatten_lfls
+COARSE_NAME=citygs_lfls_coarse
+NAME=citygs_lfls
 DATA_PATH=data/GauU_Scene/$SCENE
 max_block_id=8
 
@@ -19,33 +19,33 @@ max_block_id=8
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-                                    --config configs/$COARSE_NAME.yaml \
-                                    -n $COARSE_NAME \
-                                    --logger wandb \
-                                    --project JointGS \
+--config configs/$COARSE_NAME.yaml \
+-n $COARSE_NAME \
+--logger wandb \
+--project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$COARSE_NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 0.01 \
-                                    --sdf_trunc 0.04 \
-                                    --depth_trunc 12
+--model_path outputs/$COARSE_NAME \
+--config_path outputs/$COARSE_NAME/config.yaml \
+--voxel_size 0.01 \
+--sdf_trunc 0.04 \
+--depth_trunc 12
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene LFLS_ds_35 \
-                                    --dataset-dir data/GauU_Scene/LFLS \
-                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
+--scene LFLS_ds_35 \
+--dataset-dir data/GauU_Scene/LFLS \
+--transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
+--ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-                                    --config outputs/$COARSE_NAME/config.yaml \
-                                    --save_val \
+--config outputs/$COARSE_NAME/config.yaml \
+--save_val \
 
 # generate partition
 gpu_id=$(get_available_gpu)
@@ -53,26 +53,26 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
 
 for num in $(seq 0 $max_block_id); do
-    while true; do
-        gpu_id=$(get_available_gpu)
-        if [[ -n $gpu_id ]]; then
-            echo "GPU $gpu_id is available. Starting training block '$num'"
-            CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python main.py fit \
-                --config configs/$NAME.yaml \
-                --data.params.colmap_block.block_id $num \
-                -n $NAME \
-                --logger wandb \
-                --project JointGS & 
-            # Increment the port number for the next run
-            ((port++))
-            # Allow some time for the process to initialize and potentially use GPU memory
-            sleep 120
-            break
-        else
-            echo "No GPU available at the moment. Retrying in 2 minute."
-            sleep 120
-        fi
-    done
+while true; do
+gpu_id=$(get_available_gpu)
+if [[ -n $gpu_id ]]; then
+echo "GPU $gpu_id is available. Starting training block '$num'"
+CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python main.py fit \
+--config configs/$NAME.yaml \
+--data.params.colmap_block.block_id $num \
+-n $NAME \
+--logger wandb \
+--project JointGS & 
+# Increment the port number for the next run
+((port++))
+# Allow some time for the process to initialize and potentially use GPU memory
+sleep 120
+break
+else
+echo "No GPU available at the moment. Retrying in 2 minute."
+sleep 120
+fi
+done
 done
 wait
 
@@ -88,7 +88,9 @@ CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
                                     --config_path outputs/$COARSE_NAME/config.yaml \
                                     --voxel_size 0.01 \
                                     --sdf_trunc 0.04 \
-                                    --depth_trunc 12
+                                    --depth_trunc 2.0 \
+                                    # --sh_degree 2 \
+                                    # --use_trim_renderer \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -107,3 +109,5 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.colmap_block.eval_ratio 0.1 \
     -n $NAME \
     --save_val \
+    # --model.gaussian.sh_degree 2 \
+    # --model.correct_color true \

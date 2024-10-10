@@ -1,18 +1,32 @@
 # Function to get the id of an available GPU
 get_available_gpu() {
-  local mem_threshold=500
+  local mem_threshold=5000
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
 }
 
-COARSE_NAME=citygs2d_upper_coarse_lnorm4_wo_vast_sep_depth_init_10
-NAME=citygs2d_upper_lnorm4_wo_vast_sep_ssim_depth_trim
-DATA_PATH=data/GauU_Scene/CUHK_UPPER_COLMAP
-max_block_id=8
+COARSE_NAME=citygs2d_building_coarse_lnorm4_wo_vast_sep_depth_init_5_6w
+NAME=citygs2d_building_lnorm4_wo_vast_sep_depth_trim
+TEST_PATH=data/mill19/building-pixsfm/val
+max_block_id=19
 
 # ============================================= downsample images =============================================
-# python utils/image_downsample.py data/GauU_Scene/CUHK_UPPER_COLMAP/images --factor 3.4175
+# python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
+
+# generate depth with depth-anything-V2
+# ===================================== generate depth with depth-anything-V2 =================================
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     data/mill19/building-pixsfm/train \
+#                                     -d 4 \
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     $TEST_PATH \
+#                                     -d 4 \
 
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
@@ -23,29 +37,17 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
                                     --logger wandb \
                                     --project JointGS \
 
+
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config outputs/$COARSE_NAME/config.yaml \
+    --config configs/$COARSE_NAME.yaml \
+    -n $COARSE_NAME \
+    --data.path $TEST_PATH \
+    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
+    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
     --save_val \
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$COARSE_NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 0.01 \
-                                    --sdf_trunc 0.04 \
-                                    --depth_trunc 2.0
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene CUHK_UPPER_COLMAP_ds_35 \
-                                    --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER_COLMAP/transform.txt \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=48-step=30000/fuse_post.ply"
-
+    --model.correct_color true \
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
@@ -85,29 +87,13 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config configs/$NAME.yaml \
-    --data.params.estimated_depth_colmap_block.split_mode experiment \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
+    --config outputs/$COARSE_NAME/config.yaml \
     -n $NAME \
+    --data.path $TEST_PATH \
+    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
+    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
     --save_val \
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 0.01 \
-                                    --sdf_trunc 0.04 \
-                                    --depth_trunc 2.0
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene CUHK_UPPER_COLMAP_ds_35 \
-                                    --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER_COLMAP/transform.txt \
-                                    --ply-path "outputs/$NAME/mesh/epoch=48-step=30000/fuse_post.ply"
+    --model.correct_color true \
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do
