@@ -174,4 +174,4 @@ This repo benefits from [3DGS](https://github.com/graphdeco-inria/gaussian-splat
 
 - _Generation of COLMAP results._ We use the ground-truth poses offered by datasets and separately match the train and test sets. And this will be faster and more robust than match from scratch. But indeed it still costs a lot of time.
 
-- _Most blocks are not trained._ The main reason here is the data assigned to most blocks are too few (<50), and to prevent overfitting these blocks won't get trained. This main reason can be unreasonable aabb setting, please try to adjust it and see if things work.
+- _Most blocks are not trained._ The main reason here is the data assigned to most blocks are too few (<50), and to prevent overfitting these blocks won't get trained. This can be attributed to unreasonable aabb setting, please try to adjust it and see if things work.
