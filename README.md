@@ -60,8 +60,8 @@ This repository contains the official implementation of the paper ["CityGaussian
 Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building, Residence and Sci-Art has been prepared in `config` folder. Data of these datasets can be prepared according to [Data Preparation](doc/data_preparation.md). For COLMAP, we recommend to directly use our generated results:
 
 - **Google Drive**: https://drive.google.com/file/d/1Uz1pSTIpkagTml2jzkkzJ_rglS_z34p7/view?usp=sharing
-- **Baidu Netdisk**: https://pan.baidu.com/s/1zX34zftxj07dCM1x5bzmbA?pwd=1t6r
 - **Hugging Face**: https://huggingface.co/datasets/dylanebert/CityGaussian
+- **Baidu Netdisk**: https://pan.baidu.com/s/1zX34zftxj07dCM1x5bzmbA?pwd=1t6r
 
 ### Checkpoints
 Please download from:
