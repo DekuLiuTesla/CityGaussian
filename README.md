@@ -32,6 +32,8 @@ The advancement of real-time 3D scene reconstruction and novel view synthesis ha
 </div>
 
 ## 📰 News
+**[2024.10.12]** Checkpoints on main datasets have been released!
+
 **[2024.10.11]** Updates FAQ! If you are stucked, please first check whether it can solves the problem.
 
 **[2024.08.20]** Updates [Custom Dataset Instructions](doc/custom_dataset.md)! 
@@ -59,6 +61,12 @@ Note that the configs for five large-scale scenes: MatrixCity, Rubble, Building,
 
 - **Google Drive**: https://drive.google.com/file/d/1Uz1pSTIpkagTml2jzkkzJ_rglS_z34p7/view?usp=sharing
 - **Baidu Netdisk**: https://pan.baidu.com/s/1zX34zftxj07dCM1x5bzmbA?pwd=1t6r
+- **Hugging Face**: https://huggingface.co/datasets/dylanebert/CityGaussian
+
+### Checkpoints
+Please download from:
+- **Hugging Face**: https://huggingface.co/TeslaYang123/CityGaussian
+- **Baidu Netdisk**: https://pan.baidu.com/s/1a9C8xgAQmQy86FvO9XXBFQ?pwd=cxlr 
 
 ### Installation
 #### a. Clone the repository
@@ -142,7 +150,7 @@ python viewer.py config/rubble_c9_r4_lod.yaml
 - \[x\] Release CityGaussian code.
 - \[x\] Release ColMap results of main datasets.
 - \[x\] Release detailed instruction for custom dataset usage.
-- \[ \] Release checkpoints on main datasets.
+- \[x\] Release checkpoints on main datasets.
 
 
 
