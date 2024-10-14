@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument('--config_path', type=str, help='path of config', default=None)
     parser.add_argument('--data_path', type=str, help='path of data', default=None)
     parser.add_argument("--n_fames", type=int, help="number of frames", default=240)
-    parser.add_argument("--scale_percentile", type=int, help="trajectory radius percentile", default=99)
+    parser.add_argument("--scale_percentile", type=float, help="trajectory radius percentile", default=99)
     parser.add_argument("--pitch", type=float, help="pitch in degree, 0 means no pitch changes", default=None)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--ellipse", action="store_true", help="whether to generate new trajectories of ellipse shape")
