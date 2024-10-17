@@ -1,5 +1,5 @@
 lightning==2.0.9.post0
-lightning[pytorch-extra]
+pytorch-lightning==2.3.*
 splines==0.3.0
 plyfile==0.8.1
 tensorboard
