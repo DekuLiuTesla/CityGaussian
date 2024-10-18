@@ -17,6 +17,14 @@ import random
 
 from argparse import ArgumentParser, Namespace
 
+def focus_point_fn(poses: np.ndarray) -> np.ndarray:
+    """Calculate nearest point to all focal axes in poses."""
+    directions, origins = poses[:, :3, 2:3], poses[:, :3, 3:4]
+    m = np.eye(3) - directions * np.transpose(directions, [0, 2, 1])
+    mt_m = np.transpose(m, [0, 2, 1]) @ m
+    focus_pt = np.linalg.inv(mt_m.mean(0)) @ (mt_m @ origins).mean(0)[:, 0]
+    return focus_pt
+
 def parse(data):
     data = Namespace(**data)
     for arg in vars(data):

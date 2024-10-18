@@ -9,5 +9,7 @@ mediapy
 einops
 viser==0.1.29
 opencv-python==4.8.*
+open3d
+joblib
 ./submodules/diff-gaussian-rasterization
 ./submodules/simple-knn
