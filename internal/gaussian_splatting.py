@@ -657,6 +657,9 @@ class GaussianSplatting(LightningModule):
         for i in self.image_saving_threads:
             i.join()
         self.image_saving_threads = []
+        with open(os.path.join(self.hparams["output_path"], "results.txt"),'w') as file:
+            for k in sorted (self._trainer.logged_metrics.keys()):
+                file.write("%s: %s, \n" % (k, self._trainer.logged_metrics[k].item()))
 
     def on_test_epoch_start(self) -> None:
         super().on_test_epoch_start()
