@@ -20,7 +20,7 @@ import open3d as o3d
 import trimesh
 from tetranerf.utils.extension import cpp
 from internal.utils.tetmesh_utils import marching_tetrahedra
-from internal.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
+from internal.utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation, focus_point_fn
 
 def marching_cubes_with_contraction(
     sdf,
