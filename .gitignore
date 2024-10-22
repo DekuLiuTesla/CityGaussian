@@ -1,7 +1,7 @@
 .idea
 .vscode/
 data
-outputs
+output*
 camera_paths
 renders
 edited
