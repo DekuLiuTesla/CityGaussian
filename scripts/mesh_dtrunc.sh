@@ -9,31 +9,21 @@ get_available_gpu() {
 COARSE_NAME=citygs2d_mc_aerial_coarse_lnorm4_wo_vast_sep_depth_init_5
 NAME=citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth
 
-declare -a coarse_names=(
-  "citygs2d_lfls_coarse_lnorm4_wo_vast_sep_depth_init_5"
-  "citygs2d_smbu_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6"
-)
+declare -a depth_truncs=(3.0 3.5 4.0)
 
-declare -a names=(
-  "citygs2d_lfls_lnorm4_wo_vast_sep_depth_trim"
-  "citygs2d_smbu_lnorm4_wo_vast_sep_ssim_depth_trim_v6"
-)
-
-for i in "${!coarse_names[@]}"; do
-  COARSE_NAME="${coarse_names[i]}"
-  NAME="${names[i]}"
+for depth_trunc in "${depth_truncs[@]}"; do
   while true; do
     gpu_id=$(get_available_gpu)
     if [[ -n $gpu_id ]]; then
-      echo "GPU $gpu_id is available. Starting mesh extraction of $NAME"
+      echo "GPU $gpu_id is available. Starting mesh extraction with depth truncation of $depth_trunc"
 
       CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
                                           --model_path outputs/$NAME \
                                           --config_path outputs/$COARSE_NAME/config.yaml \
-                                          --voxel_size 0.005 \
+                                          --voxel_size 0.01 \
                                           --sdf_trunc 0.04 \
-                                          --mesh_name fuse_vox2_dtrunc2.5 \
-                                          --depth_trunc 2.5 &  # 2.0 for metrics
+                                          --mesh_name fuse_dtrunc_$depth_trunc \
+                                          --depth_trunc $depth_trunc # 2.0 for metrics
 
       # Increment the port number for the next run
       ((port++))
