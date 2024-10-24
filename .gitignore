@@ -4,6 +4,7 @@ data
 output*
 camera_paths
 renders
+videos
 edited
 **/__pycache__
 submodules/simple-knn

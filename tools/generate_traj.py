@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description="Training script parameters")
     parser.add_argument('--config_path', type=str, help='path of config', default=None)
     parser.add_argument('--data_path', type=str, help='path of data', default=None)
-    parser.add_argument("--n_fames", type=int, help="number of frames", default=240)
+    parser.add_argument("--n_frames", type=int, help="number of frames", default=240)
     parser.add_argument("--scale_percentile", type=int, help="trajectory radius percentile", default=99)
     parser.add_argument("--pitch", type=float, help="pitch in degree, 0 means no pitch changes", default=None)
     parser.add_argument("--quiet", action="store_true")
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     if args.ellipse:
         traj_dir = traj_dir + '_ellipse'
         os.makedirs(traj_dir, exist_ok=True)
-        cam_traj = generate_path(cameras, traj_dir, n_frames=args.n_fames, scale_percentile=args.scale_percentile)
+        cam_traj = generate_path(cameras, traj_dir, n_frames=args.n_frames, scale_percentile=args.scale_percentile)
     else:
         os.makedirs(traj_dir, exist_ok=True)
         cam_traj = record_path(cameras, traj_dir)

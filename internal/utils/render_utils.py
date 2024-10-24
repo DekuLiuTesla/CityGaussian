@@ -122,15 +122,15 @@ def transform_poses_pca(poses: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
 def generate_ellipse_path(poses: np.ndarray,
                           n_frames: int = 120,
                           scale_percentile: int = 90,
+                          shift: float = None,
                           pitch: float = None,
-                          const_speed: bool = True,
                           z_variation: float = 0.,
                           z_phase: float = 0.) -> np.ndarray:
   """Generate an elliptical render path based on the given poses."""
   # Calculate the focal point for the path (cameras point toward this).
   center = focus_point_fn(poses)
   # Path height sits at z=0 (in middle of zero-mean capture pattern).
-  offset = np.array([center[0], center[1], 0])
+  offset = np.array([center[0]+shift[0], center[1]+shift[1], 0])
 
   # Calculate scaling for ellipse axes based on input camera positions.
   sc = np.percentile(np.abs(poses[:, :3, 3] - offset), scale_percentile, axis=0)
@@ -179,13 +179,13 @@ def generate_ellipse_path(poses: np.ndarray,
   return np.stack([viewmatrix(lookdir[i], up, positions[i]) for i in range(positions.shape[0])])
 
 
-def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90, pitch=None):
+def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90, shift=0, pitch=None, filter=False):
   c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
   pose = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
   pose_recenter, colmap_to_world_transform = transform_poses_pca(pose)
 
   # generate new poses
-  new_poses = generate_ellipse_path(poses=pose_recenter, pitch=pitch, 
+  new_poses = generate_ellipse_path(poses=pose_recenter, pitch=pitch, shift=shift,
                                     n_frames=n_frames, scale_percentile=scale_percentile)
   # warp back to orignal scale
   new_poses = np.linalg.inv(colmap_to_world_transform) @ pad_poses(new_poses)
@@ -197,7 +197,7 @@ def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percenti
       cam.height = int(cam.height / 2) * 2
       cam.width = int(cam.width / 2) * 2
       cam.world_to_camera = torch.from_numpy(np.linalg.inv(c2w).T).float().cuda()
-      cam.full_proj_transform = (cam.world_to_camera.unsqueeze(0).bmm(cam.projection.unsqueeze(0))).squeeze(0)
+      cam.full_projection = (cam.world_to_camera.unsqueeze(0).bmm(cam.projection.unsqueeze(0))).squeeze(0)
       cam.camera_center = cam.world_to_camera.inverse()[3, :3]
       traj.append(cam)
       if traj_dir is not None:
@@ -210,7 +210,10 @@ def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percenti
                   "FoVx": cam.fov_x.item(),
               }, f)
 
-  return traj
+  if filter:
+    return traj, colmap_to_world_transform, pose_recenter
+  else:
+    return traj
 
 def record_path(viewpoint_cameras, traj_dir=None):
   c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
