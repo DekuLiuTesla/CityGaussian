@@ -256,6 +256,56 @@ class GaussianExtractor(object):
         return mesh
 
     @torch.no_grad()
+    def recon_extract_mesh_bounded(self, viewpoint_stack, voxel_size=0.004, sdf_trunc=0.02, depth_trunc=3, mask_backgrond=True):
+        """
+        Perform TSDF fusion given a fixed depth range, used in the paper.
+        
+        voxel_size: the voxel size of the volume
+        sdf_trunc: truncation value
+        depth_trunc: maximum depth range, should depended on the scene's scales
+        mask_backgrond: whether to mask backgroud, only works when the dataset have masks
+
+        return o3d.mesh
+        """
+        self.clean()
+        print("Running tsdf volume integration ...")
+        print(f'voxel_size: {voxel_size}')
+        print(f'sdf_trunc: {sdf_trunc}')
+        print(f'depth_truc: {depth_trunc}')
+
+        volume = o3d.pipelines.integration.ScalableTSDFVolume(
+            voxel_length=voxel_size,
+            sdf_trunc=sdf_trunc,
+            color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
+        )
+
+        self.viewpoint_stack = viewpoint_stack
+        self.estimate_bounding_sphere()
+        cam_o3ds = to_cam_open3d(self.viewpoint_stack)
+        for i, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="reconstruct radiance fields and conduct TSDF integration"):
+            render_pkg = self.renderer(viewpoint_cam.to_device("cuda"), self.gaussians, bg_color=self.bg_color)
+            rgb = render_pkg['render']
+            depth = render_pkg['surf_depth'] if 'surf_depth' in render_pkg else render_pkg['median_depth']
+            cam_o3d = cam_o3ds[i]
+            
+            # if we have mask provided, use it
+            if mask_backgrond and hasattr(viewpoint_cam, "gt_alpha_mask") and (viewpoint_cam.gt_alpha_mask is not None):
+                depth[(viewpoint_cam.gt_alpha_mask < 0.5)] = 0
+
+            # make open3d rgbd
+            rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+                o3d.geometry.Image(np.asarray(rgb.permute(1,2,0).cpu().numpy() * 255, order="C", dtype=np.uint8)),
+                o3d.geometry.Image(np.asarray(depth.permute(1,2,0).cpu().numpy(), order="C")),
+                depth_trunc = depth_trunc, convert_rgb_to_intensity=False,
+                depth_scale = 1.0
+            )
+
+            volume.integrate(rgbd, intrinsic=cam_o3d.intrinsic, extrinsic=cam_o3d.extrinsic)
+
+        mesh = volume.extract_triangle_mesh()
+        return mesh
+
+    @torch.no_grad()
     def extract_mesh_unbounded(self, resolution=1024):
         """
         Experimental features, extracting meshes from unbounded scenes, not fully test across datasets. 
