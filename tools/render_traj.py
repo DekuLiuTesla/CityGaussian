@@ -87,7 +87,7 @@ if __name__ == "__main__":
     os.makedirs(traj_dir, exist_ok=True)
 
     if not args.filter:
-        cam_traj = generate_path(cameras, traj_dir, n_frames=args.n_frames, pitch=args.pitch, shift=args.shift, scale_percentile=args.scale_percentile)
+        cam_traj = generate_path(cameras, traj_dir, n_frames=args.n_frames, pitch=args.pitch, shift=[args.x_shift, args.y_shift], scale_percentile=args.scale_percentile)
     else:
         cam_traj, colmap_to_world_transform, pose_recenter = generate_path(cameras, traj_dir, n_frames=args.n_frames, pitch=args.pitch, 
                                                                            shift=[args.x_shift, args.y_shift], filter=True, 
