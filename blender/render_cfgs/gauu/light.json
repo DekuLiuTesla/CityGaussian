@@ -7,7 +7,7 @@
     "rotation": [[3.142, 0.0, 1.571]]}, 
 "texture": {
     "pose": [[0, 0, -5]], 
-    "energy": [5], 
+    "energy": [2], 
     "type": ["SUN"], 
     "scale": [1], 
     "rotation": [[3.142, 0.0, 1.57]]}}
