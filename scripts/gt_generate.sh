@@ -27,3 +27,9 @@ python tools/render_traj.py --config outputs/citygs2d_upper_coarse_lnorm4_wo_vas
                             --data_path data/GauU_Scene/CUHK_UPPER_COLMAP \
                             --scale_percentile 78 --n_frames 480 \
                             --pitch 40 --filter --train 
+
+python tools/render_traj.py --config outputs/citygs2d_mc_aerial_coarse_lnorm4_wo_vast_sep_depth_init_5/config.yaml \
+                            --ckpt_path "outputs/citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth/checkpoints/epoch=6-step=30000.ckpt" \
+                            --data_path data/matrix_city/aerial/train/block_all \
+                            --scale_percentile 97 --n_frames 960 \
+                            --pitch 45 --filter --std_ratio 5.0 --train 
