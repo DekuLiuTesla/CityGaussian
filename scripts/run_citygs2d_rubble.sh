@@ -6,13 +6,14 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_rubble_coarse_lnorm4_wo_vast
-NAME=citygs2d_rubble_lnorm4_wo_vast
+COARSE_NAME=citygs2d_rubble_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6
+NAME=citygs2d_rubble_lnorm4_wo_vast_sep_ssim_depth_trim_v6
 TEST_PATH=data/mill19/rubble-pixsfm/val
-max_block_id=19
+max_block_id=8
 
 # ============================================= downsample images =============================================
-# python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
+# python utils/image_downsample.py data/mill19/rubble-pixsfm/train/images --factor 4
+# python utils/image_downsample.py data/mill19/rubble-pixsfm/val/images --factor 4
 
 # generate depth with depth-anything-V2
 # ===================================== generate depth with depth-anything-V2 =================================

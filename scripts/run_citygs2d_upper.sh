@@ -14,6 +14,12 @@ max_block_id=8
 # ============================================= downsample images =============================================
 # python utils/image_downsample.py data/GauU_Scene/CUHK_UPPER_COLMAP/images --factor 3.4175
 
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+                                    data/GauU_Scene/CUHK_UPPER_COLMAP \
+                                    -d 3.4175 \
+
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."

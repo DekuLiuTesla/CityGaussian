@@ -6,13 +6,19 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_lfls_coarse_lnorm4_wo_vast_sep_depth_init_5_sh2
-NAME=citygs2d_lfls_lnorm4_wo_vast_sep_depth_trim_sh2
+COARSE_NAME=citygs2d_lfls_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6
+NAME=citygs2d_lfls_lnorm4_wo_vast_sep_ssim_depth_trim_v6
 DATA_PATH=data/GauU_Scene/LFLS
 max_block_id=7
 
 # ============================================= downsample images =============================================
 # python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     data/GauU_Scene/LFLS \
+#                                     -d 3.4175 \
 
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
@@ -37,7 +43,7 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --scene LFLS_ds_35 \
                                     --dataset-dir data/GauU_Scene/LFLS \
-                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
+                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transformation.txt \
                                     --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
@@ -45,7 +51,6 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config outputs/$COARSE_NAME/config.yaml \
     --save_val \
-    # --model.correct_color true \
 
 
 # ============================================= generate partition =============================================

@@ -6,13 +6,19 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5
-NAME=citygs2d_smbu_lnorm4_wo_vast_sep_ssim_depth_trim
+COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6
+NAME=citygs2d_smbu_lnorm4_wo_vast_sep_ssim_depth_trim_v6
 DATA_PATH=data/GauU_Scene/SMBU
 max_block_id=8
 
 # ============================================= downsample images =============================================
 # python utils/image_downsample.py data/GauU_Scene/SMBU/images --factor 3.4175
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     data/GauU_Scene/SMBU \
+#                                     -d 3.4175 \
 
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
