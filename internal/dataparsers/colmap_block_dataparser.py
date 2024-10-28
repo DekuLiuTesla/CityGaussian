@@ -49,7 +49,7 @@ class ColmapBlockDataParser(ColmapDataParser):
                 if image.name in selected_image_names:
                     selected_image_ids[image.id] = True
                     new_images[i] = image
-            assert len(new_images) >= 50, f"Easy to overfit with {len(new_images)} images via {self.params.image_list}"
+            assert len(new_images) > 50, f"Easy to overfit with {len(new_images)} images via {self.params.image_list}"
 
             # replace images with new_images
             images = new_images
