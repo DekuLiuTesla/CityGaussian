@@ -94,8 +94,8 @@ if __name__ == "__main__":
                                                                            scale_percentile=args.scale_percentile)
         xyz_homo = torch.cat((model.get_xyz, torch.zeros(model.get_xyz.shape[0], 1, device="cuda")), dim=-1)
         transformed_xyz = xyz_homo @ torch.tensor(colmap_to_world_transform, device="cuda", dtype=xyz_homo.dtype).T
-        x_min, x_max = pose_recenter[:, 0, -1].min(), pose_recenter[:, 0, -1].max()
-        y_min, y_max = pose_recenter[:, 1, -1].min(), pose_recenter[:, 1, -1].max()
+        x_min, x_max = transformed_xyz[:, 0].min(), transformed_xyz[:, 0].max()
+        y_min, y_max = transformed_xyz[:, 1].min(), transformed_xyz[:, 1].max()
         voxel_size = torch.tensor([(x_max - x_min) / args.vox_grid, (y_max - y_min) / args.vox_grid], device="cuda")
         xy_range = torch.tensor([x_min, y_min, x_max, y_max], device="cuda")
         vox_mask = voxel_filtering_no_gt(voxel_size, xy_range, transformed_xyz, args.std_ratio).bool().cpu().numpy()

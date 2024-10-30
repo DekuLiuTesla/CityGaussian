@@ -227,3 +227,5 @@ if __name__ == "__main__":
         out_dir=args.out_dir,
         view_crop=args.view_crop
     )
+
+    print(f"Evaluation for {args.ply_path} is done.")
