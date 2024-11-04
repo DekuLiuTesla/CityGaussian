@@ -38,7 +38,7 @@ The links above points to the papers. Users could follow the [instruction](doc/c
 
 ## 📝 TODO List
 
-- \[\] Release the V2 of CityGaussian.
+- \[ \] Release the V2 of CityGaussian.
 - \[x\] Release code and checkpoints of CityGaussian.
 - \[x\] Release ColMap results of main datasets.
 
