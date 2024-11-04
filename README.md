@@ -16,7 +16,7 @@
 </div>
 
 This repo contains official implementations of our series of work in large-scale scene reconstruction with Gaussian Splatting, Star ⭐ us if you like it!
-- [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://dekuliutesla.github.io/CityGaussianV2/)
+- [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://arxiv.org/pdf/2411.00771)
 - [CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians](https://arxiv.org/pdf/2404.01133) (ECCV 2024)
 
 The links above points to the papers. Users could follow the [instruction](doc/citygaussianv1_readme.md) to download COLMAP results, checkpoints, and try the V1 of our CityGaussian. The code of V2 is also coming soon.
