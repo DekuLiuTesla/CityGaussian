@@ -65,11 +65,13 @@ If you find this repository useful, please use the following BibTeX entry for ci
 ```
 
 ```latex
-@article{liu2024citygaussian,
+@inproceedings{liu2025citygaussian,
   title={Citygaussian: Real-time high-quality large-scale scene rendering with gaussians},
-  author={Liu, Yang and Guan, He and Luo, Chuanchen and Fan, Lue and Wang, Naiyan and Peng, Junran and Zhang, Zhaoxiang},
-  booktitle={ECCV},
-  year={2024}
+  author={Liu, Yang and Luo, Chuanchen and Fan, Lue and Wang, Naiyan and Peng, Junran and Zhang, Zhaoxiang},
+  booktitle={European Conference on Computer Vision},
+  pages={265--282},
+  year={2025},
+  organization={Springer}
 }
 ```
 
