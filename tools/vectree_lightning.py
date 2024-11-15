@@ -3,7 +3,7 @@ import numpy as np
 from copy import deepcopy
 from tqdm import tqdm, trange
 
-sys.path.append('/home/yang_liu/python_workspace/gaussian-splatting-lightning')
+sys.path.append('/data1/yang_liu/python_workspace/GSPL')
 
 from internal.utils.gaussian_utils import Gaussian
 from internal.utils.vq import VectorQuantize

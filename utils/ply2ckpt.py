@@ -38,7 +38,7 @@ if os.path.exists(os.path.join(args.input, 'extreme_saving')):
     checkpoint["state_dict"]["gaussian_model._features_extra"] = torch.empty(dequantized_feats.shape[0], 0).to('cuda')
     checkpoint["gaussian_model_extra_state_dict"]["active_sh_degree"] = args.sh_degree
     if args.output is None:
-        args.output = os.path.join(args.input, args.reference.split("/")[-1])
+        args.output = os.path.join(args.input, 'checkpoints', args.reference.split("/")[-1])
     
 elif args.input.endswith(".ply"):
     model = Gaussian.load_from_ply(args.input, sh_degrees=args.sh_degree).to_parameter_structure()
@@ -51,7 +51,8 @@ elif args.input.endswith(".ply"):
     checkpoint["state_dict"]["gaussian_model._features_extra"] = model.real_features_extra
     checkpoint["gaussian_model_extra_state_dict"]["active_sh_degree"] = args.sh_degree
     if args.output is None:
-        args.output = os.path.join(args.input[:args.input.rfind("/")], args.reference.split("/")[-1])
+        os.makedirs(os.path.join(args.input[:args.input.rfind("/")], 'checkpoints'), exist_ok=True)
+        args.output = os.path.join(args.input[:args.input.rfind("/")], 'checkpoints', args.reference.split("/")[-1])
 torch.save(checkpoint, args.output)
 
 print(f"Saved to '{args.output}'")
