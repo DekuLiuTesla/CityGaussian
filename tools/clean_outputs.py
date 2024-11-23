@@ -14,6 +14,6 @@ if __name__ == '__main__':
     # remove outputs/*/checkpoints/*6999-xyz_rgb.ply and outputs/*/mesh/fuse.ply
     for root, dirs, files in os.walk(args.output_dir):
         for file in files:
-            if file.endswith("xyz_rgb.ply") or file.endswith("fuse.ply"):
+            if file.endswith("xyz_rgb.ply") or file.endswith("fuse.ply") or file.endswith("=6999.ckpt"):
                 os.remove(os.path.join(root, file))
                 print(f"Removed {os.path.join(root, file)}")

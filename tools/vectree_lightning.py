@@ -78,12 +78,13 @@ class Quantization():
         else:
             top_list = [None, ] * renderer.K
             with torch.no_grad():
+                bg_color=torch.tensor(config.model.background_color, dtype=torch.float, device=device)
                 for i in tqdm(range(len(dataparser_outputs.train_set.cameras)), desc="Calculating Importance Score"):
                     camera = dataparser_outputs.train_set.cameras[i].to_device(device)
                     trans = renderer(
                         camera,
                         model,
-                        bg_color=torch.tensor(config.model.background_color, dtype=torch.float, device=device),
+                        bg_color=bg_color,
                         record_transmittance=True
                     )
                     if top_list[0] is not None:
