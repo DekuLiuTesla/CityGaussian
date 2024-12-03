@@ -1,6 +1,6 @@
 # Function to get the id of an available GPU
 get_available_gpu() {
-  local mem_threshold=500
+  local mem_threshold=7000
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
@@ -33,22 +33,22 @@ max_block_id=8
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-                                    --config configs/$COARSE_NAME.yaml \
-                                    -n $COARSE_NAME \
-                                    --logger wandb \
-                                    --project JointGS \
+--config configs/$COARSE_NAME.yaml \
+-n $COARSE_NAME \
+--logger wandb \
+--project JointGS \
 
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config configs/$COARSE_NAME.yaml \
-    -n $COARSE_NAME \
-    --data.path $TEST_PATH \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
-    --save_val \
-    --model.correct_color true \
+--config configs/$COARSE_NAME.yaml \
+-n $COARSE_NAME \
+--data.path $TEST_PATH \
+--data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
+--data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
+--save_val \
+--model.correct_color true \
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
@@ -95,6 +95,16 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
     --save_val \
     --model.correct_color true \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
+                                    --model_path outputs/$NAME \
+                                    --config_path outputs/$COARSE_NAME/config.yaml \
+                                    --voxel_size 0.25 \
+                                    --sdf_trunc 1.5 \
+                                    --depth_trunc 250 \
+                                    --mesh_name fuse_org \
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do

@@ -1,6 +1,6 @@
 # Function to get the id of an available GPU
 get_available_gpu() {
-  local mem_threshold=500
+  local mem_threshold=11000
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
@@ -14,11 +14,11 @@ max_block_id=8
 # ============================================= downsample images =============================================
 # python utils/image_downsample.py data/GauU_Scene/CUHK_UPPER_COLMAP/images --factor 3.4175
 
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
-                                    data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    -d 3.4175 \
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     data/GauU_Scene/CUHK_UPPER_COLMAP \
+#                                     -d 3.4175 \
 
 # ============================================= train&eval coarse model =============================================
 gpu_id=$(get_available_gpu)
@@ -49,7 +49,7 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --scene CUHK_UPPER_COLMAP_ds_35 \
                                     --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER_COLMAP/transform.txt \
+                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
                                     --ply-path "outputs/$COARSE_NAME/mesh/epoch=48-step=30000/fuse_post.ply"
 
 
@@ -96,6 +96,7 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
     --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
     -n $NAME \
+    --test_speed \
     --save_val \
 
 gpu_id=$(get_available_gpu)
@@ -112,7 +113,7 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --scene CUHK_UPPER_COLMAP_ds_35 \
                                     --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER_COLMAP/transform.txt \
+                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
                                     --ply-path "outputs/$NAME/mesh/epoch=48-step=30000/fuse_post.ply"
 
 # ============================================= remove block results (if you find result OK) =============================================
@@ -121,12 +122,14 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
 #     echo "Removed checkpoints for block $num"
 # done
 
+# python tools/block_wandb_sync.py --output_path outputs/$NAME
+
 # ============================================= vector quantization =============================================
 # gpu_id=$(get_available_gpu)
 # echo "GPU $gpu_id is available."
 # CUDA_VISIBLE_DEVICES=$gpu_id python tools/vectree_lightning.py \
 #                                     --coarse_config outputs/$COARSE_NAME/config.yaml \
-#                                     --input_path outputs/$NAME/checkpoints/epoch=32-step=30000.ckpt \
+#                                     --input_path outputs/$NAME/checkpoints/epoch=48-step=30000.ckpt \
 #                                     --save_path outputs/$NAME/vectree \
 #                                     --sh_degree 2 \
 #                                     --skip_quantize \

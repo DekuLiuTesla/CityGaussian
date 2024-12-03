@@ -6,15 +6,15 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_building_coarse_lnorm4_wo_vast_sep_depth_init_5_6w
-NAME=citygs2d_building_lnorm4_wo_vast_sep_depth_trim
+COARSE_NAME=citygs2d_building_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6
+NAME=citygs2d_building_lnorm4_wo_vast_sep_ssim_depth_trim_v6
 TEST_PATH=data/mill19/building-pixsfm/val
 max_block_id=19
 
 # ============================================= downsample images =============================================
-# python utils/image_downsample.py data/GauU_Scene/LFLS/images --factor 3.4175
+# python utils/image_downsample.py data/mill19/building-pixsfm/train/images --factor 4
+# python utils/image_downsample.py data/mill19/building-pixsfm/val/images --factor 4
 
-# generate depth with depth-anything-V2
 # ===================================== generate depth with depth-anything-V2 =================================
 # gpu_id=$(get_available_gpu)
 # echo "GPU $gpu_id is available."
@@ -94,6 +94,15 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
     --save_val \
     --model.correct_color true \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
+                                    --model_path outputs/$NAME \
+                                    --config_path outputs/$COARSE_NAME/config.yaml \
+                                    --voxel_size 0.25 \
+                                    --sdf_trunc 1.5 \
+                                    --depth_trunc 250 \
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do

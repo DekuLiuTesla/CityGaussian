@@ -31,6 +31,12 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
+    --config outputs/$COARSE_NAME/config.yaml \
+    --save_val \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
                                     --model_path outputs/$COARSE_NAME \
                                     --config_path outputs/$COARSE_NAME/config.yaml \
@@ -45,12 +51,6 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --dataset-dir data/GauU_Scene/LFLS \
                                     --transform-path data/GauU_Scene/Downsampled/LFLS/transformation.txt \
                                     --ply-path "outputs/$COARSE_NAME/mesh/epoch=32-step=30000/fuse_post.ply"
-
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config outputs/$COARSE_NAME/config.yaml \
-    --save_val \
 
 
 # ============================================= generate partition =============================================
@@ -96,9 +96,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
     --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
     -n $NAME \
-    --save_val \
-#     --ckpt_path "outputs/$NAME/checkpoints/epoch=7-step=6999.ckpt" \
-#     --test_speed
+    --test_speed \
+    --save_val \   
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -114,7 +113,7 @@ echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
                                     --scene LFLS_ds_35 \
                                     --dataset-dir data/GauU_Scene/LFLS \
-                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transform.txt \
+                                    --transform-path data/GauU_Scene/Downsampled/LFLS/transformation.txt \
                                     --ply-path "outputs/$NAME/mesh/epoch=32-step=30000/fuse_post.ply"
 
 # ============================================= remove block results (if you find result OK) =============================================
@@ -122,6 +121,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
 #     rm -rf outputs/$NAME/blocks/block_${num}/checkpoints
 #     echo "Removed checkpoints for block $num"
 # done
+
+# python tools/block_wandb_sync.py --output_path outputs/$NAME
 
 # ============================================= vector quantization =============================================
 # gpu_id=$(get_available_gpu)
