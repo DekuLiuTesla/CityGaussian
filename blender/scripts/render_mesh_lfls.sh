@@ -6,14 +6,14 @@ get_available_gpu() {
   '
 }
 
-traj_path="/home/yang_liu/python_workspace/gaussian-splatting-lightning/data/GauU_Scene/LFLS/traj"
+traj_path="/data1/yang_liu/python_workspace/GSPL/data/GauU_Scene/LFLS/traj_ellipse"
 
 declare -a run_args=(
-    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_lfls_lnorm4_wo_vast_sep_depth_trim/mesh/epoch=32-step=30000/fuse_post.ply"
-    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs2d_lfls_coarse_lnorm4_wo_vast_6w/mesh/epoch=63-step=60000/fuse_post.ply"
-    "/home/yang_liu/python_workspace/gaussian-splatting-lightning/outputs/citygs_lfls/mesh/epoch=32-step=30000/fuse_post.ply"
-    "/home/yang_liu/python_workspace/gaussian-opacity-fields/outputs/LFLS/test/ours_60000/fusion/mesh_binary_search_7.ply"
-    "/home/yang_liu/python_workspace/SuGaR/output/refined_mesh/LFLS/sugarfine_3Dgs14000_sdfestim02_sdfnorm02_level03_decim2000000_normalconsistency01_gaussperface1.obj"
+    "/data1/yang_liu/python_workspace/GSPL/outputs/citygs2d_lfls_lnorm4_wo_vast_sep_depth_trim/mesh/epoch=32-step=30000/fuse_vox2_dtrunc2.5_post.ply"
+    "/data1/yang_liu/python_workspace/GSPL/outputs/citygs2d_lfls_coarse_lnorm4_wo_vast_6w/mesh/epoch=63-step=60000/fuse_post.ply"
+    "/data1/yang_liu/python_workspace/GSPL/outputs/citygs_lfls/mesh/epoch=32-step=30000/fuse_post.ply"
+    "/data1/yang_liu/python_workspace/gaussian-opacity-fields/outputs/LFLS/test/ours_60000/fusion/mesh_binary_search_7.ply"
+    "/data1/yang_liu/python_workspace/SuGaR/output/refined_mesh/LFLS/sugarfine_3Dgs14000_sdfestim02_sdfnorm02_level03_decim2000000_normalconsistency01_gaussperface1.obj"
 )
 
 declare -a names=(
@@ -37,7 +37,8 @@ for i in "${!run_args[@]}"; do
                      --traj_path $traj_path \
                      --save_dir ./output/${NAME}_lfls \
                      --config_dir render_cfgs/gauu \
-                     --image_only
+                     --write_cover \
+                    #  --image_only \
 
         break
       else
