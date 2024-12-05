@@ -15,6 +15,5 @@
 !mip_splatting_gsplat_renderer.py
 !gsplat_hit_pixel_count_renderer.py
 !vanilla_2dgs_renderer.py
-!sep_2dgs_renderer.py
-!sep_depth_2dgs_renderer.py
+!sep_depth_trim_2dgs_renderer.py
 !vanilla_trim_renderer.py
