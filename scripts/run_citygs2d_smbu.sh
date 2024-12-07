@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_smbu_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5_v6
-NAME=citygs2d_smbu_lnorm4_wo_vast_sep_ssim_depth_trim_v6
+COARSE_NAME=citygsv2_smbu_coarse_sh2
+NAME=citygsv2_smbu_sh2_trim
 DATA_PATH=data/GauU_Scene/SMBU
 max_block_id=8
 
@@ -24,33 +24,33 @@ max_block_id=8
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-                                    --config configs/$COARSE_NAME.yaml \
-                                    -n $COARSE_NAME \
-                                    --logger wandb \
-                                    --project JointGS \
+--config configs/$COARSE_NAME.yaml \
+-n $COARSE_NAME \
+--logger wandb \
+--project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$COARSE_NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 0.01 \
-                                    --sdf_trunc 0.04 \
-                                    --depth_trunc 2.0
+--model_path outputs/$COARSE_NAME \
+--config_path outputs/$COARSE_NAME/config.yaml \
+--voxel_size 0.01 \
+--sdf_trunc 0.04 \
+--depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene SMBU_ds_35 \
-                                    --dataset-dir data/GauU_Scene/SMBU \
-                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
+--scene SMBU_ds_35 \
+--dataset-dir data/GauU_Scene/SMBU \
+--transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
+--ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config outputs/$COARSE_NAME/config.yaml \
-    --save_val \
+--config outputs/$COARSE_NAME/config.yaml \
+--save_val \
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)

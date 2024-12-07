@@ -1,0 +1,33 @@
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 30000
+model:
+  init_from: outputs/citygsv2_smbu_coarse_sh2/checkpoints/epoch=60-step=30000.ckpt
+  gaussian:
+    sh_degree: 2
+    optimization:
+      position_lr_init: 0.000064
+      position_lr_final: 0.00000064
+      scaling_lr: 0.004
+  renderer: 
+    class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
+    init_args:
+        lambda_normal: 0.0125
+        depth_ratio: 1.0
+        normal_regularization_from_iter: 0
+        init: 0.5
+        final_factor: 0.005
+        prune_ratio: 0.025
+        depth_loss_type: ssim
+data:
+  type: estimated_depth_colmap_block
+  path: data/GauU_Scene/SMBU
+  params:
+    estimated_depth_colmap_block:
+      image_list: data/GauU_Scene/SMBU/partition/3_3_1_even
+      down_sample_factor: 3.4175
+      content_threshold: 0.05
+      block_dim:
+      - 3
+      - 3
+      - 1

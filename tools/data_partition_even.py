@@ -33,9 +33,7 @@ def block_filtering(gaussians,
                     ckpt_path,
                     dataset, 
                     save_dir, 
-                    block_dim, 
-                    aabb, 
-                    num_threshold, 
+                    block_dim,  
                     content_threshold, 
                     background_color, 
                     quiet=False, 
@@ -51,25 +49,6 @@ def block_filtering(gaussians,
         xyz_org = gaussians.get_xyz
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
         bg_color=torch.tensor(background_color, dtype=torch.float, device="cuda")
-
-        if aabb is None:
-            torch.cuda.empty_cache()
-            c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in dataset.cameras])
-            poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
-            center = (focus_point_fn(poses))
-            radius = torch.tensor(np.median(np.abs(c2ws[:,:3,3] - center), axis=0), device=xyz_org.device)
-            center = torch.from_numpy(center).float().to(xyz_org.device)
-            if radius.min() / radius.max() < 0.02:
-                # If the radius is too small, we don't contract in this dimension
-                radius[torch.argmin(radius)] = 0.5 * (xyz_org[:, torch.argmin(radius)].max() - xyz_org[:, torch.argmin(radius)].min())
-            aabb = torch.zeros(6, device=xyz_org.device)
-            aabb[:3] = center - radius
-            aabb[3:] = center + radius
-        else:
-            assert len(aabb) == 6, "Unknown aabb format!"
-            aabb = torch.tensor(aabb, dtype=torch.float32, device=xyz_org.device)
-        
-        print(f"Block number: {block_num}, Gaussian number threshold: {num_threshold}")
 
         block_image_list = {i: [] for i in range(block_num)}
         
@@ -157,8 +136,6 @@ if __name__ == "__main__":
     parser.add_argument('--config_path', type=str, help='path of finetuned model', default=None)
     parser.add_argument('--model_path', type=str, help='path of coarse global model')
     parser.add_argument("--block_dim", type=int, nargs="+", default=None)
-    parser.add_argument("--aabb", type=float, nargs="+", default=None)
-    parser.add_argument("--num_threshold", type=int, default=25000)
     parser.add_argument("--content_threshold", type=float, default=0.08)
     parser.add_argument("--save_dir", type=str, help="directory to save partition", default=None)
     parser.add_argument("--quiet", action="store_true")
@@ -175,8 +152,6 @@ if __name__ == "__main__":
             else:
                 params = config.data.params.colmap_block
         args.block_dim = params.block_dim
-        args.aabb = params.aabb
-        args.num_threshold = params.num_threshold
         args.content_threshold = params.content_threshold
 
         if args.save_dir is None:
@@ -228,8 +203,8 @@ if __name__ == "__main__":
 
     block_filtering(model, renderer, ckpt_path,
                     dataparser_outputs.train_set, 
-                    save_dir, args.block_dim, args.aabb, 
-                    args.num_threshold, args.content_threshold,
+                    save_dir, args.block_dim, 
+                    args.content_threshold,
                     config.model.background_color, 
                     flatten_gs=flatten_gs, disable_inblock=False)
 
