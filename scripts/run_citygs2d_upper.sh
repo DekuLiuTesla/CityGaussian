@@ -1,13 +1,13 @@
 # Function to get the id of an available GPU
 get_available_gpu() {
-  local mem_threshold=11000
+  local mem_threshold=500
   nvidia-smi --query-gpu=index,memory.used --format=csv,noheader,nounits | awk -v threshold="$mem_threshold" -F', ' '
   $2 < threshold { print $1; exit }
   '
 }
 
-COARSE_NAME=citygs2d_upper_coarse_lnorm4_wo_vast_sep_ssim_depth_init_5
-NAME=citygs2d_upper_lnorm4_wo_vast_sep_ssim_depth_trim
+COARSE_NAME=citygsv2_upper_coarse_sh2
+NAME=citygsv2_upper_trim_sh2
 DATA_PATH=data/GauU_Scene/CUHK_UPPER_COLMAP
 max_block_id=8
 
@@ -24,25 +24,25 @@ max_block_id=8
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
---config configs/$COARSE_NAME.yaml \
--n $COARSE_NAME \
---logger wandb \
---project JointGS \
+                                    --config configs/$COARSE_NAME.yaml \
+                                    -n $COARSE_NAME \
+                                    --logger wandb \
+                                    --project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
---config outputs/$COARSE_NAME/config.yaml \
---save_val \
+                                    --config outputs/$COARSE_NAME/config.yaml \
+                                    --save_val \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
---model_path outputs/$COARSE_NAME \
---config_path outputs/$COARSE_NAME/config.yaml \
---voxel_size 0.01 \
---sdf_trunc 0.04 \
---depth_trunc 2.0
+                                    --model_path outputs/$COARSE_NAME \
+                                    --config_path outputs/$COARSE_NAME/config.yaml \
+                                    --voxel_size 0.01 \
+                                    --sdf_trunc 0.04 \
+                                    --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -56,65 +56,65 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition_even.py --config_path configs/$NAME.yaml
 
 # ============================================= train&eval tuned model =============================================
 for num in $(seq 0 $max_block_id); do
-while true; do
-gpu_id=$(get_available_gpu)
-if [[ -n $gpu_id ]]; then
-echo "GPU $gpu_id is available. Starting training block '$num'"
-CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python main.py fit \
---config configs/$NAME.yaml \
---data.params.estimated_depth_colmap_block.block_id $num \
--n $NAME \
---logger wandb \
---project JointGS & 
-# Increment the port number for the next run
-((port++))
-# Allow some time for the process to initialize and potentially use GPU memory
-sleep 120
-break
-else
-echo "No GPU available at the moment. Retrying in 2 minute."
-sleep 120
-fi
-done
+    while true; do
+        gpu_id=$(get_available_gpu)
+        if [[ -n $gpu_id ]]; then
+            echo "GPU $gpu_id is available. Starting training block '$num'"
+            CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python main.py fit \
+                --config configs/$NAME.yaml \
+                --data.params.estimated_depth_colmap_block.block_id $num \
+                -n $NAME \
+                --logger wandb \
+                --project JointGS & 
+            # Increment the port number for the next run
+            ((port++))
+            # Allow some time for the process to initialize and potentially use GPU memory
+            sleep 120
+            break
+        else
+            echo "No GPU available at the moment. Retrying in 2 minute."
+            sleep 120
+        fi
+    done
 done
 wait
 
 # merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$NAME.yaml \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge_even.py --config_path configs/$NAME.yaml \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
---config configs/$NAME.yaml \
---data.params.estimated_depth_colmap_block.split_mode experiment \
---data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
---data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
--n $NAME \
---test_speed \
---save_val \
+                                    --config configs/$NAME.yaml \
+                                    --data.params.estimated_depth_colmap_block.split_mode experiment \
+                                    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
+                                    --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
+                                    -n $NAME \
+                                    --test_speed \
+                                    --save_val \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
---model_path outputs/$NAME \
---config_path outputs/$COARSE_NAME/config.yaml \
---voxel_size 0.01 \
---sdf_trunc 0.04 \
---depth_trunc 2.0
+                                    --model_path outputs/$NAME \
+                                    --config_path outputs/$COARSE_NAME/config.yaml \
+                                    --voxel_size 0.01 \
+                                    --sdf_trunc 0.04 \
+                                    --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
---scene CUHK_UPPER_COLMAP_ds_35 \
---dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
---transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
---ply-path "outputs/$NAME/mesh/epoch=48-step=30000/fuse_post.ply"
+                                    --scene CUHK_UPPER_COLMAP_ds_35 \
+                                    --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
+                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
+                                    --ply-path "outputs/$NAME/mesh/epoch=48-step=30000/fuse_post.ply"
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do

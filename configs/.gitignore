@@ -30,3 +30,7 @@
 !citygsv2_smbu.yaml
 !citygsv2_smbu_coarse_sh2.yaml
 !citygsv2_smbu_sh2_trim.yaml
+!citygsv2_upper_coarse.yaml
+!citygsv2_upper.yaml
+!citygsv2_upper_coarse_sh2.yaml
+!citygsv2_upper_sh2_trim.yaml

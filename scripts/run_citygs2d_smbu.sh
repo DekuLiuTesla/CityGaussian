@@ -24,38 +24,38 @@ max_block_id=8
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
---config configs/$COARSE_NAME.yaml \
--n $COARSE_NAME \
---logger wandb \
---project JointGS \
+                                    --config configs/$COARSE_NAME.yaml \
+                                    -n $COARSE_NAME \
+                                    --logger wandb \
+                                    --project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
---model_path outputs/$COARSE_NAME \
---config_path outputs/$COARSE_NAME/config.yaml \
---voxel_size 0.01 \
---sdf_trunc 0.04 \
---depth_trunc 2.0
+                                    --model_path outputs/$COARSE_NAME \
+                                    --config_path outputs/$COARSE_NAME/config.yaml \
+                                    --voxel_size 0.01 \
+                                    --sdf_trunc 0.04 \
+                                    --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
---scene SMBU_ds_35 \
---dataset-dir data/GauU_Scene/SMBU \
---transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
---ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
+                                    --scene SMBU_ds_35 \
+                                    --dataset-dir data/GauU_Scene/SMBU \
+                                    --transform-path data/GauU_Scene/Downsampled/SMBU/transform.txt \
+                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=60-step=30000/fuse_post.ply"
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
---config outputs/$COARSE_NAME/config.yaml \
---save_val \
+                                    --config outputs/$COARSE_NAME/config.yaml \
+                                    --save_val \
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition_even.py --config_path configs/$NAME.yaml
 
 # ============================================= train&eval tuned model =============================================
 for num in $(seq 0 $max_block_id); do
@@ -85,18 +85,18 @@ wait
 # merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$NAME.yaml \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge_even.py --config_path configs/$NAME.yaml \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config configs/$NAME.yaml \
-    --data.params.estimated_depth_colmap_block.split_mode experiment \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
-    -n $NAME \
-    --test_speed \
-    --save_val \
+                                    --config configs/$NAME.yaml \
+                                    --data.params.estimated_depth_colmap_block.split_mode experiment \
+                                    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
+                                    --data.params.estimated_depth_colmap_block.eval_ratio 0.1 \
+                                    -n $NAME \
+                                    --test_speed \
+                                    --save_val \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
