@@ -34,3 +34,7 @@
 !citygsv2_upper.yaml
 !citygsv2_upper_coarse_sh2.yaml
 !citygsv2_upper_sh2_trim.yaml
+!citygsv2_lfls_coarse.yaml
+!citygsv2_lfls.yaml
+!citygsv2_lfls_coarse_sh2.yaml
+!citygsv2_lfls_sh2_trim.yaml
