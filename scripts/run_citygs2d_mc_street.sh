@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_mc_street_coarse_lnorm4_wo_vast_sep_rgb_only_norm_depth_ubd1e1
-NAME=citygs2d_mc_street_lnorm4_wo_vast_sep_depth_rgb_only_norm_ubd1e1
+COARSE_NAME=citygsv2_mc_street_coarse
+NAME=citygsv2_mc_street
 TEST_PATH="data/matrix_city/street/test/block_A_test"
 max_block_id=19
 
@@ -105,8 +105,8 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --data.path $TEST_PATH \
     --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
     --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
-    --test_speed \
     --save_val \
+    --test_speed \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
