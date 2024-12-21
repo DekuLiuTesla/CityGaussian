@@ -54,7 +54,7 @@ Suppose that you have downloaded and unzip the COLMAP results to `./data` folder
 
 ## Prepare Mill19 & UrbanScene3D datasets
 
-1. Download data of Mill19 and UrbanScene3D according to instruction from [MegaNeRF](https://github.com/cmusatyalab/mega-nerf). Save the data to `data/mill19` and `data/urban_scene_3d` respectively.
+1. Download data of Mill19 and UrbanScene3D according to instruction from [MegaNeRF](https://github.com/cmusatyalab/mega-nerf). Save the data to `data/mill19` and `data/urban_scene_3d` respectively. It is worth noticing that the used UrbanScene3D-V1 should be downloaded from [here](https://github.com/Linxius/UrbanScene3D).
 
 2. Run following command to prepare data of Mill19 with generated COLMAP results.
     ```bash
