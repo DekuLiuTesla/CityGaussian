@@ -38,3 +38,5 @@
 !citygsv2_lfls.yaml
 !citygsv2_lfls_coarse_sh2.yaml
 !citygsv2_lfls_sh2_trim.yaml
+!citygsv2_mc_street_coarse.yaml
+!citygsv2_mc_street.yaml

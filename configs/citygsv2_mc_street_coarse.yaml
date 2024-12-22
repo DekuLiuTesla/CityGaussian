@@ -1,0 +1,31 @@
+model:
+  gaussian:
+    optimization:
+      position_lr_max_steps: 30_000
+      position_lr_init: 1.6e-5
+      position_lr_final: 1.6e-6
+      scaling_lr: 0.001
+      densification_interval: 1000
+      opacity_reset_interval: 20000
+      densify_from_iter: 4000
+      densify_grad_threshold: 0.00005
+  renderer: 
+    class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
+    init_args:
+        lambda_normal: 0.0125
+        depth_ratio: 1.0
+        init: 1.0
+        final_factor: 0.1
+        depth_norm: true
+        diable_trimming: true
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 30000
+data:
+  type: estimated_depth_colmap_block
+  path: data/matrix_city/street/train/block_A
+  params:
+    estimated_depth_colmap_block:
+      down_sample_factor: 1
+      depth_scale_lower_bound: 0.01
+      depth_scale_upper_bound: 50.0
