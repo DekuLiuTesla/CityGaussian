@@ -63,9 +63,9 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
 
 
 # ============================================= generate partition =============================================
-# gpu_id=$(get_available_gpu)
-# echo "GPU $gpu_id is available."
-# CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
 
 # ============================================= train&eval tuned model =============================================
 for num in $(seq 0 $max_block_id); do
@@ -85,8 +85,8 @@ for num in $(seq 0 $max_block_id); do
             sleep 120
             break
         else
-            echo "No GPU available at the moment. Retrying in 4 minute."
-            sleep 240
+            echo "No GPU available at the moment. Retrying in 2 minute."
+            sleep 120
         fi
     done
 done
