@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs2d_mc_aerial_coarse_lnorm4_wo_vast_sep_depth_init_5_sh2
-NAME=citygs2d_mc_aerial_lnorm4_wo_vast_sep_depth_trim_sh2_even
+COARSE_NAME=citygsv2_mc_aerial_coarse_sh2
+NAME=citygsv2_mc_aerial_sh2_trim
 TEST_PATH=data/matrix_city/aerial/test/block_all_test
 max_block_id=35
 

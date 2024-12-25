@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygsv2_mc_street_coarse
-NAME=citygsv2_mc_street
+COARSE_NAME=citygsv2_mc_street_coarse_sh2
+NAME=citygsv2_mc_street_sh2
 TEST_PATH="data/matrix_city/street/test/block_A_test"
 max_block_id=19
 
