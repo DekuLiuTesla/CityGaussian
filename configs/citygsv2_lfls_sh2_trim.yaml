@@ -25,7 +25,7 @@ data:
   path: data/GauU_Scene/LFLS
   params:
     estimated_depth_colmap_block:
-      image_list: data/GauU_Scene/LFLS/partition/4_2_1_even
+      image_list: data/GauU_Scene/LFLS/partition/4_2_1_even_sh2
       down_sample_factor: 3.4175
       content_threshold: 0.05
       block_dim:

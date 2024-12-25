@@ -3,8 +3,9 @@ trainer:
   check_val_every_n_epoch: 20
   max_steps: 60_000
 model:
-  init_from: outputs/citygsv2_mc_street_coarse/checkpoints/epoch=8-step=30000.ckpt
+  init_from: outputs/citygsv2_mc_street_coarse_sh2/checkpoints/epoch=8-step=30000.ckpt
   gaussian:
+    sh_degree: 2
     optimization:
       feature_extra_lr_max_steps: 60_000
       position_lr_max_steps: 60_000
@@ -33,7 +34,7 @@ data:
   path: data/matrix_city/street/train/block_A
   params:
     estimated_depth_colmap_block:
-      image_list: data/matrix_city/street/train/block_A/partition/5_4_1
+      image_list: data/matrix_city/street/train/block_A/partition/5_4_1_sh2
       down_sample_factor: 1
       depth_scale_lower_bound: 0.01
       depth_scale_upper_bound: 50.0

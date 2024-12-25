@@ -2,9 +2,8 @@ trainer:
   check_val_every_n_epoch: 20
   max_steps: 30000
 model:
-  init_from: outputs/citygsv2_upper_coarse_sh2/checkpoints/epoch=48-step=30000.ckpt
+  init_from: outputs/citygsv2_mc_aerial_coarse/checkpoints/epoch=6-step=30000.ckpt
   gaussian:
-    sh_degree: 2
     optimization:
       position_lr_init: 0.000064
       position_lr_final: 0.00000064
@@ -17,17 +16,16 @@ model:
         normal_regularization_from_iter: 0
         init: 0.5
         final_factor: 0.005
-        prune_ratio: 0.04
         depth_loss_type: ssim
 data:
   type: estimated_depth_colmap_block
-  path: data/GauU_Scene/CUHK_UPPER_COLMAP
+  path: data/matrix_city/aerial/train/block_all
   params:
     estimated_depth_colmap_block:
-      image_list: data/GauU_Scene/CUHK_UPPER_COLMAP/partition/3_3_1_even_sh2
-      down_sample_factor: 3.4175
+      image_list: data/matrix_city/aerial/train/block_all/partition/6_6_1_even
+      down_sample_factor: 1.2
       content_threshold: 0.05
       block_dim:
-      - 3
-      - 3
+      - 6
+      - 6
       - 1
