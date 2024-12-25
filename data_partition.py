@@ -149,10 +149,10 @@ if __name__ == "__main__":
     model_config = lp.model_config
     gaussians = getattr(modules, model_config['name'])(lp.sh_degree, **model_config['kwargs'])
     scene = LargeScene(lp, gaussians, shuffle=False)
-    camera_mask = block_partitioning(scene.getTrainCameras(), gaussians, lp, pp, 1.0, args.quiet, args.disable_inblock, args.simple_selection)
-    camera_mask = camera_mask.cpu().numpy()
     if not os.path.exists(os.path.join(lp.source_path, "data_partitions")):
         os.makedirs(os.path.join(lp.source_path, "data_partitions"))
+    camera_mask = block_partitioning(scene.getTrainCameras(), gaussians, lp, pp, 1.0, args.quiet, args.disable_inblock, args.simple_selection)
+    camera_mask = camera_mask.cpu().numpy()
     np.save(os.path.join(lp.source_path, "data_partitions", f"{config_name}.npy"), camera_mask)
 
     # All done
