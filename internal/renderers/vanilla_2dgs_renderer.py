@@ -165,6 +165,7 @@ class Vanilla2DGSRenderer(Renderer):
 
     @staticmethod
     def depths_to_points(view, depthmap):
+        device = view.world_to_camera.device
         c2w = (view.world_to_camera.T).inverse()
         W, H = view.width.item(), view.height.item()
         fx = W / (2 * math.tan(view.fov_x / 2.))
@@ -173,8 +174,8 @@ class Vanilla2DGSRenderer(Renderer):
             [[fx, 0., W / 2.],
              [0., fy, H / 2.],
              [0., 0., 1.0]]
-        ).float().cuda()
-        grid_x, grid_y = torch.meshgrid(torch.arange(W, device='cuda').float(), torch.arange(H, device='cuda').float(), indexing='xy')
+        ).float().to(device)
+        grid_x, grid_y = torch.meshgrid(torch.arange(W, device=device).float(), torch.arange(H, device=device).float(), indexing='xy')
         points = torch.stack([grid_x, grid_y, torch.ones_like(grid_x)], dim=-1).reshape(-1, 3)
         rays_d = points @ intrins.inverse().T @ c2w[:3, :3].T
         rays_o = c2w[:3, 3]
