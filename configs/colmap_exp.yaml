@@ -1,0 +1,6 @@
+logger: wandb
+data:
+  parser:
+    class_path: Colmap
+    init_args:
+      split_mode: "experiment"

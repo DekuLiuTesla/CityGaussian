@@ -1,0 +1,10 @@
+# NOTE: the quality of v2 and v1 are identical
+trainer:
+  check_val_every_n_epoch: 10
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  image_on_cpu: false
+model:
+  gaussian: internal.models.mip_splatting.MipSplatting
+  renderer: internal.renderers.gsplat_mip_splatting_renderer_v2.GSplatMipSplattingRendererV2

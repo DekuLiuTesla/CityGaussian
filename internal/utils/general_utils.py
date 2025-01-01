@@ -160,7 +160,7 @@ def build_rotation(r):
 
     q = r / norm[:, None]
 
-    R = torch.zeros((q.size(0), 3, 3), device='cuda')
+    R = torch.zeros((q.size(0), 3, 3), device=r.device)
 
     r = q[:, 0]
     x = q[:, 1]
@@ -180,7 +180,7 @@ def build_rotation(r):
 
 
 def build_scaling_rotation(s, r):
-    L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device="cuda")
+    L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device=s.device)
     R = build_rotation(r)
 
     L[:, 0, 0] = s[:, 0]

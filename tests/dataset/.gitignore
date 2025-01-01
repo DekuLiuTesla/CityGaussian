@@ -1,3 +1,4 @@
 *
 !.gitignore
+!blender_dataparser_test.py
 !nerfies_dataparser_test.py

@@ -1,6 +1,8 @@
+pbar_rate: 10
 trainer:
   check_val_every_n_epoch: 10
 data:
-  params:
-    val_max_num_images_to_cache: -1
-    test_max_num_images_to_cache: -1
+  parser: Blender
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  image_on_cpu: false

@@ -1,0 +1,12 @@
+model:
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  density:
+    opacity_reset_interval: 999999999  # no reset
+  metric:
+    class_path: internal.metrics.spotless_metrics.SpotLessMetrics
+    init_args:
+      max_mlp_mask_size: 400
+      lambda_dssim: 0.
+data:
+  parser: internal.dataparsers.spotless_colmap_dataparser.SpotLessColmap
+cache_all_images: true

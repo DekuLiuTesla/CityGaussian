@@ -1,0 +1,10 @@
+model:
+  density:
+    opacity_reset_interval: 999999999  # no reset
+  metric:
+    class_path: internal.metrics.spotless_metrics.SpotLessMetrics
+    init_args:
+      lambda_dssim: 0.
+data:
+  parser: internal.dataparsers.spotless_colmap_dataparser.SpotLessColmap
+cache_all_images: true

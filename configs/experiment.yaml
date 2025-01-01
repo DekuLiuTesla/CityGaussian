@@ -1,5 +1,0 @@
-logger: wandb
-data:
-  params:
-    colmap:
-      split_mode: "experiment"

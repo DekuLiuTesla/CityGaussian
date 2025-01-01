@@ -1,0 +1,15 @@
+model:
+  metric:
+    class_path: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+    init_args:
+      depth_normalized: true
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  renderer_output_types:
+    - rgb
+    - inverse_depth
+data:
+  parser:
+    class_path: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+    init_args:
+      depth_rescaling: false
+cache_all_images: true

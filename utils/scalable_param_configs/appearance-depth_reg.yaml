@@ -1,0 +1,3 @@
+scalable:
+  model.renderer.optimization.max_steps: 30000
+  model.metric.depth_loss_weight.max_steps: 30000

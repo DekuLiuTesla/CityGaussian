@@ -26,24 +26,25 @@ class EditPanel:
 
     def _setup_point_cloud_folder(self):
         server = self.server
-        with self.server.add_gui_folder("Point Cloud"):
-            self.show_point_cloud_checkbox = server.add_gui_checkbox(
+        with self.server.gui.add_folder("Point Cloud"):
+            self.show_point_cloud_checkbox = server.gui.add_checkbox(
                 "Show Point Cloud",
                 initial_value=False,
             )
-            self.point_cloud_color = server.add_gui_vector3(
+            self.point_cloud_color = server.gui.add_vector3(
                 "Point Color",
                 min=(0, 0, 0),
                 max=(255, 255, 255),
                 step=1,
                 initial_value=(0, 255, 255),
             )
-            self.point_size = server.add_gui_number(
+            self.point_size = server.gui.add_number(
                 "Point Size",
                 min=0.,
                 initial_value=0.01,
+                step=0.001,
             )
-            self.point_sparsify = server.add_gui_number(
+            self.point_sparsify = server.gui.add_number(
                 "Point Sparsify",
                 min=1,
                 initial_value=10,
@@ -76,7 +77,7 @@ class EditPanel:
 
         self.edit_histories = []
 
-        with server.add_gui_folder("Edit"):
+        with server.gui.add_folder("Edit"):
             # initialize a list to store panel(grid)'s information
             self.grids: dict[int, list[
                 viser.MeshHandle,
@@ -85,8 +86,8 @@ class EditPanel:
             ]] = {}
             self.grid_idx = 0
 
-            add_grid_button = server.add_gui_button("Add Panel")
-            self.delete_gaussians_button = server.add_gui_button(
+            add_grid_button = server.gui.add_button("Add Panel")
+            self.delete_gaussians_button = server.gui.add_button(
                 "Delete Gaussians",
                 color="red",
             )
@@ -95,11 +96,11 @@ class EditPanel:
 
         # create panel(grid)
         def new_grid(idx):
-            with self.server.add_gui_folder("Grid {}".format(idx)) as folder:
+            with self.server.gui.add_folder("Grid {}".format(idx)) as folder:
                 self.grid_folders[idx] = folder
 
                 # TODO: add height
-                grid_size = server.add_gui_vector2("Size", initial_value=(10., 10.), min=(0., 0.), step=0.01)
+                grid_size = server.gui.add_vector2("Size", initial_value=(10., 10.), min=(0., 0.), step=0.01)
 
                 grid = server.add_grid(
                     "/grid/{}".format(idx),
@@ -119,7 +120,7 @@ class EditPanel:
                         self._resize_grid(idx)
 
                 # handle panel deletion
-                grid_delete_button = server.add_gui_button("Delete")
+                grid_delete_button = server.gui.add_button("Delete")
 
                 @grid_delete_button.on_click
                 def _(_):
@@ -165,12 +166,12 @@ class EditPanel:
             self.viewer.rerender_for_all_client()
 
     def _setup_save_gaussian_folder(self):
-        with self.server.add_gui_folder("Save"):
-            name_text = self.server.add_gui_text(
+        with self.server.gui.add_folder("Save"):
+            name_text = self.server.gui.add_text(
                 "Name",
                 initial_value=datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),
             )
-            save_button = self.server.add_gui_button("Save")
+            save_button = self.server.gui.add_button("Save")
 
             @save_button.on_click
             def _(event: viser.GuiEvent):
@@ -184,7 +185,7 @@ class EditPanel:
                         try:
                             # check whether is a valid name
                             name = name_text.value
-                            match = re.search("^[a-zA-Z0-9_\-]+$", name)
+                            match = re.search(r"^[a-zA-Z0-9_\-]+$", name)
                             if match:
                                 output_directory = "edited"
                                 os.makedirs(output_directory, exist_ok=True)
@@ -195,29 +196,21 @@ class EditPanel:
                                     traceback.print_exc()
 
                                 if self.viewer.checkpoint is None:
+                                    from internal.utils.gaussian_utils import GaussianPlyUtils
                                     # save ply
                                     ply_save_path = os.path.join(output_directory, "{}.ply".format(name))
-                                    self.viewer.gaussian_model.to_ply_structure().save_to_ply(ply_save_path)
+                                    GaussianPlyUtils.load_from_model_properties(self.viewer.gaussian_model.get_non_pre_activated_properties(), self.viewer.gaussian_model.max_sh_degree).to_ply_format().save_to_ply(ply_save_path)
                                     message_text = "Saved to {}".format(ply_save_path)
                                 else:
                                     # save as a checkpoint if viewer started from a checkpoint
                                     checkpoint_save_path = os.path.join(output_directory, "{}.ckpt".format(name))
                                     checkpoint = self.viewer.checkpoint
                                     # update state dict of the checkpoint
-                                    state_dict_value = self.viewer.gaussian_model.to_parameter_structure()
-                                    for name_in_dict, name_in_dataclass in [
-                                        ("xyz", "xyz"),
-                                        ("features_dc", "features_dc"),
-                                        ("features_rest", "features_rest"),
-                                        ("scaling", "scales"),
-                                        ("rotation", "rotations"),
-                                        ("opacity", "opacities"),
-                                        ("features_extra", "real_features_extra"),
-                                    ]:
-                                        dict_key = "gaussian_model._{}".format(name_in_dict)
-                                        if dict_key not in checkpoint["state_dict"]:
-                                            print(f"WARNING: `{dict_key}` not found in original checkpoint")
-                                        checkpoint["state_dict"][dict_key] = getattr(state_dict_value, name_in_dataclass)
+                                    properties = self.viewer.gaussian_model.get_non_pre_activated_properties()
+                                    for name, value in properties.items():
+                                        key = "gaussian_model.gaussians.{}".format(name)
+                                        checkpoint["state_dict"][key] = properties[name].to(device=checkpoint["state_dict"][key].device)
+                                    # TODO: density controller and optimizer states need to be pruned too
                                     # save
                                     torch.save(checkpoint, checkpoint_save_path)
                                     message_text = "Saved to {}".format(checkpoint_save_path)
@@ -227,9 +220,9 @@ class EditPanel:
                             traceback.print_exc()
 
                     # show message
-                    with event.client.add_gui_modal("Message") as modal:
-                        event.client.add_gui_markdown(message_text)
-                        close_button = event.client.add_gui_button("Close")
+                    with event.client.gui.add_modal("Message") as modal:
+                        event.client.gui.add_markdown(message_text)
+                        close_button = event.client.gui.add_button("Close")
 
                         @close_button.on_click
                         def _(_) -> None:
@@ -282,6 +275,7 @@ class EditPanel:
         selected_gaussian = torch.where(self._get_selected_gaussians_mask())
         return selected_gaussian
 
+    @torch.no_grad()
     def _update_pcd(self, selected_gaussians_indices=None):
         self.remove_point_cloud()
         if self.show_point_cloud_checkbox.value is False:

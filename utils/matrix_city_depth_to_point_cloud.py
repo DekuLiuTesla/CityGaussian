@@ -1,12 +1,15 @@
+import add_pypath
 import os
 import argparse
 import math
+from concurrent.futures import ThreadPoolExecutor
 import json
 import random
 import numpy as np
+import torch
 import cv2
-import open3d as o3d
-
+from internal.utils.graphics_utils import store_ply
+from internal.utils.depth_map_utils import depth_map_to_colored_points_with_down_sample
 from tqdm import tqdm
 
 os.environ['OPENCV_IO_ENABLE_OPENEXR'] = '1'
@@ -31,16 +34,20 @@ def parse_args():
                         help="max valid depth value")
     parser.add_argument("--step", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--dtype", type=str, default="float64")
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--max-workers", type=int, default=8)
+    parser.add_argument("--down-sample", type=int, default=1)
     args = parser.parse_args()
 
     return args
 
 
-def read_depth(path: str, scale: float):
+def read_depth(path: str):
     return cv2.imread(
         path,
         cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH,
-    )[..., 0] * scale
+    )[..., 0]
 
 
 def read_rgb(path: str):
@@ -48,80 +55,95 @@ def read_rgb(path: str):
     return cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
 
-def build_point_cloud(frames: list[dict], max_point_per_image: int, max_depth: float, scene_scale: float, depth_scale: float, rgb_dirname: str):
+def build_point_cloud(
+        frames: list[dict],
+        max_point_per_image: int,
+        max_depth: float, scene_scale: float,
+        depth_scale: float,
+        rgb_dirname: str,
+        dtype,
+        device,
+        max_workers: int,
+        down_sample_factor: int,
+):
+    torch.inverse(torch.ones((1, 1), device=device))  # https://github.com/pytorch/pytorch/issues/90613#issuecomment-1817307008
+
     xyz_array_list = []
     rgb_array_list = []
 
     final_depth_scale = scene_scale * depth_scale
     final_max_depth = max_depth * final_depth_scale
 
-    for frame in tqdm(frames):
-        # build intrinsics matrix
+    def build_single_frame_3d_points(frame):
+        # read rgb and depth
+        rgb = read_rgb(os.path.join(
+            frame["base_dir"],
+            rgb_dirname,
+            "{:04d}.png".format(frame["frame_index"]),
+        ))
+        depth = torch.from_numpy(read_depth(os.path.join(
+            frame["base_dir"],
+            "depth",
+            "{:04d}.exr".format(frame["frame_index"]),
+        ))).to(dtype=dtype, device=device) * depth_scale
+        valid_pixel_mask = torch.lt(depth, final_max_depth)
+
+        # calculate intrinsics
         fov_x = frame["camera_angle_x"]
-        rgb = read_rgb(os.path.join(frame["base_dir"], rgb_dirname, "{:04d}.png".format(frame["frame_index"])))
         image_shape = rgb.shape
         height, width = image_shape[0], image_shape[1]
         fx = float(.5 * width / np.tan(.5 * fov_x))
         fy = fx
         cx = width / 2
         cy = height / 2
-        K = np.eye(3)
-        K[0, 2] = cx
-        K[1, 2] = cy
-        K[0, 0] = fx
-        K[1, 1] = fy
-
-        # build pixel coordination
-        image_pixel_count = height * width
-        u_coord = np.tile(np.arange(width), (height, 1)).reshape(image_pixel_count)
-        v_coord = np.tile(np.arange(height), (width, 1)).T.reshape(image_pixel_count)
-        p2d = np.array([u_coord, v_coord, np.ones_like(u_coord)]).T
-        homogenous_coordinate = np.matmul(p2d, np.linalg.inv(K).T)
-
-        # read rgb and depth
-        rgb = rgb.reshape((-1, 3))
-        depth = read_depth(
-            os.path.join(frame["base_dir"], "depth", "{:04d}.exr".format(frame["frame_index"])),
-            final_depth_scale,
-        ).reshape((-1,))
-
-        # discard invalid depth
-        valid_depth_indices = np.where(depth < final_max_depth)
-        rgb = rgb[valid_depth_indices]
-        depth = depth[valid_depth_indices]
-        homogenous_coordinate = homogenous_coordinate[valid_depth_indices]
-
-        # random sample
-        valid_pixel_count = rgb.shape[0]
-        if max_point_per_image < valid_pixel_count:
-            sample_indices = np.random.choice(valid_pixel_count, max_point_per_image, replace=False)
-            homogenous_coordinate = homogenous_coordinate[sample_indices]
-            rgb = rgb[sample_indices]
-            depth = depth[sample_indices]
 
         # build camera-to-world transform matrix
-        rot_mat = np.asarray(frame["rot_mat"], dtype=np.float32)
+        rot_mat = torch.tensor(frame["rot_mat"], dtype=depth.dtype, device=depth.device)
         rot_mat[:3, :3] *= 100
         if scene_scale != 1.:
             rot_mat[:3, 3] *= scene_scale
         c2w = rot_mat
 
-        # convert to world coordination
-        points_3d_in_camera = homogenous_coordinate * depth[:, None]
         """
-        convert to right-handed coordinates
-        see:
-            https://github.com/bmild/nerf/blob/18b8aebda6700ed659cb27a0c348b737a5f6ab60/run_nerf_helpers.py#L137
-            https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
+        https://github.com/bmild/nerf/blob/18b8aebda6700ed659cb27a0c348b737a5f6ab60/run_nerf_helpers.py#L137
+        https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-generating-camera-rays/generating-camera-rays.html
+        
+        x left, y down, z front
         """
-        points_3d_in_camera[:, 1] *= -1
-        points_3d_in_camera[:, 2] *= -1
-        points_3d_in_world = np.matmul(points_3d_in_camera, c2w[:3, :3].T) + c2w[:3, 3]
+        c2w[:, 1:3] *= -1
 
-        xyz_array_list.append(points_3d_in_world)
-        rgb_array_list.append(rgb)
+        # build 3D points
+        points_3d_in_world, rgb = depth_map_to_colored_points_with_down_sample(
+            depth_map=depth,
+            rgb=rgb,
+            fx=fx,
+            fy=fy,
+            cx=cx,
+            cy=cy,
+            c2w=c2w,
+            down_sample_factor=down_sample_factor,
+            valid_pixel_mask=valid_pixel_mask,
+        )
 
-    return np.concatenate(xyz_array_list, axis=0), np.concatenate(rgb_array_list, axis=0)
+        # random sample
+        n_points = points_3d_in_world.shape[0]
+        if max_point_per_image < n_points:
+            sample_indices = torch.randperm(n_points)[:max_point_per_image]
+            points_3d_in_world = points_3d_in_world[sample_indices]
+            rgb = rgb[sample_indices.cpu().numpy()]
+
+        return points_3d_in_world.cpu(), rgb
+
+    with ThreadPoolExecutor(max_workers=max_workers) as tpe:
+        for points_3d_in_world, rgb in tqdm(
+                tpe.map(build_single_frame_3d_points, frames),
+                total=len(frames),
+        ):
+            assert points_3d_in_world.shape[0] == rgb.shape[0]
+            xyz_array_list.append(points_3d_in_world)
+            rgb_array_list.append(rgb)
+
+    return torch.concat(xyz_array_list, dim=0).numpy(), np.concatenate(rgb_array_list, axis=0)
 
 
 def merge_frames(paths: list[str]) -> list:
@@ -163,11 +185,12 @@ def main():
         scene_scale=args.scale,
         depth_scale=args.depth_scale,
         rgb_dirname=args.rgb,
+        dtype=getattr(torch, args.dtype),
+        device=torch.device(args.device),
+        max_workers=args.max_workers,
+        down_sample_factor=args.down_sample,
     )
-    final_pcd = o3d.geometry.PointCloud()
-    final_pcd.points = o3d.utility.Vector3dVector(xyz)
-    final_pcd.colors = o3d.utility.Vector3dVector(rgb / 255.)
-    o3d.io.write_point_cloud(args.output, final_pcd)
+    store_ply(args.output, xyz, rgb)
 
 
 if __name__ == "__main__":

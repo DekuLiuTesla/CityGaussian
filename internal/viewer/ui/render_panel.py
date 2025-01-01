@@ -13,6 +13,10 @@
 # limitations under the License.
 
 from __future__ import annotations
+
+import os
+import re
+import traceback
 from pathlib import Path
 import colorsys
 import dataclasses
@@ -23,6 +27,7 @@ import datetime
 import numpy as onp
 import splines
 import splines.quaternion
+import torch
 import viser
 import json
 import viser.transforms as tf
@@ -78,6 +83,7 @@ class CameraPath:
         self._viewer = viewer
         self._keyframes: Dict[int, Tuple[Keyframe, viser.CameraFrustumHandle]] = {}
         self._keyframe_counter: int = 0
+        self._max_t = 0
         self._spline: Optional[viser.SceneNodeHandle] = None
         self._camera_edit_panel: Optional[viser.Gui3dContainerHandle] = None
 
@@ -92,7 +98,10 @@ class CameraPath:
         # These parameters should be overridden externally.
         self.loop: bool = False
         self.smoothness: float = 0.5  # Tension / alpha term.
+        self.constant_speed: bool = True
         self.default_fov: float = 0.0
+        self.framerate: float = 0
+        self.duration: float = 0
 
     def set_keyframes_visible(self, visible: bool) -> None:
         self._keyframes_visible = visible
@@ -113,7 +122,7 @@ class CameraPath:
             fov=keyframe.override_fov_value if keyframe.override_fov_enabled else self.default_fov,
             aspect=keyframe.aspect,
             scale=0.1,
-            color=(127, 127, 127),
+            color=(255, 0, 255),
             wxyz=keyframe.wxyz,
             position=keyframe.position,
             visible=self._keyframes_visible,
@@ -127,8 +136,8 @@ class CameraPath:
                     position=keyframe.position,
             ) as camera_edit_panel:
                 self._camera_edit_panel = camera_edit_panel
-                override_fov = server.add_gui_checkbox("Override FOV", initial_value=keyframe.override_fov_enabled)
-                override_fov_degrees = server.add_gui_slider(
+                override_fov = server.gui.add_checkbox("Override FOV", initial_value=keyframe.override_fov_enabled)
+                override_fov_degrees = server.gui.add_slider(
                     "Override FOV (degrees)",
                     5.0,
                     175.0,
@@ -136,11 +145,11 @@ class CameraPath:
                     initial_value=keyframe.override_fov_value * 180.0 / onp.pi,
                     disabled=not keyframe.override_fov_enabled,
                 )
-                enable_model_transform = server.add_gui_checkbox("Enable Model Transform", initial_value=keyframe.enable_model_transform)
-                delete_button = server.add_gui_button("Delete", color="red", icon=viser.Icon.TRASH)
-                go_to_button = server.add_gui_button("Go to")
-                update_model_poses = server.add_gui_button("Use Current Model Poses")
-                close_button = server.add_gui_button("Close")
+                enable_model_transform = server.gui.add_checkbox("Enable Model Transform", initial_value=keyframe.enable_model_transform)
+                delete_button = server.gui.add_button("Delete", color="red", icon=viser.Icon.TRASH)
+                go_to_button = server.gui.add_button("Go to")
+                update_model_poses = server.gui.add_button("Use Current Model Poses")
+                close_button = server.gui.add_button("Close")
 
                 @override_fov.on_update
                 def _(_) -> None:
@@ -160,10 +169,10 @@ class CameraPath:
 
                 @update_model_poses.on_click
                 def _(event: viser.GuiEvent) -> None:
-                    with event.client.add_gui_modal("Confirm") as modal:
-                        event.client.add_gui_markdown("Update model poses to current?")
-                        confirm_button = event.client.add_gui_button("Yes", color="red")
-                        cancel_button = event.client.add_gui_button("Cancel")
+                    with event.client.gui.add_modal("Confirm") as modal:
+                        event.client.gui.add_markdown("Update model poses to current?")
+                        confirm_button = event.client.gui.add_button("Yes", color="red")
+                        cancel_button = event.client.gui.add_button("Cancel")
 
                         @confirm_button.on_click
                         def _(_) -> None:
@@ -178,10 +187,10 @@ class CameraPath:
                 @delete_button.on_click
                 def _(event: viser.GuiEvent) -> None:
                     assert event.client is not None
-                    with event.client.add_gui_modal("Confirm") as modal:
-                        event.client.add_gui_markdown("Delete keyframe?")
-                        confirm_button = event.client.add_gui_button("Yes", color="red", icon=viser.Icon.TRASH)
-                        exit_button = event.client.add_gui_button("Cancel")
+                    with event.client.gui.add_modal("Confirm") as modal:
+                        event.client.gui.add_markdown("Delete keyframe?")
+                        confirm_button = event.client.gui.add_button("Yes", color="red", icon=viser.Icon.TRASH)
+                        exit_button = event.client.gui.add_button("Cancel")
 
                         @confirm_button.on_click
                         def _(_) -> None:
@@ -269,6 +278,7 @@ class CameraPath:
                 keyframe[0].override_fov_value if keyframe[0].override_fov_enabled else self.default_fov
                 for keyframe in self._keyframes.values()
             ],
+            self._position_spline.grid,
             tcb=(self.smoothness, 0.0, 0.0),
             endconditions="closed" if self.loop else "natural",
         )
@@ -276,7 +286,7 @@ class CameraPath:
         assert self._orientation_spline is not None
         assert self._position_spline is not None
         assert self._fov_spline is not None
-        max_t = len(self._keyframes) if self.loop else len(self._keyframes) - 1
+        max_t = self._max_t
         t = max_t * normalized_t
         quat = self._orientation_spline.evaluate(t)
         assert isinstance(quat, splines.quaternion.UnitQuaternion)
@@ -310,6 +320,15 @@ class CameraPath:
             model_poses,
         )
 
+    def get_keyframe_times(self):
+        keyframe_positions = [keyframe[0].position for keyframe in self._keyframes.values()]
+        if self.loop is True:
+            keyframe_positions += keyframe_positions[:1]
+        keyframe_distances = onp.linalg.norm(onp.diff(keyframe_positions, axis=0), axis=1)
+        keyframe_times = onp.concatenate([[0], onp.cumsum(keyframe_distances)])
+
+        return keyframe_times
+
     def update_spline(self) -> None:
         keyframes = list(self._keyframes.values())
         if len(keyframes) <= 1:
@@ -318,17 +337,30 @@ class CameraPath:
                 self._spline = None
             return
 
+        num_frames = int(self.duration * self.framerate)
+        if num_frames <= 0:
+            return
+
+        keyframe_times = None
+        max_t = len(keyframes) if self.loop else len(keyframes) - 1
+        if self.constant_speed is True:
+            keyframe_times = self.get_keyframe_times()
+            max_t = keyframe_times[-1]
+        self._max_t = max_t
+
         # Update internal splines.
         self._orientation_spline = splines.quaternion.KochanekBartels(
             [
                 splines.quaternion.UnitQuaternion.from_unit_xyzw(onp.roll(keyframe[0].wxyz, shift=-1))
                 for keyframe in keyframes
             ],
+            keyframe_times,
             tcb=(self.smoothness, 0.0, 0.0),
             endconditions="closed" if self.loop else "natural",
         )
         self._position_spline = splines.KochanekBartels(
             [keyframe[0].position for keyframe in keyframes],
+            keyframe_times,
             tcb=(self.smoothness, 0.0, 0.0),
             endconditions="closed" if self.loop else "natural",
         )
@@ -371,9 +403,8 @@ class CameraPath:
             ))
 
         # Update visualized spline.
-        num_keyframes = len(keyframes) + 1 if self.loop else len(keyframes)
         points_array = onp.array(
-            [self._position_spline.evaluate(t) for t in onp.linspace(0, num_keyframes - 1, num_keyframes * 100)]
+            [self._position_spline.evaluate(t) for t in onp.linspace(0, self._max_t, num_frames)]
         )
         colors_array = onp.array([colorsys.hls_to_rgb(h, 0.5, 1.0) for h in onp.linspace(0.0, 1.0, len(points_array))])
         self._spline = self._server.add_point_cloud(
@@ -398,9 +429,11 @@ def populate_render_tab(
     if extra_args is None:
         extra_args = []
 
-    fov_degrees = server.add_gui_slider(
+    camera_path_file_dir = datapath / "camera_paths"
+
+    fov_degrees = server.gui.add_slider(
         "FOV",
-        initial_value=90.0,
+        initial_value=75.,
         min=0.1,
         max=175.0,
         step=0.01,
@@ -418,7 +451,7 @@ def populate_render_tab(
         # Could rethink this.
         camera_path.update_aspect(resolution.value[0] / resolution.value[1])
 
-    resolution = server.add_gui_vector2(
+    resolution = server.gui.add_vector2(
         "Resolution",
         initial_value=(1920, 1080),
         min=(50, 50),
@@ -432,14 +465,14 @@ def populate_render_tab(
         """Update the aspect ratio for all cameras when the resolution changes."""
         camera_path.update_aspect(resolution.value[0] / resolution.value[1])
 
-    camera_type = server.add_gui_dropdown(
+    camera_type = server.gui.add_dropdown(
         "Camera Type",
-        ("Perspective", "Fisheye", "Equirectangular"),
+        ("Perspective",),
         initial_value="Perspective",
         hint="Camera model to render with.",
     )
 
-    add_button = server.add_gui_button(
+    add_button = server.gui.add_button(
         "Add keyframe",
         icon=viser.Icon.PLUS,
         hint="Add a new keyframe at the current pose.",
@@ -466,7 +499,7 @@ def populate_render_tab(
         add_camera(event, enable_model_transform=True)
 
     if viewer.transform_panel is not None:
-        add_without_model_transform_button = server.add_gui_button(
+        add_without_model_transform_button = server.gui.add_button(
             "Add keyframe w/o model transform",
             icon=viser.Icon.PLUS,
             hint="Add a new keyframe at the current pose, but without model transform.",
@@ -476,7 +509,7 @@ def populate_render_tab(
         def _(event: viser.GuiEvent) -> None:
             add_camera(event, enable_model_transform=False)
 
-    clear_keyframes_button = server.add_gui_button(
+    clear_keyframes_button = server.gui.add_button(
         "Clear keyframes",
         icon=viser.Icon.TRASH,
         hint="Remove all keyframes from the render path.",
@@ -486,10 +519,10 @@ def populate_render_tab(
     def _(event: viser.GuiEvent) -> None:
         assert event.client_id is not None
         client = server.get_clients()[event.client_id]
-        with client.add_gui_modal("Confirm") as modal:
-            client.add_gui_markdown("Clear all keyframes?")
-            confirm_button = client.add_gui_button("Yes", color="red", icon=viser.Icon.TRASH)
-            exit_button = client.add_gui_button("Cancel")
+        with client.gui.add_modal("Confirm") as modal:
+            client.gui.add_markdown("Clear all keyframes?")
+            confirm_button = client.gui.add_button("Yes", color="red", icon=viser.Icon.TRASH)
+            exit_button = client.gui.add_button("Cancel")
 
             @confirm_button.on_click
             def _(_) -> None:
@@ -507,16 +540,16 @@ def populate_render_tab(
             def _(_) -> None:
                 modal.close()
 
-    loop = server.add_gui_checkbox("Loop", False)
+    loop = server.gui.add_checkbox("Loop", False)
 
     @loop.on_update
     def _(_) -> None:
         camera_path.loop = loop.value
         camera_path.update_spline()
 
-    smoothness = server.add_gui_slider(
+    smoothness = server.gui.add_slider(
         "Spline Tension",
-        min=0.0,
+        min=-1.0,
         max=1.0,
         initial_value=0.0,
         step=0.01,
@@ -528,7 +561,18 @@ def populate_render_tab(
         camera_path.smoothness = smoothness.value
         camera_path.update_spline()
 
-    move_checkbox = server.add_gui_checkbox(
+    constant_speed_checkbox = server.gui.add_checkbox(
+        "Constant Speed",
+        initial_value=True,
+        hint="Maintain a constant speed for camera movement",
+    )
+
+    @constant_speed_checkbox.on_update
+    def _(_) -> None:
+        camera_path.constant_speed = constant_speed_checkbox.value
+        camera_path.update_spline()
+
+    move_checkbox = server.gui.add_checkbox(
         "Move keyframes",
         initial_value=False,
         hint="Toggle move handles for keyframes in the scene.",
@@ -569,21 +613,21 @@ def populate_render_tab(
             transform_controls.append(controls)
             _make_transform_controls_callback(keyframe, controls)
 
-    playback_folder = server.add_gui_folder("Playback")
+    playback_folder = server.gui.add_folder("Playback")
     with playback_folder:
-        duration_number = server.add_gui_number("Duration (sec)", min=0.0, max=1e8, step=0.0001, initial_value=4.0)
-        framerate_number = server.add_gui_number("Frame rate (FPS)", min=0.1, max=240.0, step=1e-8, initial_value=30.0)
-        framerate_buttons = server.add_gui_button_group("", ("24", "30", "60"))
+        duration_number = server.gui.add_number("Duration (sec)", min=0.0, max=1e8, step=0.001, initial_value=4.0)
+        framerate_number = server.gui.add_number("Frame rate (FPS)", min=0.1, max=240.0, step=1e-2, initial_value=30.0)
+        framerate_buttons = server.gui.add_button_group("", ("24", "30", "60"))
 
         @framerate_buttons.on_click
         def _(_) -> None:
             framerate_number.value = float(framerate_buttons.value)
 
-        play_button = server.add_gui_button("Play", icon=viser.Icon.PLAYER_PLAY)
-        pause_button = server.add_gui_button("Pause", icon=viser.Icon.PLAYER_PAUSE, visible=False)
-        attach_viewport_checkbox = server.add_gui_checkbox("Attach viewport", initial_value=False)
-        apply_transform_checkbox = server.add_gui_checkbox("Apply Transform", initial_value=False)
-        show_checkbox = server.add_gui_checkbox(
+        play_button = server.gui.add_button("Play", icon=viser.Icon.PLAYER_PLAY)
+        pause_button = server.gui.add_button("Pause", icon=viser.Icon.PLAYER_PAUSE, visible=False)
+        attach_viewport_checkbox = server.gui.add_checkbox("Attach viewport", initial_value=False)
+        apply_transform_checkbox = server.gui.add_checkbox("Apply Transform", initial_value=False)
+        show_checkbox = server.gui.add_checkbox(
             "Show keyframes",
             initial_value=True,
             hint="Show keyframes in the scene.",
@@ -601,7 +645,7 @@ def populate_render_tab(
         if max_frame_index <= 0:
             return None
         with playback_folder:
-            preview_frame_slider = server.add_gui_slider(
+            preview_frame_slider = server.gui.add_slider(
                 "Preview frame",
                 min=0,
                 max=max_frame_index,
@@ -680,6 +724,10 @@ def populate_render_tab(
         else:
             preview_frame_slider = old
 
+        camera_path.duration = duration_number.value
+        camera_path.framerate = framerate_number.value
+        camera_path.update_spline()
+
     # Play the camera trajectory when the play button is pressed.
     @play_button.on_click
     def _(_) -> None:
@@ -704,19 +752,29 @@ def populate_render_tab(
 
     # set the initial value to the current date-time string
     now = datetime.datetime.now()
-    render_name_text = server.add_gui_text(
+    render_name_text = server.gui.add_text(
         "Render Name", initial_value=now.strftime("%Y-%m-%d-%H-%M-%S"), hint="Name of the render"
     )
-    render_button = server.add_gui_button(
+    render_button = server.gui.add_button(
         "Generate Command",
         color="green",
         icon=viser.Icon.FILE_EXPORT,
-        hint="Generate the ns-render command for rendering the camera path.",
+        hint="Generate the command for rendering the camera path.",
     )
 
     @render_button.on_click
     def _(event: viser.GuiEvent) -> None:
         assert event.client is not None
+
+        if is_filename_valid(render_name_text.value) is False:
+            viewer.show_message("Invalid filename", event.client)
+            return
+
+        json_outfile = camera_path_file_dir / f"{render_name_text.value}.json"
+        # if os.path.exists(json_outfile) is True:
+        #     viewer.show_message("File already exists", event.client)
+        #     return
+
         num_frames = int(framerate_number.value * duration_number.value)
         json_data = {}
         # json data has the properties:
@@ -737,7 +795,9 @@ def populate_render_tab(
         # aspect: float
         # first populate the keyframes:
         keyframes = []
+        raw_keyframes = []
         for keyframe, dummy in camera_path._keyframes.values():
+            raw_keyframes.append(keyframe)
             pose = tf.SE3.from_rotation_and_translation(
                 tf.SO3(keyframe.wxyz) @ tf.SO3.from_x_radians(onp.pi),
                 keyframe.position,
@@ -793,12 +853,12 @@ def populate_render_tab(
         json_data["camera_path"] = camera_path_list
 
         # now write the json file
-        json_outfile = datapath / "camera_paths" / f"{render_name_text.value}.json"
         json_outfile.parent.mkdir(parents=True, exist_ok=True)
         with open(json_outfile.absolute(), "w") as outfile:
             json.dump(json_data, outfile, indent=4, ensure_ascii=False)
+        torch.save(raw_keyframes, camera_path_file_dir / f"{render_name_text.value}.pt")
         # now show the command
-        with event.client.add_gui_modal("Render Command") as modal:
+        with event.client.gui.add_modal("Render Command") as modal:
             dataname = datapath.name
             command = " ".join(
                 [
@@ -808,7 +868,7 @@ def populate_render_tab(
                     f"--output-path renders/{dataname}/{render_name_text.value}.mp4",
                 ] + extra_args
             )
-            event.client.add_gui_markdown(
+            event.client.gui.add_markdown(
                 "\n".join(
                     [
                         "To render the trajectory, run the following from the command line:",
@@ -819,13 +879,74 @@ def populate_render_tab(
                     ]
                 )
             )
-            close_button = event.client.add_gui_button("Close")
+            close_button = event.client.gui.add_button("Close")
 
             @close_button.on_click
             def _(_) -> None:
                 modal.close()
 
+    # load camera path
+    server.gui.add_markdown("  ")
+    load_folder = server.gui.add_folder("Load")
+    with load_folder:
+        def scan_camera_path_files():
+            file_list = []
+            try:
+                for i in os.listdir(camera_path_file_dir):
+                    if i.endswith(".pt"):
+                        file_list.append(i[:-3])
+            except:
+                pass
+            if len(file_list) == 0:
+                file_list.append("")
+            return file_list
+
+        camera_path_file_dropdown = server.gui.add_dropdown(
+            label="Camera Path",
+            options=scan_camera_path_files(),
+            initial_value="",
+        )
+        refresh_file_list_button = server.gui.add_button(
+            label="Refresh",
+        )
+        load_camera_path_file_button = server.gui.add_button(
+            label="Load",
+            color="orange",
+        )
+
+        @refresh_file_list_button.on_click
+        def _(_):
+            camera_path_file_dropdown.options = scan_camera_path_files()
+
+        @load_camera_path_file_button.on_click
+        def _(event):
+            if is_filename_valid(camera_path_file_dropdown.value) is False:
+                viewer.show_message("Invalid filename", event.client)
+                return
+
+            file_path = os.path.join(camera_path_file_dir, f"{camera_path_file_dropdown.value}.pt")
+            if os.path.exists(file_path) is False:
+                viewer.show_message("File not found", event.client)
+                return
+
+            try:
+                raw_keyframes = torch.load(file_path)
+                for i in raw_keyframes:
+                    camera_path.add_camera(i)
+                camera_path.update_spline()
+            except Exception as e:
+                traceback.print_exc()
+                viewer.show_message("Error occurred while parsing camera path file", event.client)
+
     camera_path = CameraPath(server, viewer)
+    camera_path.loop = loop.value
+    camera_path.smoothness = smoothness.value
     camera_path.default_fov = fov_degrees.value / 180.0 * onp.pi
+    camera_path.duration = duration_number.value
+    camera_path.framerate = framerate_number.value
 
     transform_controls: List[viser.SceneNodeHandle] = []
+
+
+def is_filename_valid(name):
+    return re.search(r"^[a-zA-Z0-9_\-. ]+$", name) is not None

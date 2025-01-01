@@ -6,8 +6,7 @@ import torch
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from typing import Literal
-import matplotlib
+from internal.utils.visualizers import Visualizers
 from common import find_files, AsyncNDArraySaver, AsyncImageSaver, AsyncImageReader
 from distibuted_tasks import configure_arg_parser, get_task_list_with_args
 from utils.distibuted_tasks import get_task_list_with_args
@@ -32,6 +31,7 @@ if args.output is None:
     args.output = os.path.join(os.path.dirname(args.image_dir), "estimated_depths")
 
 images = get_task_list_with_args(args, find_files(args.image_dir, args.extensions, as_relative_path=False))
+assert len(images) > 0, "not an image with extension name '{}' can be found in '{}'".format(args.extensions, args.image_dir)
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
 
@@ -47,34 +47,8 @@ depth_anything.load_state_dict(torch.load(f'{args.da2_path}/checkpoints/depth_an
 depth_anything = depth_anything.to(DEVICE).eval()
 
 
-def float_colormap(image, colormap: Literal["default", "turbo", "viridis", "magma", "inferno", "cividis", "gray"] = "default"):
-    """Copied from NeRFStudio: https://github.com/nerfstudio-project/nerfstudio/blob/f97eb2e5f0c754e1ab0873374c8dcea5d18e169c/nerfstudio/utils/colormaps.py#L93-L114. Please follow their license.
-
-    Convert single channel to a color image.
-
-    Args:
-        image: Single channel image.
-        colormap: Colormap for image.
-
-    Returns:
-        Tensor: Colored image with colors in [0, 1]
-    """
-    if colormap == "default":
-        colormap = "turbo"
-
-    image = torch.nan_to_num(image, 0)
-    if colormap == "gray":
-        return image.repeat(3, 1, 1)
-    image_long = (image * 255).long()
-    image_long_min = torch.min(image_long)
-    image_long_max = torch.max(image_long)
-    assert image_long_min >= 0, f"the min value is {image_long_min}"
-    assert image_long_max <= 255, f"the max value is {image_long_max}"
-    return torch.tensor(matplotlib.colormaps[colormap].colors, device=image.device)[image_long[0, ...]].permute(2, 0, 1)
-
-
 def apply_color_map(normalized_depth):
-    colored_depth = float_colormap(torch.from_numpy(normalized_depth).unsqueeze(0), colormap=args.colormap)
+    colored_depth = Visualizers.float_colormap(torch.from_numpy(normalized_depth).unsqueeze(0), colormap=args.colormap)
     colored_depth = (colored_depth.permute(1, 2, 0) * 255).to(torch.uint8).numpy()
     return colored_depth
 
@@ -86,7 +60,7 @@ try:
     with torch.no_grad(), tqdm(range(len(images))) as t:
         for _ in t:
             image_path, raw_image = image_reader.get()
-            image_name = image_path[len(args.image_dir):].lstrip("/")
+            image_name = image_path[len(args.image_dir):].lstrip(os.path.sep)
 
             depth = depth_anything.infer_image(raw_image, args.input_size)
             normalized_depth = (depth - depth.min()) / (depth.max() - depth.min())

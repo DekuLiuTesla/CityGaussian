@@ -1,0 +1,3 @@
+model:
+  metric:
+    class_path: internal.metrics.vanilla_with_fused_ssim_metrics.VanillaWithFusedSSIMMetrics

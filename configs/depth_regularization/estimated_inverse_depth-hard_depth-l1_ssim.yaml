@@ -1,0 +1,13 @@
+model:
+  metric:
+    class_path: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+    init_args:
+      depth_loss_type: l1+ssim
+      depth_output_key: hard_inverse_depth
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  renderer_output_types:
+    - rgb
+    - hard_inverse_depth
+data:
+  parser: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+cache_all_images: true

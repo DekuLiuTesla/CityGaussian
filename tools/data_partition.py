@@ -12,10 +12,6 @@ from internal.utils.blocking import contract_to_unisphere
 from internal.utils.general_utils import focus_point_fn
 from internal.utils.general_utils import parse
 from internal.utils.gaussian_model_loader import GaussianModelLoader
-from internal.dataparsers.colmap_dataparser import ColmapDataParser
-from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
-from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
-from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 def contract(x):
     mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
@@ -30,7 +26,6 @@ def uncontract(y):
 
 def block_filtering(gaussians, 
                     renderer, 
-                    ckpt_path,
                     dataset, 
                     save_dir, 
                     block_dim, 
@@ -39,16 +34,10 @@ def block_filtering(gaussians,
                     content_threshold, 
                     background_color, 
                     quiet=False, 
-                    flatten_gs=False,
                     disable_inblock=False):
 
-        checkpoint = torch.load(ckpt_path)
-        max_radii2D = checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"].clone()
-        xyz_gradient_accum = checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"].clone()
-        denom = checkpoint["gaussian_model_extra_state_dict"]["denom"].clone()
-        device = denom.device
-
         xyz_org = gaussians.get_xyz
+        opacity_org = torch.clone(gaussians.get_opacities())
         block_num = block_dim[0] * block_dim[1] * block_dim[2]
         bg_color=torch.tensor(background_color, dtype=torch.float, device="cuda")
 
@@ -100,8 +89,6 @@ def block_filtering(gaussians,
                     max_y += 0.01
                     min_z -= 0.01
                     max_z += 0.01
-                
-                block_output_mask = block_mask.clone()
 
                 print(f"\nStart filtering block {block_id} with {num_gs} gaussians.")
                 with open(os.path.join(save_dir, f"block_{block_id}.txt"), "w") as f:
@@ -118,36 +105,15 @@ def block_filtering(gaussians,
                             block_image_list[block_id].append(dataset.image_names[idx])
                         else:
                             img_org_gs = output["render"]
-                            gaussians.select(block_mask)  # disable gaussians within block
+                            gaussians.opacities[block_mask] = 0.0
                             img_masked_gs = renderer(camera, gaussians, bg_color=bg_color)["render"]
-                            gaussians._opacity = gaussians._opacity_origin  # recover opacity
+                            gaussians.opacities = opacity_org.clone()  # recover opacity
 
                             loss = 1.0 - ssim(img_masked_gs, img_org_gs)
                             if loss > content_threshold:
                                 f.write(f"{dataset.image_names[idx]}\n")
                                 block_image_list[block_id].append(dataset.image_names[idx])
-                        
-                        if dataset.image_names[idx] in block_image_list[block_id]:
-                            block_output_mask = block_output_mask | output['visibility_filter']
-                    
-                    # save filtered gaussians
-                    block_output_mask = block_output_mask
-                    gaussians_params = gaussians.to_parameter_structure(device)
-                    if flatten_gs:
-                        gaussians_params.scales = gaussians_params.scales[:, 1:]
-
-                    checkpoint["state_dict"]["gaussian_model._xyz"] = gaussians_params.xyz[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._opacity"] = gaussians_params.opacities[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._features_dc"] = gaussians_params.features_dc[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._features_rest"] = gaussians_params.features_rest[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._scaling"] = gaussians_params.scales[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._rotation"] = gaussians_params.rotations[block_output_mask]
-                    checkpoint["state_dict"]["gaussian_model._features_extra"] = gaussians_params.real_features_extra[block_output_mask]
-                    checkpoint["gaussian_model_extra_state_dict"]["max_radii2D"] = max_radii2D[block_output_mask].clone()
-                    checkpoint["gaussian_model_extra_state_dict"]["xyz_gradient_accum"] = xyz_gradient_accum[block_output_mask].clone()
-                    checkpoint["gaussian_model_extra_state_dict"]["denom"] = denom[block_output_mask].clone()
-                    # torch.save(checkpoint, ckpt_path.replace(".ckpt", f"_block_{block_id}.ckpt"))
-        
+  
         if not quiet:
             for block_id in range(block_num):
                 print(f"Block {block_id} / {block_num} has {len(block_image_list[block_id])} cameras.")
@@ -172,10 +138,8 @@ if __name__ == "__main__":
         print(f"Loading parameters according to config file {args.config_path}")
         with open(args.config_path, 'r') as f:
             config = parse(yaml.load(f, Loader=yaml.FullLoader))
-            if config.data.type == "estimated_depth_colmap_block":
-                params = config.data.params.estimated_depth_colmap_block
-            else:
-                params = config.data.params.colmap_block
+            params = config.data.parser.init_args
+        
         args.block_dim = params.block_dim
         args.aabb = params.aabb
         args.num_threshold = params.num_threshold
@@ -186,54 +150,50 @@ if __name__ == "__main__":
         else:
             save_dir = args.save_dir
         
-        ckpt_path = config.model.init_from
-        if 'point_cloud' in config.model.init_from:
-            args.model_path = config.model.init_from.split("/point_cloud/")[0]
-        elif 'checkpoints' in config.model.init_from:
-            args.model_path = config.model.init_from.split("/checkpoints/")[0]
+        ckpt_path = config.model.initialize_from
+        if 'point_cloud' in config.model.initialize_from:
+            args.model_path = config.model.initialize_from.split("/point_cloud/")[0]
+        elif 'checkpoints' in config.model.initialize_from:
+            args.model_path = config.model.initialize_from.split("/checkpoints/")[0]
     
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     
-    model, renderer, _ = GaussianModelLoader.initialize_simplified_model_from_checkpoint(ckpt_path, device="cuda")
+    # initialize model
+    device = torch.device("cuda")
+    ckpt = torch.load(ckpt_path, map_location="cpu")
+    bkgd_color = ckpt["hyper_parameters"]["background_color"]
+    model = GaussianModelLoader.initialize_model_from_checkpoint(
+        ckpt,
+        device=device,
+    )
+    model.freeze()
+    model.pre_activate_all_properties()
+    # initialize renderer
+    renderer = GaussianModelLoader.initialize_renderer_from_checkpoint(
+        ckpt,
+        stage="validate",
+        device=device,
+    )
     print("Gaussian count: {}".format(model.get_xyz.shape[0]))
 
-    if isinstance(renderer, VanillaTrimRenderer):
-        model._scaling = torch.cat((torch.ones_like(model._scaling[:, :1]) * 1e-8, model._scaling[:, [-2, -1]]), dim=1)
-        flatten_gs = True
-    else:
-        flatten_gs = False
-
-    config_path = os.path.join(args.model_path, "config.yaml")
-    with open(config_path, 'r') as f:
-        config = parse(yaml.load(f, Loader=yaml.FullLoader))
-    
-    # TODO: support other data parser
-    if config.data.type == "estimated_depth_colmap_block":
-        dataparser_outputs = EstimatedDepthColmapDataParser(
-            os.path.expanduser(config.data.path),
-            os.path.abspath(""),
-            global_rank=0,
-            params=config.data.params.estimated_depth_colmap_block,
-        ).get_outputs()
-    else:
-        dataparser_outputs = ColmapBlockDataParser(
-            os.path.expanduser(config.data.path),
-            os.path.abspath(""),
-            global_rank=0,
-            params=config.data.params.colmap_block,
-        ).get_outputs()
-    
+    # initialize dataset
+    dataparser_config = ckpt["datamodule_hyper_parameters"]["parser"]
+    dataset_path = ckpt["datamodule_hyper_parameters"]["path"]
+    dataparser_outputs = dataparser_config.instantiate(
+        path=dataset_path,
+        output_path=os.getcwd(),
+        global_rank=0,
+    ).get_outputs()
     
     # assert save_dir contains no files and avoid duplicated partitioning
     # assert len(os.listdir(save_dir)) == 0, f"{save_dir} already contains partition files!"
 
-    block_filtering(model, renderer, ckpt_path,
+    block_filtering(model, renderer,
                     dataparser_outputs.train_set, 
                     save_dir, args.block_dim, args.aabb, 
                     args.num_threshold, args.content_threshold,
-                    config.model.background_color, 
-                    flatten_gs=flatten_gs, disable_inblock=False)
+                    bkgd_color, disable_inblock=False)
 
     # All done
     print("Partition complete.")

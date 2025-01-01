@@ -1,0 +1,5 @@
+model:
+  renderer: 
+    class_path: internal.renderers.gsplat_v1_renderer.GSplatV1Renderer
+    init_args:
+      tile_based_culling: true

@@ -3,7 +3,7 @@ import torch
 from .renderer import Renderer
 from .vanilla_renderer import VanillaRenderer
 from ..cameras import Camera
-from ..models.gaussian_model import GaussianModel
+from ..models.gaussian import GaussianModel
 from ..models.vanilla_deform_model import VanillaDeformNetwork
 from ..utils.rigid_utils import from_homogenous, to_homogenous
 from ..utils.common import parse_cfg_args

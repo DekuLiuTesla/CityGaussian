@@ -1,0 +1,4 @@
+# NOTE: the quality of v2 and v1 are identical
+model:
+  gaussian: internal.models.mip_splatting.MipSplatting
+  renderer: internal.renderers.gsplat_mip_splatting_renderer_v2.GSplatMipSplattingRendererV2

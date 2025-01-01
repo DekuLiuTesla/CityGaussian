@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from internal.cameras.cameras import Cameras
+from internal.configs.instantiate_config import InstantiatableConfig
 
 
 @dataclass
@@ -31,7 +32,7 @@ class ImageSet:
         return len(self.image_names)
 
     def __getitem__(self, index):
-        return self.image_names[index], self.image_paths[index], self.mask_paths[index], self.cameras[index]
+        return self.image_names[index], self.image_paths[index], self.mask_paths[index], self.cameras[index], self.extra_data[index]
 
     def __iter__(self):
         for i in range(len(self)):
@@ -40,9 +41,14 @@ class ImageSet:
     def __post_init__(self):
         if self.mask_paths is None:
             self.mask_paths = [None for _ in range(len(self.image_paths))]
-        
         if self.extra_data is None:
             self.extra_data = [None for _ in range(len(self.image_paths))]
+        if self.extra_data_processor is None:
+            self.extra_data_processor = ImageSet._return_input
+
+    @staticmethod
+    def _return_input(i):
+        return i
 
         if self.extra_data_processor is None:
             self.extra_data_processor = ImageSet._return_input
@@ -53,9 +59,9 @@ class ImageSet:
 
 @dataclass
 class PointCloud:
-    xyz: np.ndarray
+    xyz: np.ndarray  # float
 
-    rgb: np.ndarray
+    rgb: np.ndarray  # uint8, in [0, 255]
 
 
 @dataclass
@@ -70,7 +76,7 @@ class DataParserOutputs:
 
     # ply_path: str
 
-    appearance_group_ids: Optional[dict]
+    appearance_group_ids: Optional[dict] = None
 
     camera_extent: Optional[float] = None
 
@@ -91,4 +97,10 @@ class DataParser:
         :return: [training set, validation set, point cloud]
         """
 
+        pass
+
+
+@dataclass
+class DataParserConfig(InstantiatableConfig):
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
         pass

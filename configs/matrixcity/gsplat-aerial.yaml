@@ -1,0 +1,29 @@
+max_steps: 60_000
+data:
+  train_max_num_images_to_cache: 4096  # avoid OOM
+  parser:
+    class_path: MatrixCity
+    init_args:
+      train:
+        - block_1/transforms_origin.json
+        - block_2/transforms_origin.json
+        - block_3/transforms_origin.json
+        - block_4/transforms_origin.json
+        - block_5/transforms_origin.json
+        - block_6/transforms_origin.json
+        - block_7/transforms_origin.json
+        - block_8/transforms_origin.json
+        - block_9/transforms_origin.json
+        - block_10/transforms_origin.json
+      test:
+        - block_1_test/transforms_origin.json
+      depth_read_step: 4
+model:
+  gaussian:
+    optimization:
+      spatial_lr_scale: 0.2  # avoid large xyz learning rate
+    sh_degree: 0  # avoid CUDA OOM
+  density:
+    densify_grad_threshold: 0.0006  # avoid CUDA OOM
+    densify_until_iter: 30_000
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer

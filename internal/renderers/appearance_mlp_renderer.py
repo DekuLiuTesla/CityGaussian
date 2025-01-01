@@ -2,7 +2,7 @@ from typing import Any, Tuple, Optional
 import torch
 from internal.configs.appearance import AppearanceModelParams
 from internal.cameras.cameras import Camera
-from internal.models.gaussian_model import GaussianModel
+from internal.models.gaussian import GaussianModel
 from internal.models.appearance_model import AppearanceModel
 from internal.utils.sh_utils import eval_sh
 from .vanilla_renderer import VanillaRenderer

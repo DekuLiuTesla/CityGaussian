@@ -3,7 +3,7 @@ import os.path
 import torch
 from ..cameras import Camera
 from ..model_components.gs4d_deformation import deform_network
-from ..models.gaussian_model import GaussianModel
+from ..models.gaussian import GaussianModel
 from ..utils.common import parse_cfg_args
 from .renderer import Renderer
 from .vanilla_renderer import VanillaRenderer
@@ -48,9 +48,9 @@ class VanillaGS4DRenderer(Renderer):
             **kwargs,
     ):
         means3D = pc.get_xyz
-        scales = pc._scaling
-        rotations = pc._rotation
-        opacity = pc._opacity
+        scales = pc.scales
+        rotations = pc.rotations
+        opacity = pc.opacities
         shs = pc.get_features
         time = viewpoint_camera.time.repeat(means3D.shape[0], 1)
 
@@ -77,7 +77,7 @@ class VanillaGS4DRenderer(Renderer):
         # scales_final[~deformation_point] = scales[~deformation_point]
         # opacity_final[~deformation_point] = opacity[~deformation_point]
 
-        scales_final = pc.scaling_activation(scales_final)
+        scales_final = pc.scale_activation(scales_final)
         rotations_final = pc.rotation_activation(rotations_final)
         opacity_final = pc.opacity_activation(opacity)
 

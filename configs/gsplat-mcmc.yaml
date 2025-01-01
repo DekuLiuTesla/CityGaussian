@@ -1,0 +1,9 @@
+# 3D Gaussian Splatting as Markov Chain Monte Carlo
+# https://ubc-vision.github.io/3dgs-mcmc/
+model:
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  metric: internal.metrics.mcmc_metrics.MCMCMetrics
+  density: internal.density_controllers.mcmc_density_controller.MCMCDensityController
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1

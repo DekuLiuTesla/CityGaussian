@@ -33,10 +33,12 @@ class MipSplattingGSplatRenderer(Renderer):
     def after_training_step(self, step: int, module):
         super().before_training_step(step, module)
 
-        optimization_hparams = module.optimization_hparams
-        is_after_densification = step < optimization_hparams.densify_until_iter and \
-                                 step > optimization_hparams.densify_from_iter and \
-                                 step % optimization_hparams.densification_interval == 0
+        # TODO: move 3D filter to model so can be densified and pruned by density controller
+        is_after_densification = False
+        # optimization_hparams = module.optimization_hparams
+        # is_after_densification = step < optimization_hparams.densify_until_iter and \
+        #                          step > optimization_hparams.densify_from_iter and \
+        #                          step % optimization_hparams.densification_interval == 0
         is_update_interval_reach = step % self.filter_3d_update_interval == 0  # the step start from 1, so this make sure that filter_3d will be calculated at the beginning
 
         is_final_interval = module.is_final_step(step + self.filter_3d_update_interval)

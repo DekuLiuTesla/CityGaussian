@@ -1,0 +1,2 @@
+scalable:
+  model.renderer.optimization.max_steps: 30000

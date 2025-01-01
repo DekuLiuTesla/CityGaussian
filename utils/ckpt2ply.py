@@ -3,7 +3,7 @@ import os
 import argparse
 import lightning
 import torch
-from internal.utils.gaussian_utils import Gaussian
+from internal.utils.gaussian_utils import GaussianPlyUtils
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 
 parser = argparse.ArgumentParser()
@@ -34,7 +34,7 @@ assert os.path.exists(args.output) is False, f"Output file already exists, pleas
 print(f"Loading checkpoint '{load_file}'...")
 ckpt = torch.load(load_file)
 print("Converting...")
-model = Gaussian.load_from_state_dict(ckpt["hyper_parameters"]["gaussian"].sh_degree, ckpt["state_dict"]).to_ply_format().save_to_ply(args.output, args.colored)
+model = GaussianPlyUtils.load_from_state_dict(ckpt["state_dict"]).to_ply_format().save_to_ply(args.output, args.colored)
 print(f"Saved to '{args.output}'")
 
 size = os.path.getsize(args.output)

@@ -5,10 +5,10 @@ import numpy as np
 import torch
 import viser
 
-import viewer
 import viser.transforms as vtf
 from queue import Queue
 
+from internal.viewer.viewer import Viewer
 from internal.cameras.cameras import Cameras
 
 
@@ -35,7 +35,7 @@ class TrainingViewerRenderer:
 
 
 # TODO: refactoring the the viewer
-class TrainingViewer(viewer.Viewer):
+class TrainingViewer(Viewer):
     def __init__(
             self,
             camera_names: list,
@@ -118,12 +118,12 @@ class TrainingViewer(viewer.Viewer):
                 for i in self.camera_handles:
                     i.visible = self.camera_visible
 
-        with viser_server.add_gui_folder("Cameras"):
-            self.toggle_camera_button = viser_server.add_gui_button("Toggle Camera Visibility")
+        with viser_server.gui.add_folder("Cameras"):
+            self.toggle_camera_button = viser_server.gui.add_button("Toggle Camera Visibility")
         self.toggle_camera_button.on_click(toggle_camera_visibility)
 
     def setup_training_panel(self, viewer, server: viser.ViserServer):
-        self.pause_training_button = server.add_gui_button("Pause Training", icon=viser.Icon.PLAYER_PAUSE_FILLED)
+        self.pause_training_button = server.gui.add_button("Pause Training", icon=viser.Icon.PLAYER_PAUSE_FILLED)
 
         @self.pause_training_button.on_click
         def _(_):
@@ -131,7 +131,7 @@ class TrainingViewer(viewer.Viewer):
             self.resume_training_button.visible = True
             self.is_training_paused = True
 
-        self.resume_training_button = server.add_gui_button("Resume Training", icon=viser.Icon.PLAYER_PLAY_FILLED, visible=False)
+        self.resume_training_button = server.gui.add_button("Resume Training", icon=viser.Icon.PLAYER_PLAY_FILLED, visible=False)
 
         @self.resume_training_button.on_click
         def _(event):
@@ -142,12 +142,16 @@ class TrainingViewer(viewer.Viewer):
             # send None to camera queue to wake blocking thread up
             self.camera_queue.put((None, None))
 
-        self.global_step_label = server.add_gui_markdown(content="Step: 0")
+        self.global_step_label = server.gui.add_markdown(content="Step: 0")
 
-        self.render_frequency_slider = server.add_gui_slider("Render Freq", initial_value=10, min=1, max=100, step=1)
+        self.render_frequency_slider = server.gui.add_slider("Render Freq", initial_value=10, min=1, max=100, step=1)
 
     def start(self):
-        super().start(False, server_config_fun=self.setup_training_panel)
+        super().start(False, server_config_fun=self.setup_training_panel, enable_renderer_options=False)
+        # avoid keeping wasting GPU to render a higher resolution one
+        self.max_res_when_static.value = self.max_res_when_moving.value
+        self.jpeg_quality_when_static.value = 100
+        self.jpeg_quality_when_moving.value = 100
 
     def process_all_render_requests(self, gaussian_model, renderer, background_color):
         device = gaussian_model.get_xyz.device

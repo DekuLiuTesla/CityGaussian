@@ -1,0 +1,7 @@
+model:
+  metric:
+    class_path: internal.metrics.scale_regularization_metrics.ScaleRegularizationMetrics
+    init_args:
+      scale_reg_from: 3300
+      max_scale: -1
+      max_scale_ratio: 10.

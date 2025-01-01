@@ -29,6 +29,7 @@
 #
 # Author: Johannes L. Schoenberger (jsch-at-demuc-dot-de)
 
+from dataclasses import dataclass
 import os
 import collections
 import numpy as np
@@ -42,9 +43,18 @@ Camera = collections.namedtuple(
     "Camera", ["id", "model", "width", "height", "params"])
 BaseImage = collections.namedtuple(
     "Image", ["id", "qvec", "tvec", "camera_id", "name", "xys", "point3D_ids"])
-Point3D = collections.namedtuple(
-    "Point3D", ["id", "xyz", "rgb", "error", "image_ids", "point2D_idxs"])
+# Point3D = collections.namedtuple(
+#     "Point3D", ["id", "xyz", "rgb", "error", "image_ids", "point2D_idxs"])
 
+
+@dataclass
+class Point3D:
+    id: int
+    xyz: np.ndarray
+    rgb: np.ndarray
+    error: np.ndarray
+    image_ids: np.ndarray
+    point2D_idxs: np.ndarray
 
 class Image(BaseImage):
     def qvec2rotmat(self):
@@ -298,8 +308,11 @@ def write_images_binary(images, path_to_model_file):
             write_next_bytes(fid, img.qvec.tolist(), "dddd")
             write_next_bytes(fid, img.tvec.tolist(), "ddd")
             write_next_bytes(fid, img.camera_id, "i")
-            for char in img.name:
-                write_next_bytes(fid, char.encode("utf-8"), "c")
+
+            img_name_encoded = img.name.encode("utf-8")
+            for char_idx in range(len(img_name_encoded)):
+                write_next_bytes(fid, img_name_encoded[char_idx:char_idx + 1], "c")
+
             write_next_bytes(fid, b"\x00", "c")
             write_next_bytes(fid, len(img.point3D_ids), "Q")
             for xy, p3d_id in zip(img.xys, img.point3D_ids):

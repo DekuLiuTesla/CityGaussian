@@ -1,9 +1,28 @@
 import os.path
-
+import internal.utils.fix_lightning_save_hyperparameters
 import torch
+import jsonargparse
 from jsonargparse import Namespace
+from jsonargparse._typehints import subclass_spec_as_namespace
 from typing import Optional, Union, List, Literal
 from lightning.pytorch.cli import LightningCLI, LightningArgumentParser
+
+
+def discard_init_args_on_class_path_change(parser_or_action, prev_val, value):
+    """
+    jsonargparse will reuse args presenting in user specified instance from the default one,
+    which means that parameter with same name in different class can not have different default value,
+    this function prevent reusing
+    """
+
+    if prev_val and "init_args" in prev_val and prev_val["class_path"] != value["class_path"]:
+        prev_val = subclass_spec_as_namespace(prev_val)
+        # pop all args
+        for key, val in list(prev_val.init_args.__dict__.items()):
+            prev_val.init_args.pop(key)
+
+
+jsonargparse._typehints.discard_init_args_on_class_path_change = discard_init_args_on_class_path_change
 
 
 class CLI(LightningCLI):
@@ -30,6 +49,9 @@ class CLI(LightningCLI):
                             help="Whether save images rendered during validation/test to files")
         parser.add_argument("--val_train", action="store_true", default=False,
                             help="Whether use train set to do validation")
+        parser.add_argument("--cache_all_images", action="store_true", default=False,
+                            help="Speedup validation/test by caching all images. Images in train set is cached by default.")
+        parser.add_argument("--pbar_rate", type=int, default=None)
 
         # parser.link_arguments("iterations", "trainer.max_steps")
         # parser.link_arguments("epochs", "trainer.max_epochs")
@@ -63,12 +85,8 @@ class CLI(LightningCLI):
         output_path = os.path.join(config.output, config.name)
         if config.version is not None:
             output_path = os.path.join(output_path, config.version)
-        if config.data.type == "estimated_depth_colmap_block":
-            params = config.data.params.estimated_depth_colmap_block
-        else:
-            params = config.data.params.colmap_block
-        if "block" in config.data.type and params.block_id is not None:
-            output_path = os.path.join(output_path, "blocks", "block_{}".format(params.block_id))
+        if "block_id" in config.data.parser.init_args and config.data.parser.init_args.block_id is not None:
+            output_path = os.path.join(output_path, "blocks", "block_{}".format(config.data.parser.init_args.block_id))
             # config.model.init_from = config.model.init_from.replace(".ckpt", f"_block_{params.block_id}.ckpt")
         os.makedirs(output_path, exist_ok=True)
         print("output path: {}".format(output_path))
@@ -80,10 +98,12 @@ class CLI(LightningCLI):
 
         if self.config.subcommand == "fit":
             if config.ckpt_path is None:
-                assert os.path.exists(
+                assert (os.path.exists(
                     os.path.join(output_path, "point_cloud")
-                ) is False, ("point cloud output already exists in {}, \n"
-                             "please specific a different experiment name (-n) or version (-v)").format(output_path)
+                ) or os.path.exists(
+                    os.path.join(output_path, "checkpoints")
+                )) is False, ("checkpoint or point cloud output already exists in '{}', \n"
+                              "please specific a different experiment name (-n) or version (-v)").format(output_path)
         else:
             # disable logger
             config.logger = "None"
@@ -127,3 +147,15 @@ class CLI(LightningCLI):
         config.model.test_speed = config.test_speed
         config.model.save_val_output = config.save_val
         config.data.val_on_train = config.val_train
+
+        # set number of cached images
+        if config.cache_all_images is True:
+            config.data.train_max_num_images_to_cache = -1
+            config.data.val_max_num_images_to_cache = -1
+            config.data.test_max_num_images_to_cache = -1
+
+        # set refresh rate of the progress bar
+        if config.pbar_rate is not None:
+            for i in self.trainer_defaults["callbacks"]:
+                if i.__class__.__name__ == "LazyInstance_ProgressBar":
+                    i._lazy_kwargs["refresh_rate"] = config.pbar_rate

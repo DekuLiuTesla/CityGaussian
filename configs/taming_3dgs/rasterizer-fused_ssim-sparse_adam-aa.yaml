@@ -1,0 +1,9 @@
+model:
+  gaussian:
+    class_path: internal.models.sparse_adam_gaussian.VanillaGaussianWithSparseAdam
+  renderer:
+    class_path: internal.renderers.taming_3dgs_renderer.Taming3DGSRenderer
+    init_args:
+      anti_aliased: true
+  metric:
+    class_path: internal.metrics.vanilla_with_fused_ssim_metrics.VanillaWithFusedSSIMMetrics

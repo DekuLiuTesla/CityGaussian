@@ -12,12 +12,16 @@ parser.add_argument("output")
 args = parser.parse_args()
 
 assert os.path.exists(args.output) is False
-
-ckpt = torch.load(args.ckpt)
+device = torch.device("cuda")
+ckpt = torch.load(args.ckpt, map_location=device)
 histories = torch.load(args.history_file)
 
-xyz = ckpt["state_dict"]["gaussian_model._xyz"]
-device = xyz.device
+if "gaussian_model._xyz" in ckpt["state_dict"]:
+    dict_key_prefix = "gaussian_model._"
+    xyz = ckpt["state_dict"]["gaussian_model._xyz"]
+else:
+    dict_key_prefix = "gaussian_model.gaussians."
+    xyz = ckpt["state_dict"]["gaussian_model.gaussians.means"]
 preserve_mask = torch.ones((xyz.shape[0],), dtype=torch.bool, device=device)
 for operation in tqdm(histories, total=len(histories)):
     is_gaussian_selected = torch.ones(xyz.shape[0], device=xyz.device, dtype=torch.bool)
@@ -35,7 +39,8 @@ for operation in tqdm(histories, total=len(histories)):
     preserve_mask = torch.bitwise_and(preserve_mask, torch.bitwise_not(is_gaussian_selected))
 
 for i in ckpt["state_dict"]:
-    if i.startswith("gaussian_model._"):
+    if i.startswith(dict_key_prefix):
         ckpt["state_dict"][i] = ckpt["state_dict"][i][preserve_mask]
+# TODO: prune density controller and optimizer states too
 torch.save(ckpt, args.output)
 print(f"{preserve_mask.sum().item()} of {preserve_mask.shape[0]} Gaussians saved to {args.output}")

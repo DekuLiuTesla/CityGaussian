@@ -1,0 +1,34 @@
+max_steps: 60_000
+trainer:
+  limit_val_batches: 64
+data:
+  add_background_sphere: true
+  background_sphere_distance: 2
+  background_sphere_points: 204800
+  background_sphere_color: white
+  train_max_num_images_to_cache: 4096  # avoid OOM
+  val_max_num_images_to_cache: 64
+  parser:
+    class_path: MatrixCity
+    init_args:
+      train:
+        - aerial/block_1/transforms_origin.json
+        - street_without_water/small_city_road_down_dense/transforms-0_145.json
+      test:
+        - aerial/block_1_test/transforms_origin.json
+        - street_without_water/small_city_road_down_test/transforms-0_2.json
+      scale: 0.1  # default is 0.01, remember to rescale `spatial_lr_scale` below by the same factor if you changed this
+      depth_read_step: 2
+      use_depth: true  # load depth maps into training batches
+model:
+  gaussian:
+    optimization:
+      spatial_lr_scale: 2  # avoid large xyz learning rate
+  density:
+    densification_interval: 200
+    densify_until_iter: 30_000
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  metric: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics  # depth regularization metrics
+  renderer_output_types:
+    - rgb
+    - inverse_depth  # predict depth map

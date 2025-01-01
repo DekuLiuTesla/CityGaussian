@@ -1,11 +1,15 @@
+"""
+Most codes are copied from https://github.com/hbb1/2d-gaussian-splatting/blob/main/train.py
+"""
+
 from typing import Dict, Tuple, Union, Callable, Optional, List
 
 import lightning
 import torch
 import math
-from .renderer import Renderer
+from .renderer import RendererOutputTypes, RendererOutputInfo, Renderer
 from ..cameras import Camera
-from ..models.gaussian_model import GaussianModel
+from ..models.gaussian import GaussianModel
 
 from diff_surfel_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
@@ -14,17 +18,9 @@ class Vanilla2DGSRenderer(Renderer):
     def __init__(
             self,
             depth_ratio: float = 0.,
-            lambda_normal: float = 0.05,
-            lambda_dist: float = 0.,
-            normal_regularization_from_iter: int = 7000,
-            dist_regularization_from_iter: int = 3000,
     ):
         super().__init__()
         self.depth_ratio = depth_ratio
-        self.lambda_normal = lambda_normal
-        self.lambda_dist = lambda_dist
-        self.normal_regularization_from_iter = normal_regularization_from_iter
-        self.dist_regularization_from_iter = dist_regularization_from_iter
 
     def forward(
             self,
@@ -43,10 +39,6 @@ class Vanilla2DGSRenderer(Renderer):
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(pc.get_xyz, dtype=pc.get_xyz.dtype, requires_grad=True,
                                               device=bg_color.device) + 0
-        try:
-            screenspace_points.retain_grad()
-        except:
-            pass
 
         # Set up rasterization configuration
         tanfovx = math.tan(viewpoint_camera.fov_x * 0.5)
@@ -80,15 +72,18 @@ class Vanilla2DGSRenderer(Renderer):
         rotations = pc.get_rotation
 
         # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
-        # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
-        shs = pc.get_features
+        colors_precomp = kwargs.get("colors_precomp", None)
+        shs = None
+        if colors_precomp is None:
+            # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
+            shs = pc.get_features
 
         # Rasterize visible Gaussians to image, obtain their radii (on screen).
         rendered_image, radii, allmap = rasterizer(
             means3D=means3D,
             means2D=means2D,
             shs=shs,
-            colors_precomp=None,
+            colors_precomp=colors_precomp,
             opacities=opacity,
             scales=scales,
             rotations=rotations,
@@ -147,35 +142,19 @@ class Vanilla2DGSRenderer(Renderer):
 
         return rets
 
-    def training_setup(self, module: lightning.LightningModule) -> Tuple[
-        Optional[Union[
-            List[torch.optim.Optimizer],
-            torch.optim.Optimizer,
-        ]],
-        Optional[Union[
-            List[torch.optim.lr_scheduler.LRScheduler],
-            torch.optim.lr_scheduler.LRScheduler,
-        ]]
-    ]:
-        with torch.no_grad():
-            # key to a quality comparable to hbb1/2d-gaussian-splatting
-            if module.hparams["init_from"] is None:
-                module.gaussian_model._rotation.copy_(torch.rand_like(module.gaussian_model._rotation))
-        return super().training_setup(module)
-
     @staticmethod
     def depths_to_points(view, depthmap):
         device = view.world_to_camera.device
         c2w = (view.world_to_camera.T).inverse()
-        W, H = view.width.item(), view.height.item()
-        fx = W / (2 * math.tan(view.fov_x / 2.))
-        fy = H / (2 * math.tan(view.fov_y / 2.))
-        intrins = torch.tensor(
-            [[fx, 0., W / 2.],
-             [0., fy, H / 2.],
-             [0., 0., 1.0]]
-        ).float().to(device)
-        grid_x, grid_y = torch.meshgrid(torch.arange(W, device=device).float(), torch.arange(H, device=device).float(), indexing='xy')
+        W, H = view.width, view.height
+        ndc2pix = torch.tensor([
+            [W / 2, 0, 0, W / 2],
+            [0, H / 2, 0, H / 2],
+            [0, 0, 0, 1]]).float().cuda().T
+        projection_matrix = c2w.T @ view.full_projection
+        intrins = (projection_matrix @ ndc2pix)[:3, :3].T
+
+        grid_x, grid_y = torch.meshgrid(torch.arange(W, device='cuda').float(), torch.arange(H, device='cuda').float(), indexing='xy')
         points = torch.stack([grid_x, grid_y, torch.ones_like(grid_x)], dim=-1).reshape(-1, 3)
         rays_d = points @ intrins.inverse().T @ c2w[:3, :3].T
         rays_o = c2w[:3, 3]
@@ -196,45 +175,13 @@ class Vanilla2DGSRenderer(Renderer):
         output[1:-1, 1:-1, :] = normal_map
         return output
 
-    def train_metrics(self, pl_module, step: int, batch, outputs):
-        metrics, prog_bar = pl_module.vanilla_train_metric_calculator(pl_module, step, batch, outputs)
-
-        # regularization
-        lambda_normal = self.lambda_normal if step > self.normal_regularization_from_iter else 0.0
-        lambda_dist = self.lambda_dist if step > self.dist_regularization_from_iter else 0.0
-
-        rend_dist = outputs["rend_dist"]
-        rend_normal = outputs['rend_normal']
-        surf_normal = outputs['surf_normal']
-        normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
-        normal_loss = lambda_normal * (normal_error).mean()
-        dist_loss = lambda_dist * (rend_dist).mean()
-
-        # update metrics
-        metrics["loss"] = metrics["loss"] + dist_loss + normal_loss
-        metrics["normal_loss"] = normal_loss
-        prog_bar["normal_loss"] = False
-        metrics["dist_loss"] = dist_loss
-        prog_bar["dist_loss"] = False
-
-        return metrics, prog_bar
-
-    def get_metric_calculators(self) -> Tuple[Union[None, Callable], Union[None, Callable]]:
-        return self.train_metrics, None
-
-    def get_available_output_types(self) -> Dict:
+    def get_available_outputs(self) -> Dict:
         return {
-            "rgb": "render",
-            'render_alpha': "rend_alpha",
-            'render_normal': "rend_normal",
-            'view_normal': "view_normal",
-            'render_dist': "rend_dist",
-            'surf_depth': "surf_depth",
-            'surf_normal': "surf_normal",
+            "rgb": RendererOutputInfo("render"),
+            'render_alpha': RendererOutputInfo("rend_alpha", type=RendererOutputTypes.GRAY),
+            'render_normal': RendererOutputInfo("rend_normal", type=RendererOutputTypes.NORMAL_MAP),
+            'view_normal': RendererOutputInfo("view_normal", type=RendererOutputTypes.NORMAL_MAP),
+            'render_dist': RendererOutputInfo("rend_dist", type=RendererOutputTypes.GRAY),
+            'surf_depth': RendererOutputInfo("surf_depth", type=RendererOutputTypes.GRAY),
+            'surf_normal': RendererOutputInfo("surf_normal", type=RendererOutputTypes.NORMAL_MAP),
         }
-
-    def is_type_depth_map(self, t: str) -> bool:
-        return t == "surf_depth"
-
-    def is_type_normal_map(self, t: str) -> bool:
-        return t == "render_normal" or t == "surf_normal" or t == "view_normal"

@@ -1,0 +1,10 @@
+model:
+  renderer:
+    class_path: internal.renderers.gsplat_v1_renderer.GSplatV1Renderer
+    init_args:
+      separate_sh: true
+      tile_based_culling: true
+  metric:
+    init_args:
+      fused_ssim: true
+  density: internal.density_controllers.taming_3dgs_density_controller.Taming3DGSDensityController

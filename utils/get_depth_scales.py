@@ -46,9 +46,6 @@ def get_scales(key, cameras, images, points3d_ordered, points3d_error_ordered, a
     mask = pts_idx >= 0
     mask *= pts_idx < len(points3d_ordered)
 
-    if mask.sum() == 0:
-        return None
-
     # get valid 3D point indices and 2D point xy
     pts_idx = pts_idx[mask]
     valid_xys = image_meta.xys[mask]

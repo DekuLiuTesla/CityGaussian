@@ -1,0 +1,9 @@
+model:
+  metric: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  renderer_output_types:
+    - rgb
+    - inverse_depth
+data:
+  parser: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+cache_all_images: true

@@ -18,18 +18,5 @@ class OptimizationParams:
     opacity_lr: float = 0.05
     scaling_lr: float = 0.005
     rotation_lr: float = 0.001
-    percent_dense: float = 0.01
-    lambda_dssim: float = 0.2
-    densification_interval: int = 100
-    opacity_reset_interval: int = 3000
-    densify_from_iter: int = 500
-    densify_until_iter: int = 15_000
-    densify_grad_threshold: float = 0.0002
-    densify_grad_scaler: float = 0.
-
-    cull_opacity_threshold: float = 0.005
-    """threshold of opacity for culling gaussians."""
 
     spatial_lr_scale: float = -1  # auto calculate from camera poses if > 0
-
-    rgb_diff_loss: Literal["l1", "l2"] = "l1"

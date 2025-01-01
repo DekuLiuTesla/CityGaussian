@@ -1,0 +1,15 @@
+data:
+  parser:
+    class_path: MatrixCity
+    init_args:
+      use_depth: true
+model:
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  metric:
+    class_path: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+    init_args:
+      depth_output_key: hard_inverse_depth
+  renderer_output_types:
+    - rgb
+    - hard_inverse_depth
+cache_all_images: true

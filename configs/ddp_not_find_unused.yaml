@@ -1,0 +1,5 @@
+strategy:
+  class_path: lightning.pytorch.strategies.ddp.DDPStrategy
+  init_args:
+    find_unused_parameters: false
+devices: -1

@@ -1,0 +1,3 @@
+data:
+  image_on_cpu: false
+  image_uint8: true

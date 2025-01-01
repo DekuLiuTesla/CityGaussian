@@ -1,0 +1,12 @@
+# A simplified https://daohanlu.github.io/scaling-up-3dgs/.
+# Gaussians are stored, projected and its colors are calculated in a distributed manner.
+# Rasterization are done locally.
+# No Pixel-wise Distribution.
+
+trainer:
+  strategy:
+    class_path: internal.mp_strategy.MPStrategy
+  devices: -1
+model:
+  renderer: internal.renderers.gsplat_distributed_renderer.GSplatDistributedRenderer
+  density: internal.density_controllers.distributed_vanilla_density_controller.DistributedVanillaDensityController

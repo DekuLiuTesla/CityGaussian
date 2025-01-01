@@ -1,9 +1,9 @@
 # SWAG: Splatting in the Wild images with Appearance-conditioned Gaussians
 # [NOTE] This is not an official implementation, and can not reach the metrics in the paper
 data:
-  type: phototourism
-  params:
-    phototourism:
+  parser:
+    class_path: PhotoTourism
+    init_args:
       split_mode: experiment
       down_sample_factor: 2
 model:

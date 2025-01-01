@@ -2,7 +2,9 @@ max_steps: 35_000
 model:
   gaussian:
     optimization:
-      position_lr_max_steps: 35_000
+      means_lr_scheduler:
+        init_args:
+          max_steps: 35_000
   light_gaussian:
     prune_steps:
       - 30_001

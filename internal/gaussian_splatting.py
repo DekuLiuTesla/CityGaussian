@@ -2,7 +2,7 @@ import os.path
 import queue
 import threading
 import traceback
-from typing import Tuple, List, Dict, Union, Any
+from typing import Tuple, List, Dict, Union, Any, Callable, Optional
 from typing_extensions import Self
 
 import time
@@ -10,74 +10,76 @@ import torch
 import torch.optim
 import torchvision
 import wandb
-import numpy as np
+import csv
 from lightning.pytorch.core.module import MODULE_OPTIMIZERS
-from torchmetrics.image import PeakSignalNoiseRatio
-from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from lightning.pytorch import LightningDataModule, LightningModule
 from lightning.pytorch.utilities.types import OptimizerLRScheduler, LRSchedulerPLType, STEP_OUTPUT
 import lightning.pytorch.loggers
 
+import internal.mp_strategy
 from internal.viewer.training_viewer import TrainingViewer
-from internal.configs.model import ModelParams
-# from internal.configs.appearance import AppearanceModelParams
 from internal.configs.light_gaussian import LightGaussian
 
-from internal.models.gaussian_model import GaussianModel
-from internal.models.flatten_gaussian_model import FlattenGaussianModel
-# from internal.models.appearance_model import AppearanceModel
-from internal.renderers import Renderer, VanillaRenderer
-from internal.renderers.vanilla_2dgs_renderer import Vanilla2DGSRenderer
-from internal.utils.ssim import ssim
+from internal.models.gaussian import Gaussian, GaussianModel
+from internal.models.vanilla_gaussian import VanillaGaussian
+from internal.renderers import Renderer, VanillaRenderer, RendererConfig
+from internal.metrics.metric import Metric
+from internal.metrics.vanilla_metrics import VanillaMetrics
+from internal.density_controllers.density_controller import DensityController
+from internal.density_controllers.vanilla_density_controller import VanillaDensityController
 from jsonargparse import lazy_instance
 
 from internal.utils.sh_utils import eval_sh
 from internal.utils.graphics_utils import store_ply
 
-lpips: LearnedPerceptualImagePatchSimilarity
-
 
 class GaussianSplatting(LightningModule):
     def __init__(
             self,
-            gaussian: ModelParams,
-            light_gaussian: LightGaussian,
+            light_gaussian: LightGaussian,  # TODO: may be should implement as a hook
             save_iterations: List[int],
-            camera_extent_factor: float = 1.,
-            # enable_appearance_model: bool = False,
+            gaussian: Gaussian = lazy_instance(VanillaGaussian),
             background_color: Tuple[float, float, float] = (0., 0., 0.),
             random_background: bool = False,
             output_path: str = None,
             init_from: str = None,
             correct_color: bool = False,
-            save_val_output: bool = False,
-            max_save_val_output: int = -1,
-            renderer: Renderer = lazy_instance(VanillaRenderer),
-            absgrad: bool = False,
-            flatten_3dgs: bool = False,
             test_speed: bool = False,
+            save_val_output: bool = False,
+            save_val_metrics: bool = None,
+            max_save_val_output: int = -1,
+            renderer: Union[Renderer, RendererConfig] = lazy_instance(VanillaRenderer),
+            metric: Metric = lazy_instance(VanillaMetrics),
+            density: DensityController = lazy_instance(VanillaDensityController),
             save_ply: bool = False,
             web_viewer: bool = False,
+            initialize_from: str = None,
+            renderer_output_types: Optional[List[str]] = None,
     ) -> None:
         super().__init__()
         self.automatic_optimization = False
         self.save_hyperparameters()
 
-        # setup models; TODO: remove redundant Gaussian Model
-        apply_2dgs = "2DGS" in type(renderer).__name__.upper()
-        Model = FlattenGaussianModel if self.hparams["flatten_3dgs"] else GaussianModel
-        self.gaussian_model = Model(sh_degree=gaussian.sh_degree, extra_feature_dims=gaussian.extra_feature_dims, apply_2dgs=apply_2dgs)
-        self.optimization_hparams = self.hparams["gaussian"].optimization
+        # setup models
+        self.gaussian_model = gaussian.instantiate()
+        self.frozen_gaussians = None
+
         self.light_gaussian_hparams = light_gaussian
 
+        # instantiate renderer
+        if isinstance(renderer, RendererConfig):
+            renderer = renderer.instantiate()
         self.renderer = renderer
 
-        # metrics
-        self.lambda_dssim = gaussian.optimization.lambda_dssim
-        self.psnr = PeakSignalNoiseRatio()
-        global lpips  # prevent from storing in state_dict
-        lpips = LearnedPerceptualImagePatchSimilarity(normalize=True)
+        self.renderer_output_types = renderer_output_types
 
+        # instantiate density controller
+        self.density_controller = density.instantiate()
+
+        # metrics
+        self.metric = metric.instantiate()
+
+        # background color
         self.background_color = torch.tensor(background_color, dtype=torch.float32)
         if random_background is True:
             self.get_background_color = self._random_background_color
@@ -94,47 +96,12 @@ class GaussianSplatting(LightningModule):
         self.image_queue = queue.Queue(maxsize=self.max_image_saving_threads)
         self.image_saving_threads = []
 
-        # metric calculator
-        self.train_metric_calculator = self.vanilla_train_metric_calculator
-        self.validation_metric_calculator = self.vanilla_validation_metric_calculator
+        self.val_metrics: List[Tuple[str, Dict]] = []
 
-    def vanilla_train_metric_calculator(self, pl_module, step: int, batch, outputs) -> Tuple[Dict[str, Any], Dict[str, bool]]:
-        camera, image_info, _ = batch
-        image_name, gt_image, masked_pixels = image_info
-        image = outputs["render"]
-
-        # calculate loss
-        if masked_pixels is not None:
-            gt_image = gt_image.clone()
-            gt_image[masked_pixels] = image.detach()[masked_pixels]  # copy masked pixels from prediction to G.T.
-        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render"], gt_image)
-        ssim_metric = ssim(outputs["render"], gt_image)
-        loss = (1.0 - self.lambda_dssim) * rgb_diff_loss + self.lambda_dssim * (1. - ssim_metric)
-
-        return {
-            "loss": loss,
-            "rgb_diff": rgb_diff_loss,
-            "ssim": ssim_metric,
-        }, {
-            "loss": True,
-            "rgb_diff": False,
-            "ssim": False,
-        }
-
-    def vanilla_validation_metric_calculator(self, pl_module, batch, outputs) -> Tuple[Dict[str, float], Dict[str, bool]]:
-        metrics, prog_bar = self.train_metric_calculator(self, self.trainer.global_step, batch, outputs)
-
-        camera, image_info, _ = batch
-        image_name, gt_image, _ = image_info
-
-        metrics["psnr"] = self.psnr(outputs["render"], gt_image)
-        prog_bar["psnr"] = True
-        metrics["lpips"] = lpips(outputs["render"].clamp(0., 1.).unsqueeze(0), gt_image.unsqueeze(0))
-        prog_bar["lpips"] = True
-
-        prog_bar["ssim"] = True
-
-        return metrics, prog_bar
+        # hooks
+        self.on_train_start_hooks: List[Callable[[GaussianModel, Self], None]] = []
+        self.on_after_backward_hooks: List[Callable[[Dict, Any, GaussianModel, int, Self], None]] = []
+        self.on_train_batch_end_hooks: List[Callable[[Dict, Any, GaussianModel, int, Self], None]] = []
 
     def log_metrics(
             self,
@@ -143,10 +110,11 @@ class GaussianSplatting(LightningModule):
             prefix: str,
             on_step: bool,
             on_epoch: bool,
+            name_prefix: str = "",
     ):
         for name in metrics:
             self.log(
-                f"{prefix}/{name}",
+                f"{prefix}/{name_prefix}{name}",
                 metrics[name],
                 prog_bar=prog_bar[name],
                 on_step=on_step,
@@ -154,51 +122,55 @@ class GaussianSplatting(LightningModule):
                 batch_size=self.batch_size,
             )
 
-    def _l1_loss(self, predict: torch.Tensor, gt: torch.Tensor):
-        return torch.abs(predict - gt).mean()
-
-    def _l2_loss(self, predict: torch.Tensor, gt: torch.Tensor):
-        return torch.mean((predict - gt) ** 2)
-
     def _fixed_background_color(self):
         return self.background_color
 
     def _random_background_color(self):
         return torch.rand(3)
 
+    def _initialize_gaussians_from_trained_model(self):
+        # assert self.hparams["gaussian"].extra_feature_dims == 0
+
+        from internal.utils.gaussian_model_loader import GaussianModelLoader
+        load_from = GaussianModelLoader.search_load_file(self.hparams["initialize_from"])
+
+        # TODO: may be should adapt sh_degree of ply or checkpoint to current value?
+        if load_from.endswith(".ply") is True:
+            from internal.utils.gaussian_utils import Gaussian as GaussianUtils
+            gaussian_model, _ = GaussianModelLoader.initialize_model_and_renderer_from_ply_file(
+                ply_file_path=load_from,
+                device=self.device,
+                eval_mode=False,
+                pre_activate=False,
+            )
+        else:
+            # load from ckpt
+            gaussian_model, _, _ = GaussianModelLoader.initialize_model_and_renderer_from_checkpoint_file(
+                load_from,
+                device=self.device,
+                eval_mode=False,
+                pre_activate=False,
+            )
+
+        # replace config
+        self.hparams["gaussians"] = gaussian_model.config
+        self.gaussian_model = gaussian_model
+
+        print(f"initialize from {load_from}: sh_degree={self.gaussian_model.max_sh_degree}")
+
     def setup(self, stage: str):
         if stage == "fit":
-            if self.hparams["init_from"] is None:
-                self.gaussian_model.create_from_pcd(
-                    self.trainer.datamodule.point_cloud,
-                    device=self.device,
-                )
-                self.training = True
+            if self.hparams["initialize_from"] is None:
+                self.gaussian_model.setup_from_pcd(xyz=self.trainer.datamodule.point_cloud.xyz, rgb=self.trainer.datamodule.point_cloud.rgb / 255.)
             else:
-                if self.hparams["init_from"].endswith(".ply"):
-                    self.gaussian_model.load_ply(self.hparams["init_from"], device=self.device)
-                    self.gaussian_model.max_radii2D = torch.zeros((self.gaussian_model.get_xyz.shape[0]), device=self.gaussian_model._xyz.device)
-                    self.gaussian_model.xyz_gradient_accum = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
-                    self.gaussian_model.denom = torch.zeros((self.gaussian_model.get_xyz.shape[0], 1), device=self.gaussian_model._xyz.device)
+                self._initialize_gaussians_from_trained_model()
+        else:
+            if self.hparams["save_val_metrics"] is None:
+                self.hparams["save_val_metrics"] = True
 
-                elif self.hparams["init_from"].endswith(".ckpt"):
-                    checkpoint = torch.load(self.hparams["init_from"])
-                    self.gaussian_model.load_ckpt(checkpoint["state_dict"], device=self.device)
-                    if "gaussian_model_extra_state_dict" in checkpoint:
-                        for i in checkpoint["gaussian_model_extra_state_dict"]:
-                            setattr(self.gaussian_model, i, checkpoint["gaussian_model_extra_state_dict"][i])
-                        # for previous version
-                        if "active_sh_degree" not in checkpoint["gaussian_model_extra_state_dict"]:
-                            self.gaussian_model.active_sh_degree = self.gaussian_model.max_sh_degree
-                
-        self.renderer.setup(stage, lightning_module=self)
-
-        # get metric calculator from renderer if available
-        train_metric_calculator, validation_metric_calculator = self.renderer.get_metric_calculators()
-        if train_metric_calculator is not None:
-            self.train_metric_calculator = train_metric_calculator
-        if validation_metric_calculator is not None:
-            self.validation_metric_calculator = validation_metric_calculator
+        self.renderer.setup(stage=stage, lightning_module=self)
+        self.metric.setup(stage=stage, pl_module=self)
+        self.density_controller.setup(stage=stage, pl_module=self)
 
         # use different image log method based on the logger type
         self.log_image = None
@@ -207,32 +179,15 @@ class GaussianSplatting(LightningModule):
         elif isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
             self.log_image = self.wandb_log_image
 
-        # set loss function
-        self.rgb_diff_loss_fn = self._l1_loss
-        if self.hparams["gaussian"].optimization.rgb_diff_loss == "l2":
-            print("Use L2 loss")
-            self.rgb_diff_loss_fn = self._l2_loss
-
     def on_load_checkpoint(self, checkpoint) -> None:
         # reinitialize parameters based on the gaussian number in the checkpoint
-        self.gaussian_model.initialize_by_gaussian_number(checkpoint["state_dict"]["gaussian_model._xyz"].shape[0])
-        # restore some extra parameters
-        if "gaussian_model_extra_state_dict" in checkpoint:
-            for i in checkpoint["gaussian_model_extra_state_dict"]:
-                setattr(self.gaussian_model, i, checkpoint["gaussian_model_extra_state_dict"][i])
-            # for previous version
-            if "active_sh_degree" not in checkpoint["gaussian_model_extra_state_dict"]:
-                self.gaussian_model.active_sh_degree = self.gaussian_model.max_sh_degree
-
-        if "gaussian_model._features_extra" not in checkpoint["state_dict"]:
-            # create an empty `_features_extra`
-            checkpoint["state_dict"]["gaussian_model._features_extra"] = torch.zeros_like(self.gaussian_model._features_extra)
-            # create an optimizer param group
-            new_param_groups = checkpoint["optimizer_states"][0]["param_groups"][0].copy()
-            new_param_groups["name"] = "f_extra"
-            new_param_groups["lr"] = 0.
-            new_param_groups["params"] = [len(checkpoint["optimizer_states"][0]["param_groups"])]
-            checkpoint["optimizer_states"][0]["param_groups"].append(new_param_groups)
+        self.gaussian_model.setup_from_number(checkpoint["state_dict"]["gaussian_model.gaussians.means"].shape[0])
+        if "frozen_gaussians.means" in checkpoint["state_dict"]:
+            from internal.utils.gaussian_containers import TensorDict
+            self.frozen_gaussians = TensorDict({
+                k: torch.empty_like(checkpoint["state_dict"]["frozen_gaussians.{}".format(k)])
+                for k in self.gaussian_model.property_names
+            })
 
         # get epoch and global_step, which used in the output path of the validation and test images
         self.restored_epoch = checkpoint["epoch"]
@@ -240,18 +195,20 @@ class GaussianSplatting(LightningModule):
 
         # call for renderer
         self.renderer.on_load_checkpoint(self, checkpoint)
+        # call density controller's hook
+        self.density_controller.on_load_checkpoint(self, checkpoint)
 
         super().on_load_checkpoint(checkpoint)
 
     def on_save_checkpoint(self, checkpoint) -> None:
         # store some extra parameters
-        checkpoint["gaussian_model_extra_state_dict"] = {
-            "max_radii2D": self.gaussian_model.max_radii2D,
-            "xyz_gradient_accum": self.gaussian_model.xyz_gradient_accum,
-            "denom": self.gaussian_model.denom,
-            "spatial_lr_scale": self.gaussian_model.spatial_lr_scale,
-            "active_sh_degree": self.gaussian_model.active_sh_degree,
-        }
+        # checkpoint["gaussian_model_extra_state_dict"] = {
+        #     "max_radii2D": self.gaussian_model.max_radii2D,
+        #     "xyz_gradient_accum": self.gaussian_model.xyz_gradient_accum,
+        #     "denom": self.gaussian_model.denom,
+        #     "spatial_lr_scale": self.gaussian_model.spatial_lr_scale,
+        #     "active_sh_degree": self.gaussian_model.active_sh_degree,
+        # }
         super().on_save_checkpoint(checkpoint)
 
     def tensorboard_log_image(self, tag: str, image_tensor):
@@ -270,6 +227,22 @@ class GaussianSplatting(LightningModule):
             step=self.trainer.global_step,
         )
 
+    def transfer_batch_to_device(self, batch: Any, device: torch.device, dataloader_idx: int) -> Any:
+        if batch[0].device != self.device:
+            return super().transfer_batch_to_device(batch, device, dataloader_idx)
+
+        camera, image_info, extra_data = batch
+        image_name, gt_image, masked_pixels = image_info
+
+        if extra_data is not None:
+            extra_data = super().transfer_batch_to_device(extra_data, device, dataloader_idx)
+        if gt_image is not None:
+            gt_image = gt_image.to(device)
+        if masked_pixels is not None:
+            masked_pixels = masked_pixels.to(device)
+
+        return camera, (image_name, gt_image, masked_pixels), extra_data
+
     def forward(self, camera):
         if self.training is True:
             return self.renderer.training_forward(
@@ -278,49 +251,14 @@ class GaussianSplatting(LightningModule):
                 camera,
                 self.gaussian_model,
                 bg_color=self.get_background_color().to(camera.R.device),
+                render_types=self.renderer_output_types,
             )
         return self.renderer(
             camera,
             self.gaussian_model,
             bg_color=self._fixed_background_color().to(camera.R.device),
+            render_types=self.renderer_output_types,
         )
-
-    def forward_with_loss_calculation(self, camera, image_info):
-        image_name, gt_image, masked_pixels = image_info
-
-        # forward
-        outputs = self(camera)
-
-        image = outputs["render"]
-
-        # calculate loss
-        if masked_pixels is not None:
-            gt_image[masked_pixels] = image.detach()[masked_pixels]  # copy masked pixels from prediction to G.T.
-        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render"], gt_image)
-        ssim_metric = ssim(outputs["render_org"] if "render_org" in outputs else outputs["render"], gt_image)
-        loss = (1.0 - self.lambda_dssim) * rgb_diff_loss + self.lambda_dssim * (1. - ssim_metric)
-
-        return outputs, loss, rgb_diff_loss, ssim_metric
-
-    def forward_with_time_loss_calculation(self, camera, image_info):
-        image_name, gt_image, masked_pixels = image_info
-
-        # forward
-        torch.cuda.synchronize()
-        start = time.time()
-        outputs = self(camera)
-        torch.cuda.synchronize()
-        end = time.time()
-        image = outputs["render"]
-
-        # calculate loss
-        if masked_pixels is not None:
-            gt_image[masked_pixels] = image.detach()[masked_pixels]  # copy masked pixels from prediction to G.T.
-        rgb_diff_loss = self.rgb_diff_loss_fn(outputs["render"], gt_image)
-        ssim_metric = ssim(outputs["render_org"] if "render_org" in outputs else outputs["render"], gt_image)
-        loss = (1.0 - self.lambda_dssim) * rgb_diff_loss + self.lambda_dssim * (1. - ssim_metric)
-
-        return outputs, loss, rgb_diff_loss, ssim_metric, end-start
 
     def optimizers(self, use_pl_optimizer: bool = True):
         optimizers = super().optimizers(use_pl_optimizer=use_pl_optimizer)
@@ -361,13 +299,10 @@ class GaussianSplatting(LightningModule):
         return False
 
     def on_train_start(self) -> None:
-        global_step = self.trainer.global_step + 1
-        if global_step < self.hparams["gaussian"].optimization.densify_until_iter and self.trainer.world_size > 1:
-            print("[WARNING] DDP should only be enabled after finishing densify (after densify_until_iter={} iterations, but {} currently)".format(self.hparams["gaussian"].optimization.densify_until_iter, global_step))
         super().on_train_start()
 
         if self.hparams["web_viewer"] is True and self.trainer.global_rank == 0:
-            if self.trainer.datamodule.hparams["type"] in ["blender", "nsvf", "matrixcity"]:
+            if self.trainer.datamodule.hparams["parser"].__class__.__name__.lower() in ["blender", "nsvf", "matrixcity"]:
                 up = torch.tensor([0., 0., 1.])
             else:
                 c2w = self.trainer.datamodule.dataparser_outputs.train_set.cameras.world_to_camera[:, :3, :3]
@@ -381,6 +316,9 @@ class GaussianSplatting(LightningModule):
                 available_appearance_options=self.trainer.datamodule.dataparser_outputs.appearance_group_ids,
             )
             self.web_viewer.start()
+
+        for i in self.on_train_start_hooks:
+            i(self.gaussian_model, self)
 
     def on_train_batch_start(self, batch: Any, batch_idx: int):
         if self.web_viewer is not None:
@@ -414,21 +352,11 @@ class GaussianSplatting(LightningModule):
         # call renderer hook
         self.renderer.before_training_step(global_step, self)
 
-        # Every 1000 its we increase the levels of SH up to a maximum degree
-        if global_step % 1000 == 0:
-            self.gaussian_model.oneupSHdegree()
-
         # forward
         outputs = self(camera)
         # metrics
-        metrics, prog_bar = self.train_metric_calculator(self, global_step, batch, outputs)
+        metrics, prog_bar = self.metric.get_train_metrics(self, self.gaussian_model, global_step, batch, outputs)
         self.log_metrics(metrics, prog_bar, prefix="train", on_step=True, on_epoch=False)
-
-        image, viewspace_point_tensor, visibility_filter, radii = outputs["render"], outputs["viewspace_points"], \
-            outputs["visibility_filter"], outputs["radii"]
-
-        # retrieve viewspace_points_grad_scale if provided
-        viewspace_points_grad_scale = outputs.get("viewspace_points_grad_scale", None)
 
         # log learning rate and gaussian count every 100 iterations (without plus one step)
         if self.trainer.global_step % 100 == 0:
@@ -446,81 +374,49 @@ class GaussianSplatting(LightningModule):
                 step=self.trainer.global_step,
             )
 
+        # invoke `before_backward` interface of density controller
+        self.density_controller.before_backward(
+            outputs=outputs,
+            batch=batch,
+            gaussian_model=self.gaussian_model,
+            optimizers=self.gaussian_optimizers,
+            global_step=global_step,
+            pl_module=self,
+        )
         # backward
         self.manual_backward(metrics["loss"], retain_graph=("extra_loss" in metrics.keys()))
 
         if "extra_loss" in metrics.keys():
-            grad_norm_avg = torch.norm(viewspace_point_tensor.grad[visibility_filter, :2], dim=-1, keepdim=True).mean()
-            org_grad = viewspace_point_tensor.grad.detach().clone()
+            grad_norm_avg = torch.norm(outputs["viewspace_points"].grad[outputs["visibility_filter"], :2], dim=-1, keepdim=True).mean()
+            org_grad = outputs["viewspace_points"].grad.detach().clone()
             self.manual_backward(metrics["extra_loss"])
-            grad_norm_avg_final = torch.norm(viewspace_point_tensor.grad[visibility_filter, :2], dim=-1, keepdim=True).mean()
-            viewspace_point_tensor.grad = org_grad * max(self.hparams["gaussian"].optimization.densify_grad_scaler * grad_norm_avg_final / grad_norm_avg, 1.0)
+            grad_norm_avg_final = torch.norm(outputs["viewspace_points"].grad[outputs["visibility_filter"], :2], dim=-1, keepdim=True).mean()
+            outputs["viewspace_points"].grad = org_grad * max(self.hparams["density"].densify_grad_scaler * grad_norm_avg_final / grad_norm_avg, 1.0)
 
-        # before gradient descend
-        with torch.no_grad():
-            # Densification
-            if global_step < self.hparams["gaussian"].optimization.densify_until_iter:
-                # if viewspace_point_tensor.shape[0] != visibility_filter.shape[0]:
-                #     # viewspace_point_tensor and radii only contain visible gaussians
-                #
-                #     original_viewspace_point_tensor = viewspace_point_tensor
-                #     original_radii = radii
-                #
-                #     viewspace_point_tensor = torch.zeros((visibility_filter.shape[0], 2), dtype=original_viewspace_point_tensor.dtype, device=original_viewspace_point_tensor.device)
-                #     viewspace_point_tensor.grad = torch.zeros_like(viewspace_point_tensor)
-                #     viewspace_point_tensor.grad[visibility_filter] = original_viewspace_point_tensor.grad
-                #     radii = torch.zeros((visibility_filter.shape[0],), dtype=original_radii.dtype, device=original_radii.device)
-                #     radii[visibility_filter] = original_radii
-
-                gaussians = self.gaussian_model
-                gaussians.max_radii2D[visibility_filter] = torch.max(
-                    gaussians.max_radii2D[visibility_filter],
-                    radii[visibility_filter]
-                )
-                if self.hparams["absgrad"] is True:
-                    viewspace_point_tensor.grad = viewspace_point_tensor.absgrad
-                gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter, scale=viewspace_points_grad_scale)
-
-                if global_step > self.optimization_hparams.densify_from_iter and global_step % self.optimization_hparams.densification_interval == 0:
-                    size_threshold = 20 if global_step > self.optimization_hparams.opacity_reset_interval else None
-                    gaussians.densify_and_prune(
-                        self.hparams["gaussian"].optimization.densify_grad_threshold,
-                        self.hparams["gaussian"].optimization.cull_opacity_threshold,
-                        extent=self.cameras_extent,
-                        prune_extent=self.prune_extent,
-                        max_screen_size=size_threshold,
-                    )
-
-                if global_step % self.hparams["gaussian"].optimization.opacity_reset_interval == 0 or \
-                        (
-                                torch.all(self.background_color == 1.) and global_step == self.hparams[
-                            "gaussian"].optimization.densify_from_iter
-                        ):
-                    gaussians.reset_opacity()
-                
-                if self.trainer.global_step % 100 == 0:
-                    grad_accum = gaussians.xyz_gradient_accum[gaussians.denom > 0.]
-                    denom = gaussians.denom[gaussians.denom > 0.]
-                    metrics_to_log = {
-                        "trainer/grad_accum_mean":grad_accum.mean(),
-                        "trainer/denom_mean":denom.mean(),
-                        "trainer/grad_avg":(grad_accum / denom).mean(),
-                    }
-                    self.logger.log_metrics(
-                        metrics_to_log,
-                        step=self.trainer.global_step,
-                    )
+        # invoke `after_backward` interface of density controller
+        self.density_controller.after_backward(
+            outputs=outputs,
+            batch=batch,
+            gaussian_model=self.gaussian_model,
+            optimizers=self.gaussian_optimizers,
+            global_step=global_step,
+            pl_module=self,
+        )
+        # invoke other hooks
+        for i in self.on_after_backward_hooks:
+            i(outputs, batch, self.gaussian_model, global_step, self)
 
         # optimize
         for optimizer in optimizers:
             optimizer.step()
 
         # schedule lr
-        self.gaussian_model.update_learning_rate(global_step)
         for scheduler in schedulers:
             scheduler.step()
 
     def light_gaussian_prune(self, global_step):
+        # TODO: move elsewhere
+
         """
         LightGaussian prune
         """
@@ -558,7 +454,12 @@ class GaussianSplatting(LightningModule):
                   f"number_to_prune={prune_mask.sum().item()}, "
                   f"prune_percent={prune_percent}, "
                   f"anti_aliased={anti_aliased}")
-            self.gaussian_model.prune_points(prune_mask)
+
+            from internal.density_controllers.density_controller import Utils
+            valid_points_mask = ~prune_mask  # `True` to keep
+            self.gaussian_model.properties = Utils.prune_properties(valid_points_mask, self.gaussian_model, self.gaussian_optimizers)
+            self.density_updated_by_renderer()
+
             print(f"number_of_gaussian_after_pruning={self.gaussian_model.get_xyz.shape[0]}")
 
     def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
@@ -566,9 +467,15 @@ class GaussianSplatting(LightningModule):
         # is the same as the local variable `global_step` in training_step
         global_step = self.trainer.global_step
 
-        self.light_gaussian_prune(global_step)
+        self.gaussian_model.on_train_batch_end(global_step, self)
 
         self.renderer.after_training_step(self.trainer.global_step, self)
+
+        self.light_gaussian_prune(global_step)
+
+        for i in self.on_train_batch_end_hooks:
+            i(outputs, batch, self.gaussian_model, global_step, self)
+
         super().on_train_batch_end(outputs, batch, batch_idx)
 
     def on_validation_batch_start(self, batch: Any, batch_idx: int, dataloader_idx: int = 0) -> None:
@@ -587,32 +494,35 @@ class GaussianSplatting(LightningModule):
 
         # forward
         if self.hparams["test_speed"]:
-            outputs, loss, rgb_diff_loss, ssim_metric, time = self.forward_with_time_loss_calculation(camera, image_info)
-            self.log(f"{name}/time(s)", time, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
-        else:
-            outputs, loss, rgb_diff_loss, ssim_metric = self.forward_with_loss_calculation(camera, image_info)
+            torch.cuda.synchronize()
+            start = time.time()
+            outputs = self(camera)
+            torch.cuda.synchronize()
+            end = time.time()
 
-        self.log(f"{name}/rgb_diff", rgb_diff_loss, on_epoch=True, prog_bar=False, batch_size=self.batch_size)
-        
-        self.log(f"{name}/loss", loss, on_epoch=True, prog_bar=True, batch_size=self.batch_size)
-        if self.hparams["correct_color"]:
-            from internal.utils.psnr import color_correct
-            outputs["render"] = color_correct(outputs["render"][None, ...].permute(0, 2, 3, 1), 
-                                              gt_image[None, ...].permute(0, 2, 3, 1)).permute(0, 3, 1, 2).contiguous()[0]
-            
-        self.log(f"{name}/ssim", ssim(outputs["render"], gt_image), on_epoch=True, prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{name}/psnr", self.psnr(outputs["render"], gt_image), on_epoch=True, prog_bar=True,
-                 batch_size=self.batch_size)
-        self.log(f"{name}/lpips", lpips(outputs["render"].clamp(0., 1.).unsqueeze(0), gt_image.unsqueeze(0)), on_epoch=True, prog_bar=True,
-                 batch_size=self.batch_size)
+            metrics, prog_bar = self.metric.get_validate_metrics(self, self.gaussian_model, batch, outputs)
+            prog_bar["time(s)"] = True
+            metrics["time(s)"] = torch.tensor(end - start)
+        else:
+            outputs = self(camera)
+            metrics, prog_bar = self.metric.get_validate_metrics(self, self.gaussian_model, batch, outputs)
+        self.log_metrics(metrics, prog_bar, prefix=name, on_step=False, on_epoch=True)
+        self.val_metrics.append((image_info[0], metrics))
 
         # write validation image
         if self.trainer.global_rank == 0 and self.hparams["save_val_output"] is True and (
                 self.hparams["max_save_val_output"] < 0 or batch_idx < self.hparams["max_save_val_output"]
         ):
+            output_images = []
+            if self.renderer_output_types is None:
+                output_images.append(outputs["render"].cpu())
+            else:
+                for i in self.renderer_output_types:
+                    output_images.append(self.renderer_output_visualizers[i](outputs).cpu())
+            if "extra_image" in outputs:
+                output_images.append(outputs["extra_image"].cpu())
             self.image_queue.put({
-                "output_image": outputs["render"].cpu(),
-                "extra_image": outputs["extra_image"].cpu() if "extra_image" in outputs else None,
+                "output_images": output_images,
                 "gt_image": gt_image.cpu(),
                 "stage": name,
                 "image_name": image_info[0],
@@ -645,12 +555,15 @@ class GaussianSplatting(LightningModule):
     def on_validation_epoch_start(self) -> None:
         super().on_validation_epoch_start()
         if self.hparams["save_val_output"] is True:
+            from internal.utils.visualizers import Visualizers
+            self.renderer_output_visualizers = Visualizers.get_simplified_visualizer_by_renderer_output_info(self.renderer.get_available_outputs())
+
             for i in range(self.max_image_saving_threads):
                 thread = threading.Thread(target=self.save_images)
                 self.image_saving_threads.append(thread)
                 thread.start()
 
-    def on_validation_epoch_end(self) -> None:
+    def on_validation_epoch_end(self, name="val") -> None:
         super().on_validation_epoch_end()
         for i in range(len(self.image_saving_threads)):
             self.image_queue.put(None)
@@ -661,13 +574,44 @@ class GaussianSplatting(LightningModule):
             for k in sorted (self._trainer.logged_metrics.keys()):
                 file.write("%s: %s, \n" % (k, self._trainer.logged_metrics[k].item()))
 
+        # save metrics
+        if self.hparams["save_val_metrics"] is True and self.global_rank == 0 and len(self.val_metrics) > 0:
+            metrics_output_dir = os.path.join(self.hparams["output_path"], "metrics")
+            os.makedirs(metrics_output_dir, exist_ok=True)
+            step = max(self.trainer.global_step, self.restored_global_step)
+
+            metric_list_key_by_name = {}  # [metric_name] = metric_value_list
+            metric_fields = list(self.val_metrics[0][1].keys())
+            for i in metric_fields:
+                metric_list_key_by_name[i] = []
+
+            with open(os.path.join(metrics_output_dir, f"{name}-step={step}.csv"), "w") as f:
+                metrics_writer = csv.writer(f)
+                metrics_writer.writerow(["name"] + list(metric_fields))
+
+                for image_name, metrics in self.val_metrics:
+                    metric_row = [image_name]
+                    for metric_name in metric_fields:
+                        metric_list_key_by_name[metric_name].append(metrics[metric_name])
+                        metric_row.append("{:.8f}".format(metrics[metric_name].item()))
+                    metrics_writer.writerow(metric_row)
+
+                # calculate mean metrics
+                metrics_writer.writerow([""] + ["" for _ in range(len(metric_fields))])
+                mean_metrics = ["MEAN"]
+                for i in metric_fields:
+                    mean_metrics.append("{:.8f}".format(torch.stack(metric_list_key_by_name[i]).mean(dim=0).item()))
+                metrics_writer.writerow(mean_metrics)
+
+        self.val_metrics.clear()
+
     def on_test_epoch_start(self) -> None:
         super().on_test_epoch_start()
         self.on_validation_epoch_start()
 
     def on_test_epoch_end(self) -> None:
         super().on_test_epoch_end()
-        self.on_validation_epoch_end()
+        self.on_validation_epoch_end(name="test")
 
     def save_images(self):
         while True:
@@ -676,10 +620,9 @@ class GaussianSplatting(LightningModule):
                 break
 
             try:
-                image_list = []
-                if item["extra_image"] is not None:
-                    image_list.append(item["extra_image"])
-                image_list += [item["output_image"], item["gt_image"]]
+                image_list = [item["gt_image"]]
+                for i in item["output_images"]:
+                    image_list.append(i)
                 image = torch.concat(image_list, dim=-1)
 
                 if self.log_image is not None:
@@ -710,40 +653,56 @@ class GaussianSplatting(LightningModule):
         return self.validation_step(batch, batch_idx, name="test")
 
     def configure_optimizers(self):
-        self.cameras_extent = self.trainer.datamodule.dataparser_outputs.camera_extent
-        self.prune_extent = self.trainer.datamodule.prune_extent
-        # gaussian_model.training_setup() must be called here, where parameters have been moved to GPUs
-        self.gaussian_model.training_setup(self.hparams["gaussian"].optimization, self.cameras_extent)
-        # scale after optimizer being configured, avoid lr scaling
-        self.cameras_extent *= self.hparams["camera_extent_factor"]
-        self.prune_extent *= self.hparams["camera_extent_factor"]
-
         # initialize lists that store optimizers and schedulers
-        optimizers = [
-            self.gaussian_model.optimizer,
-        ]
+        optimizers = []
         schedulers = []
+
+        def add_optimizers_and_schedulers(new_optimizers, new_schedulers):
+            nonlocal optimizers
+            nonlocal schedulers
+
+            if new_optimizers is not None:
+                if isinstance(new_optimizers, list):
+                    optimizers += new_optimizers
+                else:
+                    optimizers.append(new_optimizers)
+            if new_schedulers is not None:
+                if isinstance(new_schedulers, list):
+                    schedulers += new_schedulers
+                else:
+                    schedulers.append(new_schedulers)
+
+        # gaussian model optimizer and scheduler setup
+        gaussian_optimizers, gaussian_schedulers = self.gaussian_model.training_setup(self)
+        self.gaussian_optimizers = gaussian_optimizers
+        if isinstance(self.gaussian_optimizers, list) is False:
+            self.gaussian_optimizers = [self.gaussian_optimizers]
+        add_optimizers_and_schedulers(gaussian_optimizers, gaussian_schedulers)
+        # add frozen Gaussians
+        if self.frozen_gaussians is not None:
+            from internal.utils.gaussian_containers import HasExtraParameters
+            self.gaussian_model.gaussians = HasExtraParameters(self.frozen_gaussians, self.gaussian_model.gaussians)
 
         # renderer optimizer and scheduler setup
         renderer_optimizer, renderer_scheduler = self.renderer.training_setup(self)
-        if renderer_optimizer is not None:
-            if isinstance(renderer_optimizer, list):
-                optimizers += renderer_optimizer
-            else:
-                optimizers.append(renderer_optimizer)
-        if renderer_scheduler is not None:
-            if isinstance(renderer_scheduler, list):
-                schedulers += renderer_scheduler
-            else:
-                schedulers.append(renderer_scheduler)
+        add_optimizers_and_schedulers(renderer_optimizer, renderer_scheduler)
+
+        # metric optimizer and scheduler setup
+        metric_optimizer, metric_scheduler = self.metric.training_setup(self)
+        add_optimizers_and_schedulers(metric_optimizer, metric_scheduler)
 
         return optimizers, schedulers
 
+    def density_updated_by_renderer(self):
+        self.density_controller.after_density_changed(self.gaussian_model, self.gaussian_optimizers, self)
+
     def save_gaussians(self):
-        if self.trainer.global_rank != 0:
+        is_mp_strategy = isinstance(self.trainer.strategy, internal.mp_strategy.MPStrategy)
+        if self.trainer.global_rank != 0 and is_mp_strategy is False:
             return
 
         if self.hparams["save_ply"] is True:
+            from internal.utils.gaussian_utils import GaussianPlyUtils
             # save ply file
             filename = "point_cloud.ply"
             # if self.trainer.global_rank != 0:
@@ -753,16 +712,20 @@ class GaussianSplatting(LightningModule):
                                           "iteration_{}".format(self.trainer.global_step))
                 os.makedirs(output_dir, exist_ok=True)
                 output_path = os.path.join(output_dir, filename)
-                self.gaussian_model.save_ply(output_path + ".tmp")
+                GaussianPlyUtils.load_from_model(self.gaussian_model).to_ply_format().save_to_ply(output_path + ".tmp")
                 os.rename(output_path + ".tmp", output_path)
 
             print("Gaussians saved to {}".format(output_path))
 
         # save checkpoint
+        checkpoint_name_suffix = ""
+        if is_mp_strategy is True:
+            checkpoint_name_suffix = f"-rank={self.global_rank}"
+
         checkpoint_path = os.path.join(
             self.hparams["output_path"],
             "checkpoints",
-            "epoch={}-step={}.ckpt".format(self.trainer.current_epoch, self.trainer.global_step),
+            "epoch={}-step={}{}.ckpt".format(self.trainer.current_epoch, self.trainer.global_step, checkpoint_name_suffix),
         )
         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
         self.trainer.save_checkpoint(checkpoint_path)
@@ -772,11 +735,43 @@ class GaussianSplatting(LightningModule):
             store_ply(os.path.join(
                 self.hparams["output_path"],
                 "checkpoints",
-                "epoch={}-step={}-xyz_rgb.ply".format(self.trainer.current_epoch, self.trainer.global_step),
+                "epoch={}-step={}{}-xyz_rgb.ply".format(self.trainer.current_epoch, self.trainer.global_step, checkpoint_name_suffix),
             ), xyz.cpu().numpy(), ((rgb + 0.5).clamp(min=0., max=1.) * 255).to(torch.int).cpu().numpy())
         print("Checkpoint saved to {}".format(checkpoint_path))
 
+    def set_datamodule_device(self, device):
+        # whether trainer exists
+        try:
+            self.trainer
+        except RuntimeError:
+            return
+
+        datamodule = getattr(self.trainer, "datamodule", None)
+        if datamodule is None:
+            return
+        datamodule.set_device(device)
+
+    def _on_device_updated(self):
+        self.metric.on_parameter_move(device=self.device)
+        self.set_datamodule_device(self.device)
+
     def to(self, *args: Any, **kwargs: Any) -> Self:
-        global lpips
-        lpips = lpips.to(*args, **kwargs)
-        return super().to(*args, **kwargs)
+        super().to(*args, **kwargs)
+
+        self._on_device_updated()
+
+        return self
+
+    def cuda(self, device: Optional[Union[torch.device, int]] = None) -> Self:
+        super().cuda(device)
+
+        self._on_device_updated()
+
+        return self
+
+    def cpu(self) -> Self:
+        super().cpu()
+
+        self._on_device_updated()
+
+        return self

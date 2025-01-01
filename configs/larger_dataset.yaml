@@ -1,10 +1,9 @@
 data:
-  params:
-    colmap:
-      split_mode: "reconstruction"
-      eval_image_select_mode: "ratio"
-      eval_ratio: 0.01
-
+  class_path: Colmap
+  init_args:
+    split_mode: "reconstruction"
+    eval_image_select_mode: "ratio"
+    eval_ratio: 0.01
 # https://github.com/graphdeco-inria/gaussian-splatting#faq
 #  How can I use this for a much larger dataset, like a city district? The current method was not designed for these, but given enough memory, it should work out. However, the approach can struggle in multi-scale detail scenes (extreme close-ups, mixed with far-away shots). This is usually the case in, e.g., driving data sets (cars close up, buildings far away). For such scenes, you can lower the --position_lr_init, --position_lr_final and --scaling_lr (x0.3, x0.1, ...). The more extensive the scene, the lower these values should be. Below, we use default learning rates (left) and --position_lr_init 0.000016 --scaling_lr 0.001"
 model:

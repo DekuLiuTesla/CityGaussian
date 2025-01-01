@@ -1,39 +1,38 @@
-import time
-
 import numpy as np
 import json
-import os.path
+import os
 
 import torch
-
-from .dataparser import ImageSet, PointCloud, DataParser, DataParserOutputs
-from internal.configs.dataset import BlenderParams
+from PIL import Image
+from typing import Literal
+from dataclasses import dataclass
+from .dataparser import ImageSet, PointCloud, DataParserConfig, DataParser, DataParserOutputs
 from internal.cameras.cameras import Cameras
-from internal.utils.graphics_utils import fov2focal, getNerfppNorm
-from internal.utils.sh_utils import SH2RGB
+from internal.utils.graphics_utils import fov2focal
+
+
+@dataclass
+class Blender(DataParserConfig):
+    white_background: bool = False
+
+    random_point_color: bool = False
+
+    split_mode: Literal["reconstruction", "experiment"] = "experiment"
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return BlenderDataParser(path, output_path, global_rank, self)
 
 
 class BlenderDataParser(DataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: BlenderParams) -> None:
+    def __init__(self, path: str, output_path: str, global_rank: int, params: Blender) -> None:
         super().__init__()
         self.path = path
         self.output_path = output_path
         self.global_rank = global_rank
         self.params = params
 
-    def _parse_transforms_json(self, split: str) -> ImageSet:
-        with open(os.path.join(self.path, "transforms_{}.json".format(split)), "r") as f:
-            transforms = json.load(f)
-
-        # if in reconstruction mode, merge val and test into train set
-        if split == "train" and self.params.split_mode == "reconstruction":
-            for i in ["val", "test"]:
-                with open(os.path.join(self.path, "transforms_{}.json".format(i)), "r") as f:
-                    transforms["frames"] += json.load(f)["frames"]
-
-        # TODO: auto detect image size
-        width = 800
-
+    @staticmethod
+    def parse_transforms(transforms: dict, path: str) -> ImageSet:
         # parse extrinsic
         image_name_list = []
         image_path_list = []
@@ -42,7 +41,7 @@ class BlenderDataParser(DataParser):
         for frame in transforms["frames"]:
             image_name_with_extension = "{}.png".format(frame["file_path"])
             image_name_list.append(os.path.basename(image_name_with_extension))
-            image_path_list.append(os.path.join(self.path, image_name_with_extension))
+            image_path_list.append(os.path.join(path, image_name_with_extension))
             camera_to_world_list.append(frame["transform_matrix"])
             if "time" in frame:
                 time_list.append(frame["time"])
@@ -56,17 +55,24 @@ class BlenderDataParser(DataParser):
         R = world_to_camera[:, :3, :3]
         T = world_to_camera[:, :3, 3]
 
+        # TODO: allow different height
+        height_list = []
+        for image_path in image_path_list:
+            img = Image.open(image_path)
+            try:
+                width, height = img.size
+                assert height == width, "height must be equal to width"
+                height_list.append(height)
+            finally:
+                img.close()
+
+        height = torch.tensor(height_list, dtype=torch.int)
+        width = torch.clone(height)
+
         # parse focal length
-        fx = torch.tensor(
-            [fov2focal(fov=transforms["camera_angle_x"], pixels=width)],
-            dtype=torch.float32,
-        ).expand(R.shape[0])
+        fx = fov2focal(fov=transforms["camera_angle_x"], pixels=width)
         # TODO: allow different fy
         fy = torch.clone(fx)
-
-        width = torch.tensor([width], dtype=torch.float32).expand(R.shape[0])
-        # TODO: allow different height
-        height = torch.clone(width)
 
         return ImageSet(
             image_names=image_name_list,
@@ -77,17 +83,29 @@ class BlenderDataParser(DataParser):
                 T=T,
                 fx=fx,
                 fy=fy,
-                cx=width / 2,
-                cy=height / 2,
+                cx=width.float() / 2,
+                cy=height.float() / 2,
                 width=width,
                 height=height,
-                appearance_id=torch.zeros_like(width),
-                normalized_appearance_id=torch.zeros_like(width),
+                appearance_id=torch.zeros_like(width, dtype=torch.int),
+                normalized_appearance_id=torch.zeros_like(width, dtype=torch.float),
                 distortion_params=None,
-                camera_type=torch.zeros_like(width),
+                camera_type=torch.zeros_like(width, dtype=torch.int),
                 time=torch.tensor(time_list, dtype=torch.float),
             ),
         )
+
+    def _parse_transforms_json(self, split: str) -> ImageSet:
+        with open(os.path.join(self.path, "transforms_{}.json".format(split)), "r") as f:
+            transforms = json.load(f)
+
+        # if in reconstruction mode, merge val and test into train set
+        if split == "train" and self.params.split_mode == "reconstruction":
+            for i in ["val", "test"]:
+                with open(os.path.join(self.path, "transforms_{}.json".format(i)), "r") as f:
+                    transforms["frames"] += json.load(f)["frames"]
+
+        return self.parse_transforms(transforms=transforms, path=self.path)
 
     def get_outputs(self) -> DataParserOutputs:
         # ply_path = os.path.join(self.path, "points3D.ply")

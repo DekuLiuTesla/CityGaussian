@@ -1,0 +1,18 @@
+data:
+  add_background_sphere: true
+  background_sphere_distance: 1
+  background_sphere_points: 204800
+  background_sphere_color: white
+  background_sphere_min_altitude: 0.
+  parser:
+    class_path: MatrixCity
+    init_args:
+      use_depth: true
+model:
+  renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
+  metric:
+    class_path: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+  renderer_output_types:
+    - rgb
+    - inverse_depth
+cache_all_images: true

@@ -4,15 +4,20 @@ from glob import glob
 import numpy as np
 import torch
 
-from internal.configs.dataset import NSVFParams
+from dataclasses import dataclass
 from internal.cameras.cameras import Cameras
-from internal.utils.sh_utils import SH2RGB
-from internal.utils.graphics_utils import getNerfppNorm
 from .dataparser import DataParser, DataParserOutputs, ImageSet, PointCloud
+from .blender_dataparser import Blender
+
+
+@dataclass
+class NSVF(Blender):
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return NSVFDataParser(path, output_path, global_rank, self)
 
 
 class NSVFDataParser(DataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: NSVFParams):
+    def __init__(self, path: str, output_path: str, global_rank: int, params: NSVF):
         super().__init__()
 
         self.path = path

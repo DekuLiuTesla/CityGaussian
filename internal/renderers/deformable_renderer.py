@@ -6,7 +6,7 @@ import torch
 from .renderer import Renderer
 from .vanilla_renderer import VanillaRenderer
 from ..cameras import Camera
-from ..models.gaussian_model import GaussianModel
+from ..models.gaussian import GaussianModel
 from ..models.deform_model import DeformModel
 from ..utils.network_factory import NetworkFactory
 from ..utils.general_utils import get_linear_noise_func

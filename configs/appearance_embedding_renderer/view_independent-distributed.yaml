@@ -1,0 +1,28 @@
+trainer:
+  strategy:
+    class_path: internal.mp_strategy.MPStrategy
+  devices: -1
+model:
+  gaussian:
+    class_path: internal.models.appearance_feature_gaussian.AppearanceFeatureGaussian
+    init_args:
+      sh_degree: 0
+      appearance_feature_dims: 64
+      optimization:
+        appearance_feature_lr_init: 2e-3
+  renderer:
+    class_path: internal.renderers.gsplat_distributed_appearance_embedding_renderer.GSplatDistributedAppearanceEmbeddingRenderer
+    init_args:
+      appearance:
+        n_appearances: 1024
+        is_view_dependent: false
+      appearance_optimization:
+        warm_up: 0
+  density: internal.density_controllers.distributed_vanilla_density_controller.DistributedVanillaDensityController
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  parser:
+    class_path: Colmap
+    init_args:
+      split_mode: "reconstruction"

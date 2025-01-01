@@ -210,8 +210,9 @@ def build_gaussian_sort_key(
 
 def build_rotation_matrix(quaternions):
     # normalize quaternion
-    quaternion_norm = torch.norm(quaternions, dim=-1)
-    normalized_quaternion = quaternions / quaternion_norm[:, None]
+    # quaternion_norm = torch.norm(quaternions, dim=-1)
+    # normalized_quaternion = quaternions / quaternion_norm[:, None]
+    normalized_quaternion = quaternions
     # build rotation matrix
     r = normalized_quaternion[:, 0]
     x = normalized_quaternion[:, 1]

@@ -1,0 +1,17 @@
+model:
+  metric:
+    class_path: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+    init_args:
+      fused_ssim: true
+      depth_output_key: inv_depth_alt
+  renderer:
+    class_path: internal.renderers.gsplat_v1_renderer.GSplatV1Renderer
+    init_args:
+      separate_sh: true
+      tile_based_culling: true
+  renderer_output_types:
+    - rgb
+    - inv_depth_alt
+data:
+  parser: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+cache_all_images: true

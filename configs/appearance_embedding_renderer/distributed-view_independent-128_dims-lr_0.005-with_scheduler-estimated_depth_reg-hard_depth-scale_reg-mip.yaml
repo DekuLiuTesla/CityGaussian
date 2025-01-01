@@ -1,0 +1,43 @@
+trainer:
+  strategy:
+    class_path: internal.mp_strategy.MPStrategy
+  devices: -1
+model:
+  gaussian:
+    class_path: internal.models.appearance_mip_gaussian.AppearanceMipGaussian
+    init_args:
+      sh_degree: 0
+      appearance_feature_dims: 64
+      optimization:
+        appearance_feature_lr_init: 0.005
+        appearance_feature_lr_scheduler:
+          class_path: ExponentialDecayScheduler
+          init_args:
+            lr_final: 0.00025
+  renderer:
+    class_path: internal.renderers.gsplat_distributed_appearance_embedding_renderer.GSplatDistributedAppearanceMipRenderer
+    init_args:
+      appearance:
+        n_appearance_embedding_dims: 128
+        n_appearances: 2560  # must be greater than the number of images
+        is_view_dependent: false
+      appearance_optimization:
+        embedding_lr_init: 5e-3
+        embedding_lr_final_factor: 0.05
+        warm_up: 0
+  density: internal.density_controllers.distributed_vanilla_density_controller.DistributedVanillaDensityController
+  metric:
+    class_path: internal.metrics.scale_regularization_metrics.ScaleRegularizationWithDepthMetrics
+    init_args:
+      depth_output_key: hard_inverse_depth
+  renderer_output_types:
+    - rgb
+    - hard_inverse_depth
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  distributed: true
+  parser:
+    class_path: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+    init_args:
+      split_mode: "reconstruction"

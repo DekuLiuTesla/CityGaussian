@@ -110,10 +110,11 @@ class AsyncImageReader:
 
         self.tpe = ThreadPoolExecutor(max_workers=4)
 
+        self.is_finished = False
+
         self.thread = threading.Thread(target=self._read_images)
         self.thread.start()
 
-        self.is_finished = False
 
     def get(self):
         return self.queue.get()

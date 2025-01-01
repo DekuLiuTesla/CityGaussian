@@ -1,0 +1,3 @@
+model:
+  renderer: internal.renderers.stp_renderer.STPRenderer
+cache_all_images: true

@@ -19,9 +19,6 @@ from argparse import ArgumentParser
 from internal.utils.common import parse_cfg_yaml
 from internal.utils.gaussian_model_loader import GaussianModelLoader
 from internal.utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh
-from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
-from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
-from internal.renderers.vanilla_trim_renderer import VanillaTrimRenderer
 
 import open3d as o3d
 
@@ -29,7 +26,6 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Testing script parameters")
     parser.add_argument('--model_path', type=str, help='path of 2DGS model')
-    parser.add_argument('--config_path', type=str, default=None, help='path of configs')
     parser.add_argument("--iteration", default=-1, type=int)
     parser.add_argument('--skip_mesh', action="store_true", help='Mesh: if directly apply post processing')
     parser.add_argument("--voxel_size", default=-1.0, type=float, help='Mesh: voxel size for TSDF')
@@ -46,46 +42,70 @@ if __name__ == "__main__":
     args = parser.parse_args(sys.argv[1:])
     print("Rendering " + args.model_path)
 
-    gaussians, renderer = GaussianModelLoader.search_and_load(
-        args.model_path,
-        sh_degree=args.sh_degree,
-        device="cuda",
-    )
+    device = torch.device("cuda")
 
-    if isinstance(renderer, VanillaTrimRenderer):
-        gaussians._scaling = torch.cat((torch.ones_like(gaussians._scaling[:, :1]) * 1e-8, gaussians._scaling[:, [-2, -1]]), dim=1)
+    # load ckpt
+    loadable_file = GaussianModelLoader.search_load_file(args.model_path)
+    print(loadable_file)
+    dataparser_config = None
+    if loadable_file.endswith(".ckpt"):
+        ckpt = torch.load(loadable_file, map_location="cpu")
+        # initialize model
+        model = GaussianModelLoader.initialize_model_from_checkpoint(
+            ckpt,
+            device=device,
+        )
+        model.freeze()
+        model.pre_activate_all_properties()
+        # initialize renderer
+        renderer = GaussianModelLoader.initialize_renderer_from_checkpoint(
+            ckpt,
+            stage="validate",
+            device=device,
+        )
+        try:
+            dataparser_config = ckpt["datamodule_hyper_parameters"]["parser"]
+        except:
+            pass
 
-    if args.use_trim_renderer and not isinstance(renderer, VanillaTrimRenderer):
-        renderer = VanillaTrimRenderer(renderer.compute_cov3D_python, renderer.convert_SHs_python)
-
-    if args.config_path is None:
-        config_path = os.path.join(args.model_path, "config.yaml")
+        dataset_path = ckpt["datamodule_hyper_parameters"]["path"]
     else:
-        config_path = args.config_path
-    load_from = GaussianModelLoader.search_load_file(args.model_path)
-    with open(config_path, 'r') as f:
-        config = parse_cfg_yaml(yaml.load(f, Loader=yaml.FullLoader))
-    
-    if config.data.type == "estimated_depth_colmap_block":
-        dataparser_outputs = EstimatedDepthColmapDataParser(
-            os.path.expanduser(config.data.path),
-            os.path.abspath(""),
-            global_rank=0,
-            params=config.data.params.estimated_depth_colmap_block,
-        ).get_outputs()
-    else:
-        dataparser_outputs = ColmapBlockDataParser(
-            os.path.expanduser(config.data.path),
-            os.path.abspath(""),
-            global_rank=0,
-            params=config.data.params.colmap_block,
-        ).get_outputs()
+        dataset_path = args.dataset_path
+        if dataset_path is None:
+            cfg_args_file = os.path.join(args.model_path, "cfg_args")
+            try:
+                from argparse import Namespace
+                with open(cfg_args_file, "r") as f:
+                    cfg_args = eval(f.read())
+                dataset_path = cfg_args.source_path
+            except Exception as e:
+                print("Can not parse `cfg_args`: {}".format(e))
+                print("Please specific the data path via: `--dataset_path`")
+                exit(1)
+
+        model, renderer = GaussianModelLoader.initialize_model_and_renderer_from_ply_file(
+            loadable_file,
+            device=device,
+            eval_mode=True,
+            pre_activate=True,
+        )
+    if dataparser_config is None:
+        from internal.dataparsers.colmap_dataparser import Colmap
+        dataparser_config = Colmap()
+
+    # load dataset
+    dataparser_outputs = dataparser_config.instantiate(
+        path=dataset_path,
+        output_path=os.getcwd(),
+        global_rank=0,
+    ).get_outputs()
+    cameras = [i.to_device(device) for i in dataparser_outputs.train_set.cameras]
     
     if args.model_path.endswith('.ckpt'):
-        mesh_dir = os.path.join(args.model_path.split('/checkpoints')[0], 'mesh', load_from.split('/')[-1].split('.')[0])
+        mesh_dir = os.path.join(args.model_path.split('/checkpoints')[0], 'mesh')
     else:
-        mesh_dir = os.path.join(args.model_path, 'mesh', load_from.split('/')[-1].split('.')[0])
-    gaussExtractor = GaussianExtractor(gaussians, renderer, bg_color=config.model.background_color)
+        mesh_dir = os.path.join(args.model_path, 'mesh')
+    gaussExtractor = GaussianExtractor(model, renderer, bg_color=ckpt["hyper_parameters"]["background_color"])
 
     if not args.skip_mesh:
         print(f"export mesh to {mesh_dir} ...")

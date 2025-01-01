@@ -1,0 +1,14 @@
+splines==0.3.0
+plyfile==0.8.1
+tensorboard
+wandb
+tqdm
+einops
+joblib
+open3d
+viser==0.2.3
+opencv-python-headless==4.10.*
+matplotlib
+mediapy==1.2.2
+git+https://github.com/graphdeco-inria/diff-gaussian-rasterization.git@59f5f77e3ddbac3ed9db93ec2cfe99ed6c5d121d
+git+https://github.com/yzslab/simple-knn.git@44f764299fa305faf6ec5ebd99939e0508331503

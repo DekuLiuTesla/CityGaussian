@@ -1,0 +1,12 @@
+model:
+  gaussian:
+    class_path: internal.models.periodic_vibration_gaussian.PeriodicVibrationGaussian
+    init_args:
+      optimization:
+        opacities_lr: 0.005
+  renderer:
+    class_path: internal.renderers.periodic_vibration_gaussian_renderer.PeriodicVibrationGaussianRenderer
+    init_args:
+      env_map_res: -1
+      lambda_self_supervision: -1
+  metric: internal.metrics.pvg_dynamic_metrics.PVGDynamicMetrics

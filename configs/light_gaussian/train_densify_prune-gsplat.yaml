@@ -1,7 +1,6 @@
 data:
-  params:
-    val_max_num_images_to_cache: -1
-    test_max_num_images_to_cache: -1
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
 model:
   renderer: internal.renderers.gsplat_renderer.GSPlatRenderer
   light_gaussian:

@@ -1,0 +1,26 @@
+model:
+  gaussian:
+    class_path: internal.models.appearance_feature_gaussian.AppearanceFeatureGaussian
+    init_args:
+      sh_degree: 0
+      appearance_feature_dims: 64
+      optimization:
+        appearance_feature_lr_init: 2e-3
+  renderer:
+    class_path: internal.renderers.gsplat_appearance_embedding_renderer.GSplatAppearanceEmbeddingRenderer
+    init_args:
+      model:
+        is_view_dependent: false
+      optimization:
+        warm_up: 1000
+  metric: internal.metrics.inverse_depth_metrics.HasInverseDepthMetrics
+  renderer_output_types:
+    - rgb
+    - inverse_depth
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  parser:
+    class_path: internal.dataparsers.estimated_depth_colmap_dataparser.EstimatedDepthColmap
+    init_args:
+      split_mode: "reconstruction"

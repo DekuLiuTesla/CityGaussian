@@ -1,0 +1,2 @@
+-f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py39_cu118_pyt201/download.html
+pytorch3d

@@ -9,5 +9,12 @@
 !deform_model.py
 !vanilla_deform_model.py
 !swag_model.py
-!flatten_gaussian_model.py
-!vast_model.py
+!gaussian.py
+!vanilla_gaussian.py
+!appearance_feature_gaussian.py
+!appearance_mip_gaussian.py
+!gaussian_2d.py
+!periodic_vibration_gaussian.py
+!mip_splatting.py
+!appearance_gs2d.py
+!sparse_adam_gaussian.py

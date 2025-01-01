@@ -1,3 +1,10 @@
+"""
+This file is kept only for compatible purpose.
+All values are ignored.
+
+DataParser configs have been move to `internal/dataparsers`.
+"""
+
 from typing import Optional, Literal
 from dataclasses import dataclass
 
@@ -217,6 +224,18 @@ class PhotoTourismParams(ColmapParams):
 
 
 @dataclass
+class SegAnyColmapParams(ColmapParams):
+    semantic_mask_dir: str = "semantic/masks"
+
+    semantic_scale_dir: str = "semantic/scales"
+
+
+@dataclass
+class Feature3DGSColmapParams(ColmapParams):
+    feature_dir: str = "semantic/sam_features"
+
+
+@dataclass
 class DatasetParams:
     """
         Args:
@@ -242,6 +261,10 @@ class DatasetParams:
     matrix_city: MatrixCityParams
 
     phototourism: PhotoTourismParams
+
+    segany_colmap: SegAnyColmapParams
+
+    feature_3dgs_colmap: Feature3DGSColmapParams
 
     image_scale_factor: float = 1.  # TODO
 

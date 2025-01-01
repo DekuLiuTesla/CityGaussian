@@ -3,14 +3,26 @@ import json
 import numpy as np
 import torch
 from dataclasses import dataclass
-from .colmap_block_dataparser import ColmapBlockDataParser
+from .colmap_block_dataparser import ColmapBlock, ColmapBlockDataParser
 from internal.dataparsers import DataParserOutputs
-from internal.configs.dataset import EstimatedDepthColmapBlockParams
 
-class EstimatedDepthColmapDataParser(ColmapBlockDataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: EstimatedDepthColmapBlockParams) -> None:
-        super().__init__(path, output_path, global_rank, params)
+@dataclass
+class EstimatedDepthBlockColmap(ColmapBlock):
+    depth_dir: str = "estimated_depths"
 
+    depth_rescaling: bool = True
+
+    depth_scale_name: str = "estimated_depth_scales"
+
+    depth_scale_lower_bound: float = 0.2
+
+    depth_scale_upper_bound: float = 5.
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> "EstimatedDepthBlockColmapDataParser":
+        return EstimatedDepthBlockColmapDataParser(path=path, output_path=output_path, global_rank=global_rank, params=self)
+
+
+class EstimatedDepthBlockColmapDataParser(ColmapBlockDataParser):
     def get_outputs(self) -> DataParserOutputs:
         dataparser_outputs = super().get_outputs()
 

@@ -1,11 +1,11 @@
-from typing import List, Tuple
+from typing import Iterable, Tuple
 import torch
 from internal.renderers.gsplat_hit_pixel_count_renderer import GSplatHitPixelCountRenderer
 
 
 def get_count_and_score(
         gaussian_model,
-        cameras: List,
+        cameras: Iterable,
         anti_aliased: bool,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     device = gaussian_model.get_xyz.device
@@ -34,8 +34,7 @@ def get_count_and_score(
     )
 
     # count for each training camera
-    for i in range(len(cameras)):
-        camera = cameras[i]
+    for camera in cameras:
         count, opacity_score, alpha_score, visibility_score = GSplatHitPixelCountRenderer.hit_pixel_count(
             means3D=gaussian_model.get_xyz,
             opacities=gaussian_model.get_opacity,

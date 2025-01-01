@@ -1,24 +1,54 @@
-import os.path
+import os
 import math
 import json
-import time
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Optional, Literal, Tuple
 
 import torch
 import numpy as np
 
-from plyfile import PlyData, PlyElement
-
 import internal.utils.colmap as colmap_utils
 from internal.cameras.cameras import Cameras
-from internal.dataparsers.dataparser import DataParser, ImageSet, PointCloud, DataParserOutputs
-from internal.dataparsers.colmap_dataparser import ColmapDataParser
-from internal.configs.dataset import ColmapBlockParams
-from internal.utils.graphics_utils import getNerfppNorm
+from internal.dataparsers.dataparser import DataParserConfig, DataParser, ImageSet, PointCloud, DataParserOutputs
+from .colmap_dataparser import Colmap, ColmapDataParser
 
+@dataclass
+class ColmapBlock(Colmap):
+    """
+        Args:
+            image_dir: the path to the directory that store images
+
+            mask_dir:
+                the path to the directory store mask files;
+                the mask file of the image `a/image_name.jpg` is `a/image_name.jpg.png`;
+                single channel, 0 is the masked pixel;
+
+            split_mode: reconstruction: train model use all images; experiment: withholding a test set for evaluation
+
+            eval_step: -1: use all images as training set; > 1: pick an image for every eval_step
+
+            reorient: whether reorient the scene
+
+            appearance_groups: filename without extension
+    """
+
+    down_sample_factor: float = 1
+
+    block_id: int = None
+
+    block_dim: list[int] = None
+
+    aabb: list[float] = None
+
+    num_threshold: int = 25_000
+
+    content_threshold: float = 0.08
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return ColmapDataParser(path, output_path, global_rank, self)
 
 class ColmapBlockDataParser(ColmapDataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: ColmapBlockParams) -> None:
+    def __init__(self, path: str, output_path: str, global_rank: int, params: ColmapBlock) -> None:
         super().__init__(path, output_path, global_rank, params)
 
     def get_outputs(self) -> DataParserOutputs:
@@ -94,11 +124,16 @@ class ColmapBlockDataParser(ColmapDataParser):
             image_appearance_id.append(image_name_to_appearance_id[images[i].name])
             image_normalized_appearance_id.append(image_name_to_normalized_appearance_id[images[i].name])
 
-        print("loading colmap 3D points")
-        xyz, rgb, _ = ColmapDataParser.read_points3D_binary(
-            os.path.join(sparse_model_dir, "points3D.bin"),
-            selected_image_ids=selected_image_ids,
-        )
+        if self.params.points_from == "sfm":
+            print("loading colmap 3D points")
+            xyz, rgb, _ = ColmapDataParser.read_points3D_binary(
+                os.path.join(sparse_model_dir, "points3D.bin"),
+                selected_image_ids=selected_image_ids,
+            )
+        else:
+            # random points generated later
+            xyz = np.ones((1, 3))
+            rgb = np.ones((1, 3))
 
         loaded_mask_count = 0
         # initialize lists
@@ -138,7 +173,7 @@ class ColmapBlockDataParser(ColmapDataParser):
                 cy = intrinsics.params[2]
                 # fov_y = focal2fov(focal_length_x, height)
                 # fov_x = focal2fov(focal_length_x, width)
-            elif intrinsics.model == "PINHOLE":
+            elif intrinsics.model == "PINHOLE" or self.params.force_pinhole is True:
                 focal_length_x = intrinsics.params[0]
                 focal_length_y = intrinsics.params[1]
                 cx = intrinsics.params[2]
@@ -146,7 +181,8 @@ class ColmapBlockDataParser(ColmapDataParser):
                 # fov_y = focal2fov(focal_length_y, height)
                 # fov_x = focal2fov(focal_length_x, width)
             else:
-                assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+                undistorted_output_dir = os.path.join(self.path, "dense")
+                raise RuntimeError("Unsupported camera model: only PINHOLE or SIMPLE_PINHOLE currently. Please undistort your images with the command below first:\n  colmap image_undistorter --image_path {} --input_path {} --output_path {}\nthen use `{}` as the value of `--data.path`.".format(image_dir, sparse_model_dir, undistorted_output_dir, undistorted_output_dir))
 
             # whether mask exists
             mask_path = None
@@ -200,7 +236,10 @@ class ColmapBlockDataParser(ColmapDataParser):
 
         # recalculate intrinsics if down sample enabled
         if self.params.down_sample_factor != 1:
-            rounding_func = getattr(torch, self.params.down_sample_rounding_model)
+            if self.params.down_sample_rounding_mode == "round_half_up":
+                rounding_func = self._round_half_up
+            else:
+                rounding_func = getattr(torch, self.params.down_sample_rounding_mode)
             down_sampled_width = rounding_func(width.to(torch.float) / self.params.down_sample_factor)
             down_sampled_height = rounding_func(height.to(torch.float) / self.params.down_sample_factor)
             width_scale_factor = down_sampled_width / width
@@ -290,6 +329,20 @@ class ColmapBlockDataParser(ColmapDataParser):
                 mask_paths=[mask_path_list[i] for i in index_list],
                 cameras=cameras
             ))
+
+        if self.params.points_from == "random":
+            print("generate {} random points".format(self.params.n_random_points))
+            scene_center = torch.mean(image_set[0].cameras.camera_center, dim=0)
+            scene_radius = (image_set[0].cameras.camera_center - scene_center).norm(dim=-1).max()
+            xyz = (np.random.random((self.params.n_random_points, 3)) * 2. - 1.) * 3 * scene_radius.numpy() + scene_center.numpy()
+            rgb = (np.random.random((self.params.n_random_points, 3)) * 255).astype(np.uint8)
+        elif self.params.points_from == "ply":
+            assert self.params.ply_file is not None
+            from internal.utils.graphics_utils import fetch_ply_without_rgb_normalization
+            basic_pcd = fetch_ply_without_rgb_normalization(os.path.join(self.path, self.params.ply_file))
+            xyz = basic_pcd.points
+            rgb = basic_pcd.colors
+            print("load {} points from {}".format(xyz.shape[0], self.params.ply_file))
 
         # print information
         print("[colmap dataparser] train set images: {}, val set images: {}, loaded mask: {}".format(

@@ -1,0 +1,5 @@
+model:
+  renderer:
+    class_path: internal.renderers.taming_3dgs_renderer.Taming3DGSRenderer
+  metric:
+    class_path: internal.metrics.vanilla_with_fused_ssim_metrics.VanillaWithFusedSSIMMetrics

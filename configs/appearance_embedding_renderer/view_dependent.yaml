@@ -1,0 +1,22 @@
+model:
+  gaussian:
+    class_path: internal.models.appearance_feature_gaussian.AppearanceFeatureGaussian
+    init_args:
+      sh_degree: 0
+      appearance_feature_dims: 64
+      optimization:
+        appearance_feature_lr_init: 2e-3
+  renderer:
+    class_path: internal.renderers.gsplat_appearance_embedding_renderer.GSplatAppearanceEmbeddingRenderer
+    init_args:
+      model:
+        is_view_dependent: true
+      optimization:
+        warm_up: 1000
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  parser:
+    class_path: Colmap
+    init_args:
+      split_mode: "reconstruction"

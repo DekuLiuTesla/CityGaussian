@@ -3,13 +3,31 @@ import os.path
 
 import torch
 import numpy as np
-from internal.configs.dataset import NerfiesParams
-from .dataparser import DataParser, ImageSet, Cameras, PointCloud, DataParserOutputs
-from ..utils.graphics_utils import get_center_and_diag_from_hstacked_xyz
+from typing import Literal
+from dataclasses import dataclass
+from .dataparser import DataParserConfig, DataParser, ImageSet, Cameras, PointCloud, DataParserOutputs
+
+
+@dataclass
+class Nerfies(DataParserConfig):
+    down_sample_factor: int = 1
+
+    undistort_image: bool = True
+
+    step: int = 1
+
+    split_mode: Literal["reconstruction", "experiment"] = "experiment"
+
+    eval_image_select_mode: Literal["step"] = "step"
+
+    eval_step: int = 16
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return NerfiesDataparser(path=path, output_path=output_path, global_rank=global_rank, params=self)
 
 
 class NerfiesDataparser(DataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: NerfiesParams):
+    def __init__(self, path: str, output_path: str, global_rank: int, params: Nerfies):
         self.path = path
         self.output_path = output_path
         self.global_rank = global_rank

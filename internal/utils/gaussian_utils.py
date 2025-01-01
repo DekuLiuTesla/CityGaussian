@@ -6,13 +6,19 @@ from typing import Union
 from dataclasses import dataclass
 from plyfile import PlyData, PlyElement
 
+SHS_REST_DIM_TO_DEGREE = {
+    0: 0,
+    3: 1,
+    8: 2,
+    15: 3,
+}
+
 
 @dataclass
-class Gaussian:
+class GaussianPlyUtils:
     """
-    Load parameters from ply or ckpt file;
-    Convert between ply and ckpt;
-    Save to ply or ckpt;
+    Load parameters from ply;
+    Save to ply;
     """
 
     sh_degrees: int
@@ -22,13 +28,18 @@ class Gaussian:
     features_rest: Union[np.ndarray, torch.Tensor]  # ndarray[n, 3, 15], or tensor[n, 15, 3]; NOTE: this is features_rest actually!
     scales: Union[np.ndarray, torch.Tensor]  # [n, 3]
     rotations: Union[np.ndarray, torch.Tensor]  # [n, 4]
-    real_features_extra: Union[np.ndarray, torch.Tensor]
 
     @staticmethod
-    def load_array_from_plyelement(plyelement, name_prefix: str):
+    def detect_sh_degree_from_shs_rest(shs_rest: torch.Tensor):
+        assert isinstance(shs_rest, torch.Tensor)
+        return SHS_REST_DIM_TO_DEGREE[shs_rest.shape[-2]]
+
+    @staticmethod
+    def load_array_from_plyelement(plyelement, name_prefix: str, required: bool = True):
         names = [p.name for p in plyelement.properties if p.name.startswith(name_prefix)]
         if len(names) == 0:
-            # print(f"WARNING: '{name_prefix}' not found in ply, create an empty one")
+            if required is True:
+                raise RuntimeError(f"'{name_prefix}' not found in ply")
             return np.empty((plyelement["x"].shape[0], 0))
         names = sorted(names, key=lambda x: int(x.split('_')[-1]))
         v_list = []
@@ -36,10 +47,6 @@ class Gaussian:
             v_list.append(np.asarray(plyelement[attr_name]))
 
         return np.stack(v_list, axis=1)
-
-    @classmethod
-    def load_real_feature_extra_from_plyelement(cls, plyelement):
-        return cls.load_array_from_plyelement(plyelement, "f_extra_")
 
     @classmethod
     def load_from_ply(cls, path: str, sh_degrees: int = -1):
@@ -57,15 +64,7 @@ class Gaussian:
         features_dc[:, 1, 0] = np.asarray(plydata.elements[0]["f_dc_1"])
         features_dc[:, 2, 0] = np.asarray(plydata.elements[0]["f_dc_2"])
 
-        # extra_f_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("f_rest_")]
-        # extra_f_names = sorted(extra_f_names, key=lambda x: int(x.split('_')[-1]))
-        # assert len(extra_f_names) == 3 * (sh_degrees + 1) ** 2 - 3  # TODO: remove such a assertion
-        # features_extra = np.zeros((xyz.shape[0], len(extra_f_names)))
-        # for idx, attr_name in enumerate(extra_f_names):
-        #     features_extra[:, idx] = np.asarray(plydata.elements[0][attr_name])
-        # # Reshape (P,F*SH_coeffs) to (P, F, SH_coeffs except DC)
-        # features_rest = features_extra.reshape((features_extra.shape[0], 3, (sh_degrees + 1) ** 2 - 1))
-        features_rest = cls.load_array_from_plyelement(plydata.elements[0], "f_rest_").reshape((xyz.shape[0], 3, -1))
+        features_rest = cls.load_array_from_plyelement(plydata.elements[0], "f_rest_", required=False).reshape((xyz.shape[0], 3, -1))
         if sh_degrees >= 0:
             assert features_rest.shape[-1] == (sh_degrees + 1) ** 2 - 1  # TODO: remove such a assertion
         else:
@@ -77,21 +76,8 @@ class Gaussian:
                     break
             assert sh_degrees >= 0, f"invalid sh_degrees={sh_degrees}"
 
-        # scale_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("scale_")]
-        # scale_names = sorted(scale_names, key=lambda x: int(x.split('_')[-1]))
-        # scales = np.zeros((xyz.shape[0], len(scale_names)))
-        # for idx, attr_name in enumerate(scale_names):
-        #     scales[:, idx] = np.asarray(plydata.elements[0][attr_name])
         scales = cls.load_array_from_plyelement(plydata.elements[0], "scale_")
-
-        # rot_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("rot")]
-        # rot_names = sorted(rot_names, key=lambda x: int(x.split('_')[-1]))
-        # rots = np.zeros((xyz.shape[0], len(rot_names)))
-        # for idx, attr_name in enumerate(rot_names):
-        #     rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
         rots = cls.load_array_from_plyelement(plydata.elements[0], "rot_")
-
-        features_extra = cls.load_real_feature_extra_from_plyelement(plydata.elements[0])
 
         return cls(
             sh_degrees=sh_degrees,
@@ -101,13 +87,65 @@ class Gaussian:
             features_rest=features_rest,
             scales=scales,
             rotations=rots,
-            real_features_extra=features_extra,
         )
 
     @classmethod
-    def load_from_state_dict(cls, sh_degrees: int, state_dict: dict, key_prefix: str = "gaussian_model._"):
+    def load_from_model_properties(cls, properties, sh_degree: int = -1):
+        if sh_degree < 0:
+            sh_degree = cls.detect_sh_degree_from_shs_rest(properties["shs_rest"])
+
         init_args = {
-            "sh_degrees": sh_degrees,
+            "sh_degrees": sh_degree,
+        }
+
+        for name_in_model, name_in_dataclass in [
+            ("means", "xyz"),
+            ("shs_dc", "features_dc"),
+            ("shs_rest", "features_rest"),
+            ("scales", "scales"),
+            ("rotations", "rotations"),
+            ("opacities", "opacities"),
+        ]:
+            init_args[name_in_dataclass] = properties[name_in_model].detach()
+
+        return cls(**init_args)
+
+    @classmethod
+    def load_from_model(cls, model):
+        return cls.load_from_model_properties(model.properties, sh_degree=model.max_sh_degree)
+
+    @classmethod
+    def load_from_state_dict(cls, state_dict):
+        if "gaussian_model.gaussians.means" in state_dict:
+            return cls.load_from_new_state_dict(state_dict)
+        return cls.load_from_old_state_dict(state_dict)
+
+    @classmethod
+    def load_from_new_state_dict(cls, state_dict):
+        prefix = "gaussian_model.gaussians."
+
+        init_args = {
+            "sh_degrees": cls.detect_sh_degree_from_shs_rest(state_dict["{}shs_rest".format(prefix)]),
+        }
+
+        for name_in_dict, name_in_dataclass in [
+            ("means", "xyz"),
+            ("shs_dc", "features_dc"),
+            ("shs_rest", "features_rest"),
+            ("scales", "scales"),
+            ("rotations", "rotations"),
+            ("opacities", "opacities"),
+        ]:
+            init_args[name_in_dataclass] = state_dict["{}{}".format(prefix, name_in_dict)]
+
+        return cls(**init_args)
+
+    @classmethod
+    def load_from_old_state_dict(cls, state_dict):
+        key_prefix = "gaussian_model._"
+
+        init_args = {
+            "sh_degrees": cls.detect_sh_degree_from_shs_rest(state_dict["{}features_rest".format(key_prefix)]),
         }
         for name_in_dict, name_in_dataclass in [
             ("xyz", "xyz"),
@@ -119,18 +157,11 @@ class Gaussian:
         ]:
             init_args[name_in_dataclass] = state_dict["{}{}".format(key_prefix, name_in_dict)]
 
-        # compat with previous versions
-        if f"{key_prefix}features_extra" in state_dict:
-            init_args["real_features_extra"] = state_dict[f"{key_prefix}features_extra"]
-        else:
-            print("'features_extra' not found in state_dict, create an empty one")
-            init_args["real_features_extra"] = torch.empty((init_args["xyz"].shape[0], 0), device=init_args["xyz"].device)
-
         return cls(**init_args)
 
     def to_parameter_structure(self):
         assert isinstance(self.xyz, np.ndarray) is True
-        return Gaussian(
+        return GaussianPlyUtils(
             sh_degrees=self.sh_degrees,
             xyz=torch.tensor(self.xyz, dtype=torch.float),
             opacities=torch.tensor(self.opacities, dtype=torch.float),
@@ -138,12 +169,12 @@ class Gaussian:
             features_rest=torch.tensor(self.features_rest, dtype=torch.float).transpose(1, 2),
             scales=torch.tensor(self.scales, dtype=torch.float),
             rotations=torch.tensor(self.rotations, dtype=torch.float),
-            real_features_extra=torch.tensor(self.real_features_extra, dtype=torch.float),
         )
 
+    @torch.no_grad()
     def to_ply_format(self):
         assert isinstance(self.xyz, torch.Tensor) is True
-        return self.__class__(
+        return GaussianPlyUtils(
             sh_degrees=self.sh_degrees,
             xyz=self.xyz.cpu().numpy(),
             opacities=self.opacities.cpu().numpy(),
@@ -151,7 +182,6 @@ class Gaussian:
             features_rest=self.features_rest.transpose(1, 2).cpu().numpy(),
             scales=self.scales.cpu().numpy(),
             rotations=self.rotations.cpu().numpy(),
-            real_features_extra=self.real_features_extra.cpu().numpy(),
         )
 
     def save_to_ply(self, path: str, with_colors: bool = False):
@@ -172,7 +202,6 @@ class Gaussian:
         opacities = gaussian.opacities
         scale = gaussian.scales
         rotation = gaussian.rotations
-        # f_extra = gaussian.real_features_extra
 
         def construct_list_of_attributes():
             l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
@@ -187,8 +216,6 @@ class Gaussian:
                 l.append('scale_{}'.format(i))
             for i in range(gaussian.rotations.shape[1]):
                 l.append('rot_{}'.format(i))
-            # for i in range(self.real_features_extra.shape[1]):
-            #     l.append('f_extra_{}'.format(i))
             return l
 
         dtype_full = [(attribute, 'f4') for attribute in construct_list_of_attributes()]
@@ -276,7 +303,7 @@ class GaussianTransformUtils:
             from einops import einsum
         except:
             print("Please run `pip install e3nn einops` to enable SHs rotation")
-            return
+            return features
 
         if features.shape[1] == 1:
             return features

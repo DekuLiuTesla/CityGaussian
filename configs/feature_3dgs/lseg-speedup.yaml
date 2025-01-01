@@ -1,0 +1,16 @@
+max_steps: 10000
+model:
+  renderer:
+    class_path: internal.renderers.feature_3dgs_renderer.Feature3DGSRenderer
+    init_args:
+      speedup: true
+      n_feature_dims: 512
+  metric: internal.metrics.feature_3dgs_metrics.Feature3DGSMetrics
+  density: internal.density_controllers.static_density_controller.StaticDensityController
+data:
+  parser:
+    class_path: Feature3DGSColmap
+    init_args:
+      feature_dir: "rgb_feature_langseg"
+      filename_suffix: "_fmap_CxHxW"
+      filename_include_image_ext: false

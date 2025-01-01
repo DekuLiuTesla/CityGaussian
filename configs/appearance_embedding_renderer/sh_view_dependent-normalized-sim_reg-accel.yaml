@@ -1,0 +1,27 @@
+model:
+  gaussian:
+    class_path: internal.models.appearance_feature_gaussian.AppearanceFeatureGaussian
+    init_args:
+      sh_degree: 3
+      appearance_feature_dims: 64
+  renderer:
+    class_path: internal.renderers.gsplat_appearance_embedding_renderer.GSplatAppearanceEmbeddingRenderer
+    init_args:
+      model:
+        is_view_dependent: false
+        normalize: true
+      optimization:
+        warm_up: 1000
+      tile_based_culling: true
+  metric:
+    class_path: internal.metrics.appearance_feature_similarity_regularization_metrics.VanillaMetricsWithSimilarityRegularization
+    init_args:
+      fused_ssim: true
+data:
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1
+  parser:
+    class_path: Colmap
+    init_args:
+      split_mode: reconstruction
+      appearance_groups: appearance_groups-image_dedicated

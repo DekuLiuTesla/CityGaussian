@@ -43,7 +43,7 @@ class TransformPanel:
         self.model_t_xyz_text_handle = []
         self.model_r_xyz_text_handle = []
 
-        self.pose_control_size = server.add_gui_slider(
+        self.pose_control_size = server.gui.add_slider(
             "Pose Control Size",
             min=0.,
             max=10.,
@@ -54,9 +54,9 @@ class TransformPanel:
 
         # create gui folder for each model
         for i in range(n_models):
-            with server.add_gui_folder("Model {} Transform".format(i)):
+            with server.gui.add_folder("Model {} Transform".format(i)):
                 # model size control
-                size_slider = server.add_gui_number(
+                size_slider = server.gui.add_number(
                     "Size",
                     min=0.,
                     # max=5.,
@@ -71,7 +71,7 @@ class TransformPanel:
                     np.asarray([1., 0., 0., 0.]),
                     np.zeros((3,)),
                 ))
-                model_show_transform_control_checkbox = server.add_gui_checkbox(
+                model_show_transform_control_checkbox = server.gui.add_checkbox(
                     "Pose Control",
                     initial_value=False,
                 )
@@ -79,7 +79,7 @@ class TransformPanel:
                 self.model_show_transform_control_checkboxes.append(model_show_transform_control_checkbox)
 
                 # add text input (synchronize with model pose control) that control model pose more precisely
-                t_xyz_text_handle = server.add_gui_vector3(
+                t_xyz_text_handle = server.gui.add_vector3(
                     "t_xyz",
                     initial_value=(0., 0., 0.),
                     step=0.01,
@@ -87,7 +87,7 @@ class TransformPanel:
                 self._make_t_xyz_text_callback(i, t_xyz_text_handle)
                 self.model_t_xyz_text_handle.append(t_xyz_text_handle)
 
-                r_xyz_text_handle = server.add_gui_vector3(
+                r_xyz_text_handle = server.gui.add_vector3(
                     "r_xyz",
                     initial_value=(0., 0., 0.),
                     # min=(-180, -180, -180),
@@ -126,14 +126,16 @@ class TransformPanel:
         def _(event: viser.GuiEvent) -> None:
             if self.transform_control_no_handle_update is True:
                 return
-            model_pose = self.model_poses[idx]
-            model_pose.wxyz = controls.wxyz
-            model_pose.position = controls.position
 
-            self.model_t_xyz_text_handle[idx].value = model_pose.position.tolist()
-            self.model_r_xyz_text_handle[idx].value = self.quaternion_to_euler_angle_vectorized2(model_pose.wxyz)
+            with self.server.atomic():
+                model_pose = self.model_poses[idx]
+                model_pose.wxyz = controls.wxyz
+                model_pose.position = controls.position
 
-            self._transform_model(idx)
+                self.model_t_xyz_text_handle[idx].value = model_pose.position.tolist()
+                self.model_r_xyz_text_handle[idx].value = self.quaternion_to_euler_angle_vectorized2(model_pose.wxyz)
+
+                self._transform_model(idx)
             self.viewer.rerender_for_all_client()
 
     def _show_model_transform_handle(
@@ -216,7 +218,7 @@ class TransformPanel:
                     self.model_transform_controls[idx].wxyz = wxyz
                 self.model_poses[idx].wxyz = wxyz
 
-            self._transform_model(idx)
+                self._transform_model(idx)
             self.viewer.rerender_for_all_client()
 
     @staticmethod

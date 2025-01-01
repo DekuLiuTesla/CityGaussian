@@ -1,28 +1,85 @@
-import os.path
+import os
 import math
 import json
-import time
-from typing import Tuple
+from dataclasses import dataclass
+from typing import Optional, Literal, Tuple
 
 import torch
 import numpy as np
 
-from plyfile import PlyData, PlyElement
-
 import internal.utils.colmap as colmap_utils
 from internal.cameras.cameras import Cameras
-from internal.dataparsers.dataparser import DataParser, ImageSet, PointCloud, DataParserOutputs
-from internal.configs.dataset import ColmapParams
-from internal.utils.graphics_utils import getNerfppNorm
+from internal.dataparsers.dataparser import DataParserConfig, DataParser, ImageSet, PointCloud, DataParserOutputs
+
+
+@dataclass
+class Colmap(DataParserConfig):
+    """
+        Args:
+            image_dir: the path to the directory that store images
+
+            mask_dir:
+                the path to the directory store mask files;
+                the mask file of the image `a/image_name.jpg` is `a/image_name.jpg.png`;
+                single channel, 0 is the masked pixel;
+
+            split_mode: reconstruction: train model use all images; experiment: withholding a test set for evaluation
+
+            eval_step: -1: use all images as training set; > 1: pick an image for every eval_step
+
+            reorient: whether reorient the scene
+
+            appearance_groups: filename without extension
+    """
+
+    image_dir: str = None
+
+    mask_dir: str = None
+
+    split_mode: Literal["reconstruction", "experiment"] = "reconstruction"
+
+    eval_image_select_mode: Literal["step", "ratio", "list", "list-optional"] = "step"
+
+    eval_step: int = 8
+
+    eval_ratio: float = 0.01
+
+    eval_list: str = None
+
+    scene_scale: float = 1.
+
+    reorient: bool = False  # TODO
+
+    appearance_groups: Optional[str] = None
+
+    image_list: Optional[str] = None
+
+    down_sample_factor: int = 1
+
+    down_sample_rounding_mode: Literal["floor", "round", "round_half_up", "ceil"] = "round"
+
+    points_from: Literal["sfm", "random", "ply"] = "sfm"
+
+    ply_file: str = None
+
+    n_random_points: int = 100_000
+
+    force_pinhole: bool = False
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return ColmapDataParser(path, output_path, global_rank, self)
 
 
 class ColmapDataParser(DataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: ColmapParams) -> None:
+    def __init__(self, path: str, output_path: str, global_rank: int, params: Colmap) -> None:
         super().__init__()
         self.path = path
         self.output_path = output_path
         self.global_rank = global_rank
         self.params = params
+
+    def _round_half_up(self, i: torch.Tensor):
+        return torch.floor(i + 0.5)
 
     def detect_sparse_model_dir(self) -> str:
         if os.path.isdir(os.path.join(self.path, "sparse", "0")):
@@ -49,21 +106,23 @@ class ColmapDataParser(DataParser):
         """
         a = a / torch.linalg.norm(a)
         b = b / torch.linalg.norm(b)
-        v = torch.cross(a, b)
+        v = torch.cross(a, b, dim=-1)
         c = torch.dot(a, b)
         # If vectors are exactly opposite, we add a little noise to one of them
         if c < -1 + 1e-8:
-            eps = (torch.rand(3) - 0.5) * 0.01
+            eps = (torch.rand(3, dtype=a.dtype, device=a.device) - 0.5) * 0.01
             return ColmapDataParser.rotation_matrix(a + eps, b)
         s = torch.linalg.norm(v)
-        skew_sym_mat = torch.Tensor(
+        skew_sym_mat = torch.tensor(
             [
                 [0, -v[2], v[1]],
                 [v[2], 0, -v[0]],
                 [-v[1], v[0], 0],
-            ]
+            ],
+            dtype=a.dtype,
+            device=a.device,
         )
-        return torch.eye(3) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s ** 2 + 1e-8))
+        return torch.eye(3, dtype=a.dtype, device=a.device) + skew_sym_mat + skew_sym_mat @ skew_sym_mat * ((1 - c) / (s ** 2 + 1e-8))
 
     @staticmethod
     def read_points3D_binary(path_to_model_file, selected_image_ids: dict = None):
@@ -194,11 +253,16 @@ class ColmapDataParser(DataParser):
         #         # waiting ply
         #         print("#{} waiting for {}".format(os.getpid(), ply_path))
         #         time.sleep(1)
-        print("loading colmap 3D points")
-        xyz, rgb, _ = ColmapDataParser.read_points3D_binary(
-            os.path.join(sparse_model_dir, "points3D.bin"),
-            selected_image_ids=selected_image_ids,
-        )
+        if self.params.points_from == "sfm":
+            print("loading colmap 3D points")
+            xyz, rgb, _ = ColmapDataParser.read_points3D_binary(
+                os.path.join(sparse_model_dir, "points3D.bin"),
+                selected_image_ids=selected_image_ids,
+            )
+        else:
+            # random points generated later
+            xyz = np.ones((1, 3))
+            rgb = np.ones((1, 3))
 
         loaded_mask_count = 0
         # initialize lists
@@ -238,7 +302,7 @@ class ColmapDataParser(DataParser):
                 cy = intrinsics.params[2]
                 # fov_y = focal2fov(focal_length_x, height)
                 # fov_x = focal2fov(focal_length_x, width)
-            elif intrinsics.model == "PINHOLE":
+            elif intrinsics.model == "PINHOLE" or self.params.force_pinhole is True:
                 focal_length_x = intrinsics.params[0]
                 focal_length_y = intrinsics.params[1]
                 cx = intrinsics.params[2]
@@ -246,7 +310,8 @@ class ColmapDataParser(DataParser):
                 # fov_y = focal2fov(focal_length_y, height)
                 # fov_x = focal2fov(focal_length_x, width)
             else:
-                assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+                undistorted_output_dir = os.path.join(self.path, "dense")
+                raise RuntimeError("Unsupported camera model: only PINHOLE or SIMPLE_PINHOLE currently. Please undistort your images with the command below first:\n  colmap image_undistorter --image_path {} --input_path {} --output_path {}\nthen use `{}` as the value of `--data.path`.".format(image_dir, sparse_model_dir, undistorted_output_dir, undistorted_output_dir))
 
             # whether mask exists
             mask_path = None
@@ -300,7 +365,10 @@ class ColmapDataParser(DataParser):
 
         # recalculate intrinsics if down sample enabled
         if self.params.down_sample_factor != 1:
-            rounding_func = getattr(torch, self.params.down_sample_rounding_model)
+            if self.params.down_sample_rounding_mode == "round_half_up":
+                rounding_func = self._round_half_up
+            else:
+                rounding_func = getattr(torch, self.params.down_sample_rounding_mode)
             down_sampled_width = rounding_func(width.to(torch.float) / self.params.down_sample_factor)
             down_sampled_height = rounding_func(height.to(torch.float) / self.params.down_sample_factor)
             width_scale_factor = down_sampled_width / width
@@ -391,6 +459,20 @@ class ColmapDataParser(DataParser):
                 cameras=cameras
             ))
 
+        if self.params.points_from == "random":
+            print("generate {} random points".format(self.params.n_random_points))
+            scene_center = torch.mean(image_set[0].cameras.camera_center, dim=0)
+            scene_radius = (image_set[0].cameras.camera_center - scene_center).norm(dim=-1).max()
+            xyz = (np.random.random((self.params.n_random_points, 3)) * 2. - 1.) * 3 * scene_radius.numpy() + scene_center.numpy()
+            rgb = (np.random.random((self.params.n_random_points, 3)) * 255).astype(np.uint8)
+        elif self.params.points_from == "ply":
+            assert self.params.ply_file is not None
+            from internal.utils.graphics_utils import fetch_ply_without_rgb_normalization
+            basic_pcd = fetch_ply_without_rgb_normalization(os.path.join(self.path, self.params.ply_file))
+            xyz = basic_pcd.points
+            rgb = basic_pcd.colors
+            print("load {} points from {}".format(xyz.shape[0], self.params.ply_file))
+
         # print information
         print("[colmap dataparser] train set images: {}, val set images: {}, loaded mask: {}".format(
             len(image_set[0]),
@@ -410,7 +492,38 @@ class ColmapDataParser(DataParser):
             appearance_group_ids=appearance_group_name_to_appearance_id,
         )
 
-    def build_split_indices(self, image_name_list) -> Tuple[list, list]:
+    def build_eval_list_split_indices(self, image_name_list) -> Tuple[list, list]:
+        assert self.params.eval_list is not None
+
+        eval_image_set = {}
+        with open(self.params.eval_list, "r") as f:
+            for row in f:
+                row = row.rstrip("\n")
+                eval_image_set[row] = True
+
+        train_set_indices = []
+        eval_set_indices = []
+
+        for idx, name in enumerate(image_name_list):
+            if name in eval_image_set:
+                eval_set_indices.append(idx)
+                del eval_image_set[name]
+                if self.params.split_mode == "experiment":
+                    continue
+            train_set_indices.append(idx)
+
+        if len(eval_image_set) != 0:
+            message = "Some images can not be found in colmap sparse model: {}".format(list(eval_image_set.keys()))
+            if self.params.split_mode == "list":
+                raise RuntimeError(message)
+            print("[WARNING]{}".format(message))
+
+        if len(eval_set_indices) == 0:
+            eval_set_indices = train_set_indices[:1]
+
+        return train_set_indices, eval_set_indices
+
+    def build_step_split_indices(self, image_name_list) -> Tuple[list, list]:
         assert self.params.eval_step > 1, "eval_step must > 1"
         eval_step = self.params.eval_step
         if self.params.eval_image_select_mode == "ratio":
@@ -432,3 +545,9 @@ class ColmapDataParser(DataParser):
             validation_set_indices = training_set_indices[::eval_step]
 
         return training_set_indices, validation_set_indices
+
+    def build_split_indices(self, image_name_list) -> Tuple[list, list]:
+        if self.params.eval_image_select_mode.startswith("list"):
+            return self.build_eval_list_split_indices(image_name_list)
+        assert self.params.eval_list is None, "eval_image_select_mode=='{}', but eval_list is not None".format(self.params.eval_image_select_mode)
+        return self.build_step_split_indices(image_name_list)

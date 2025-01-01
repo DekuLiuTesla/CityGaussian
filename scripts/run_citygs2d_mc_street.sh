@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygsv2_mc_street_coarse_sh2
-NAME=citygsv2_mc_street_sh2
+COARSE_NAME=citygsv2_mc_street_coarse_sh2_t1
+NAME=citygsv2_mc_street_sh2_t1
 TEST_PATH="data/matrix_city/street/test/block_A_test"
 max_block_id=19
 
@@ -27,45 +27,53 @@ max_block_id=19
 #                                     $TEST_PATH \
 
 # ============================================= train&eval coarse model =============================================
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
-    --config configs/$COARSE_NAME.yaml \
-    -n $COARSE_NAME \
-    --logger wandb \
-    --project JointGS \
-    --data.params.train_max_num_images_to_cache 1024
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
+#     --config configs/$COARSE_NAME.yaml \
+#     -n $COARSE_NAME \
+#     --logger wandb \
+#     --project JointGS \
+#     --data.train_max_num_images_to_cache 1024
 
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config outputs/$COARSE_NAME/config.yaml \
-    --data.path $TEST_PATH \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
-    --save_val
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
+#     --config outputs/$COARSE_NAME/config.yaml \
+#     --data.path $TEST_PATH \
+#     --data.parser.eval_image_select_mode ratio \
+#     --data.parser.eval_ratio 1.0 \
+#     --save_val
 
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$COARSE_NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 1 \
-                                    --sdf_trunc 4 \
-                                    --depth_trunc 500 \
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
+#                                     --model_path outputs/$COARSE_NAME \
+#                                     --config_path outputs/$COARSE_NAME/config.yaml \
+#                                     --voxel_size 1 \
+#                                     --sdf_trunc 4 \
+#                                     --depth_trunc 500 \
 
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
-                                    --scene Block_A_ds \
-                                    --dataset-dir data/matrix_city/point_cloud_ds20/street \
-                                    --ply-path "outputs/$COARSE_NAME/mesh/epoch=8-step=30000/fuse_post.ply"
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
+#                                       outputs/$COARSE_NAME \
+#                                       --voxel_size 1 \
+#                                       --sdf_trunc 4 \
+#                                       --depth_trunc 500 \
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
+#                                     --scene Block_A_ds \
+#                                     --dataset-dir data/matrix_city/point_cloud_ds20/street \
+#                                     --ply-path "outputs/$COARSE_NAME/fuse_post.ply"
 
 
 # ============================================= generate partition =============================================
-gpu_id=$(get_available_gpu)
-echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/data_partition.py --config_path configs/$NAME.yaml
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --contract --force
 
 # ============================================= train&eval tuned model =============================================
 for num in $(seq 0 $max_block_id); do
@@ -75,7 +83,7 @@ for num in $(seq 0 $max_block_id); do
             echo "GPU $gpu_id is available. Starting training block '$num'"
             CUDA_VISIBLE_DEVICES=$gpu_id WANDB_MODE=offline python main.py fit \
                 --config configs/$NAME.yaml \
-                --data.params.estimated_depth_colmap_block.block_id $num \
+                --data.parser.block_id $num \
                 -n $NAME \
                 --logger wandb \
                 --project JointGS & 
@@ -95,7 +103,7 @@ wait
 # merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/block_merge.py --config_path configs/$NAME.yaml \
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/merge_citygs_ckpts.py outputs/$NAME \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
@@ -103,27 +111,25 @@ CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
     --config outputs/$COARSE_NAME/config.yaml \
     -n $NAME \
     --data.path $TEST_PATH \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
+    --data.parser.eval_image_select_mode ratio \
+    --data.parser.eval_ratio 1.0 \
     --save_val \
     --test_speed \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
-                                    --voxel_size 1 \
-                                    --sdf_trunc 4 \
-                                    --depth_trunc 500 \
-                                    # --use_trim_renderer \
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
+                                      outputs/$NAME \
+                                      --voxel_size 1 \
+                                      --sdf_trunc 4 \
+                                      --depth_trunc 500 \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
                                     --scene Block_A_ds \
                                     --dataset-dir data/matrix_city/point_cloud_ds20/street \
-                                    --ply-path "outputs/$NAME/mesh/epoch=8-step=30000/fuse_post.ply"
+                                    --ply-path "outputs/$NAME/fuse_post.ply"
 
 # ============================================= remove block results (if you find result OK) =============================================
 # for num in $(seq 0 $max_block_id); do

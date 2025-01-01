@@ -1,9 +1,11 @@
 model:
-  gaussian:
-    optimization:
-      cull_opacity_threshold: 0.05
+  gaussian: internal.models.gaussian_2d.Gaussian2D
   renderer: internal.renderers.vanilla_2dgs_renderer.Vanilla2DGSRenderer
+  metric: internal.metrics.gs2d_metrics.GS2DMetrics
+  density:
+    class_path: internal.density_controllers.gs2d_density_controller.GS2DDensityController
+    init_args:
+      cull_opacity_threshold: 0.05
 data:
-  params:
-    val_max_num_images_to_cache: -1
-    test_max_num_images_to_cache: -1
+  val_max_num_images_to_cache: -1
+  test_max_num_images_to_cache: -1

@@ -1,15 +1,1 @@
-lightning==2.0.9.post0
-pytorch-lightning==2.3.*
-splines==0.3.0
-plyfile==0.8.1
-tensorboard
-wandb
-tqdm
-mediapy
-einops
-viser==0.1.29
-opencv-python==4.8.*
-open3d
-joblib
-./submodules/diff-gaussian-rasterization
-./submodules/simple-knn
+-r requirements/lightning23.txt

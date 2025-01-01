@@ -2,12 +2,23 @@ import os
 import torch
 import csv
 from typing import Tuple
-from internal.configs.dataset import PhotoTourismParams
-from internal.dataparsers.colmap_dataparser import ColmapDataParser
+from dataclasses import dataclass
+from internal.dataparsers import DataParser, DataParserOutputs
+from internal.dataparsers.colmap_dataparser import Colmap, ColmapDataParser
+
+
+@dataclass
+class PhotoTourism(Colmap):
+    semantic_feature: bool = False
+
+    semantic_feature_dir: str = "SD"
+
+    def instantiate(self, path: str, output_path: str, global_rank: int) -> DataParser:
+        return PhotoTourismDataParser(path, output_path, global_rank, self)
 
 
 class PhotoTourismDataParser(ColmapDataParser):
-    def __init__(self, path: str, output_path: str, global_rank: int, params: PhotoTourismParams) -> None:
+    def __init__(self, path: str, output_path: str, global_rank: int, params: PhotoTourism) -> None:
         super().__init__(path, output_path, global_rank, params)
 
         self.tsv_file_path = None
@@ -16,6 +27,21 @@ class PhotoTourismDataParser(ColmapDataParser):
                 self.tsv_file_path = i.path
 
         assert self.tsv_file_path is not None, "tsv file not found in {}, please download one from the 'additional links' section of https://nerf-w.github.io/, or create one yourself.".format(self.path)
+
+    def get_outputs(self) -> DataParserOutputs:
+        dataparser_outputs = super().get_outputs()
+
+        if self.params.semantic_feature:
+            from .spotless_colmap_dataparser import SpotLessColmapDataParser
+
+            for image_set in [dataparser_outputs.train_set, dataparser_outputs.val_set]:
+                for idx, image_name in enumerate(image_set.image_names):
+                    image_name_without_ext = image_name[:image_name.rfind(".")]
+                    semantic_file_name = f"{image_name_without_ext}.npy"
+                    image_set.extra_data[idx] = os.path.join(self.path, "dense", self.params.semantic_feature_dir, semantic_file_name)
+                image_set.extra_data_processor = SpotLessColmapDataParser.read_semantic_feature
+
+        return dataparser_outputs
 
     def detect_sparse_model_dir(self) -> str:
         return os.path.join(self.path, "dense", "sparse")

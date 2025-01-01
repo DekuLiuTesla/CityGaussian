@@ -18,3 +18,6 @@ tools/render_clip.py
 scripts/run.sh
 scripts/run1.sh
 scripts/run2.sh
+clusters
+segments
+**/__pycache__

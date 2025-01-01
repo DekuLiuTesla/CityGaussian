@@ -1,0 +1,2 @@
+scalable:
+  model.metric.depth_loss_weight.max_steps: 30000

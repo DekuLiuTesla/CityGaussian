@@ -1,0 +1,7 @@
+data:
+  add_background_sphere: true
+  background_sphere_center: "cameras"
+  background_sphere_distance: 1
+  background_sphere_points: 204800
+model:
+  random_background: true

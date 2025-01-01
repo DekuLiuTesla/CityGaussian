@@ -1,0 +1,11 @@
+max_steps: 10000
+model:
+  renderer:
+    class_path: internal.renderers.feature_3dgs_renderer.Feature3DGSRenderer
+    init_args:
+      speedup: false
+      n_feature_dims: 256
+  metric: internal.metrics.feature_3dgs_metrics.Feature3DGSMetrics
+  density: internal.density_controllers.static_density_controller.StaticDensityController
+data:
+  parser: Feature3DGSColmap
