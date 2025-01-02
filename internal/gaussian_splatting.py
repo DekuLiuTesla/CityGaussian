@@ -42,7 +42,6 @@ class GaussianSplatting(LightningModule):
             background_color: Tuple[float, float, float] = (0., 0., 0.),
             random_background: bool = False,
             output_path: str = None,
-            init_from: str = None,
             correct_color: bool = False,
             test_speed: bool = False,
             save_val_output: bool = False,
@@ -54,6 +53,7 @@ class GaussianSplatting(LightningModule):
             save_ply: bool = False,
             web_viewer: bool = False,
             initialize_from: str = None,
+            overwrite_config: bool = True,
             renderer_output_types: Optional[List[str]] = None,
     ) -> None:
         super().__init__()
@@ -153,10 +153,15 @@ class GaussianSplatting(LightningModule):
             )
 
         # replace config
-        self.hparams["gaussians"] = gaussian_model.config
-        self.gaussian_model = gaussian_model
+        if self.hparams["overwrite_config"]:
+            self.hparams["gaussian"] = gaussian_model.config
+            self.gaussian_model = gaussian_model
+        else:
+            org_config = self.gaussian_model.config
+            self.gaussian_model = gaussian_model
+            self.gaussian_model.config = org_config
 
-        print(f"initialize from {load_from}: sh_degree={self.gaussian_model.max_sh_degree}")
+        print(f"initialize from {load_from}: sh_degree={self.gaussian_model.max_sh_degree}, overwrite_config={self.hparams['overwrite_config']}")
 
     def setup(self, stage: str):
         if stage == "fit":

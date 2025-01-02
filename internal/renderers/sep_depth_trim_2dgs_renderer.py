@@ -195,7 +195,7 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             # tile = torch.quantile(contribution, self.prune_ratio)
             tile = 0  # only prune invisible points at start
             prune_mask = contribution <= tile
-            module.gaussian_model.prune_points(prune_mask)
+            module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
             print("Trimming done.")
         torch.cuda.empty_cache()
 
@@ -205,7 +205,7 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             module,
     ):
         cameras = module.trainer.datamodule.dataparser_outputs.train_set.cameras
-        if self.diable_trimming or (step > module.optimization_hparams.densify_until_iter) \
+        if self.diable_trimming or (step > module.density_controller.config.densify_until_iter) \
            or (step < self.contribution_prune_from_iter) \
            or (step % self.contribution_prune_interval != 0):
            return
@@ -236,6 +236,6 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
 
             tile = torch.quantile(contribution, self.prune_ratio)
             prune_mask = (contribution <= tile)
-            module.gaussian_model.prune_points(prune_mask)
+            module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
             print("Trimming done.")
         torch.cuda.empty_cache()

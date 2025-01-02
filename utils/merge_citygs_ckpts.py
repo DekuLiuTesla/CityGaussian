@@ -47,6 +47,7 @@ for i in os.listdir(checkpoint_dir):
     except:
         pass
 
+checkpoint_files = sorted(checkpoint_files)
 assert len(checkpoint_files) > 0
 
 logger.info(checkpoint_files)
@@ -73,18 +74,6 @@ for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
     
     if xyz_quantile is None and os.path.exists(os.path.join(os.path.dirname(dataparser_config.image_list), "quantiles.pt")):
         xyz_quantile = torch.load(os.path.join(os.path.dirname(dataparser_config.image_list), "quantiles.pt"))
-        x_quantile = xyz_quantile["x"]
-        y_quantile = xyz_quantile["y"]
-        z_quantile = xyz_quantile["z"]
-
-        min_x, max_x = x_quantile[block_id_x].item(), x_quantile[block_id_x + 1].item()
-        min_y, max_y = y_quantile[block_id_y].item(), y_quantile[block_id_y + 1].item()
-        min_z, max_z = z_quantile[block_id_z].item(), z_quantile[block_id_z + 1].item()
-
-        xyz_gs = ckpt['state_dict']['gaussian_model.gaussians.means']
-        mask_preserved = (xyz_gs[:, 0] >= min_x) & (xyz_gs[:, 0] < max_x)  \
-                        & (xyz_gs[:, 1] >= min_y) & (xyz_gs[:, 1] < max_y) \
-                        & (xyz_gs[:, 2] >= min_z) & (xyz_gs[:, 2] < max_z)
         
     if xyz_quantile is None:
         # in this case, we assume partition under contracted space
@@ -100,6 +89,19 @@ for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
         min_z, max_z = float(block_id_z) / dataparser_config.block_dim[2], float(block_id_z + 1) / dataparser_config.block_dim[2]
 
         xyz_gs = contract_to_unisphere(ckpt['state_dict']['gaussian_model.gaussians.means'], dataparser_config.aabb, ord=torch.inf)
+        mask_preserved = (xyz_gs[:, 0] >= min_x) & (xyz_gs[:, 0] < max_x)  \
+                        & (xyz_gs[:, 1] >= min_y) & (xyz_gs[:, 1] < max_y) \
+                        & (xyz_gs[:, 2] >= min_z) & (xyz_gs[:, 2] < max_z)
+    else:
+        x_quantile = xyz_quantile["x"]
+        y_quantile = xyz_quantile["y"]
+        z_quantile = xyz_quantile["z"]
+
+        min_x, max_x = x_quantile[block_id_x].item(), x_quantile[block_id_x + 1].item()
+        min_y, max_y = y_quantile[block_id_y].item(), y_quantile[block_id_y + 1].item()
+        min_z, max_z = z_quantile[block_id_z].item(), z_quantile[block_id_z + 1].item()
+
+        xyz_gs = ckpt['state_dict']['gaussian_model.gaussians.means']
         mask_preserved = (xyz_gs[:, 0] >= min_x) & (xyz_gs[:, 0] < max_x)  \
                         & (xyz_gs[:, 1] >= min_y) & (xyz_gs[:, 1] < max_y) \
                         & (xyz_gs[:, 2] >= min_z) & (xyz_gs[:, 2] < max_z)
@@ -172,7 +174,7 @@ def rename_ddp_appearance_states():
 logger.info("number_of_gaussians=sum({})={}".format(number_of_gaussians, sum(number_of_gaussians)))
 if not os.path.exists(os.path.join(os.path.dirname(checkpoint_dir), "checkpoints")):
     os.makedirs(os.path.join(os.path.dirname(checkpoint_dir), "checkpoints"))
-output_path = os.path.join(os.path.dirname(checkpoint_dir), "checkpoints", ckpt["hyper_parameters"]["init_from"].split('/')[-1])
+output_path = os.path.join(os.path.dirname(checkpoint_dir), "checkpoints", ckpt["hyper_parameters"]["initialize_from"].split('/')[-1])
 logger.info("Saving...")
 torch.save(ckpt, output_path)
 logger.info(f"Saved to '{output_path}'")

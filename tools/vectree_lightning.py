@@ -5,24 +5,20 @@ from tqdm import tqdm, trange
 
 sys.path.append('/data1/yang_liu/python_workspace/GSPL')
 
-from internal.utils.gaussian_utils import Gaussian
 from internal.utils.vq import VectorQuantize
-from internal.utils.general_utils import parse
+from internal.utils.gaussian_utils import GaussianPlyUtils
 from internal.utils.gaussian_model_loader import GaussianModelLoader
-from internal.renderers.sep_depth_trim_2dgs_renderer import SepDepthTrim2DGSRenderer
-from internal.dataparsers.colmap_block_dataparser import ColmapBlockDataParser
-from internal.dataparsers.estimated_depth_colmap_block_dataparser import EstimatedDepthColmapDataParser
 from internal.utils.vq_utils import read_ply_data, write_ply_data, load_vqgaussian
 
 def parse_args():
     parser = argparse.ArgumentParser(description="vectree quantization")
-    parser.add_argument("--coarse_config", type=str, default=None)
-    parser.add_argument("--input_path", type=str, default=None)
+    parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--save_path", type=str, default=None)  
     parser.add_argument("--no_load_data", action='store_true')
-    parser.add_argument("--no_save_ply", action='store_true')
+    parser.add_argument("--no_save_ply", action='store_true', help="if true, save as .ckpt")
     parser.add_argument("--skip_quantize", action='store_true')
     parser.add_argument("--sh_degree", type=int, default=3)
+    parser.add_argument("--gs_dim", type=int, default=3, help="3 for 3DGS, 2 for 2DGS")
 
     parser.add_argument("--iteration_num", type=float, default=1000)
     parser.add_argument("--vq_ratio", type=float, default=0.4)
@@ -40,37 +36,36 @@ class Quantization():
             self.sh_dim = 3+45
         elif opt.sh_degree == 2:
             self.sh_dim = 3+24
+        self.gs_dim = opt.gs_dim
 
-        self.input_path = opt.input_path
-
-        if opt.input_path.endswith('.ckpt'):
-            model, _, _ = GaussianModelLoader.initialize_simplified_model_from_checkpoint(opt.input_path, device="cuda")
-        else:
-            model, _, _ = GaussianModelLoader.initialize_simplified_model_from_point_cloud(opt.input_path, opt.sh_degree, device="cuda")
-        
-        # ----- read config and load data -----
-        with open(opt.coarse_config, 'r') as f:
-            config = parse(yaml.load(f, Loader=yaml.FullLoader))
-        
-        if config.data.type == "estimated_depth_colmap_block":
-            dataparser_outputs = EstimatedDepthColmapDataParser(
-                os.path.expanduser(config.data.path),
-                os.path.abspath(""),
-                global_rank=0,
-                params=config.data.params.estimated_depth_colmap_block,
-            ).get_outputs()
-        else:
-            dataparser_outputs = ColmapBlockDataParser(
-                os.path.expanduser(config.data.path),
-                os.path.abspath(""),
-                global_rank=0,
-                params=config.data.params.colmap_block,
-            ).get_outputs()
-        
-        # ----- set renderer with default setting -----
-        renderer = SepDepthTrim2DGSRenderer(
-            depth_ratio = config.model.renderer.init_args.depth_ratio,
+        self.model_path = GaussianModelLoader.search_load_file(opt.model_path)
+        ckpt = torch.load(self.model_path, map_location="cpu")
+        # initialize modeld
+        model = GaussianModelLoader.initialize_model_from_checkpoint(
+            ckpt,
+            device=device,
         )
+        structred_model = GaussianPlyUtils.load_from_model(model).to_ply_format()
+        model.freeze()
+        model.pre_activate_all_properties()
+        # initialize renderer
+        renderer = GaussianModelLoader.initialize_renderer_from_checkpoint(
+            ckpt,
+            stage="validate",
+            device=device,
+        )
+        try:
+            dataparser_config = ckpt["datamodule_hyper_parameters"]["parser"]
+        except:
+            pass
+
+        dataset_path = ckpt["datamodule_hyper_parameters"]["path"]
+
+        dataparser_outputs = dataparser_config.instantiate(
+            path=dataset_path,
+            output_path=os.getcwd(),
+            global_rank=0,
+        ).get_outputs()
 
         # ----- get trim-gs style importance score -----
         if os.path.exists(f'{opt.save_path}/imp_score.npz'):
@@ -78,7 +73,7 @@ class Quantization():
         else:
             top_list = [None, ] * renderer.K
             with torch.no_grad():
-                bg_color=torch.tensor(config.model.background_color, dtype=torch.float, device=device)
+                bg_color=torch.tensor(ckpt["hyper_parameters"]["background_color"], dtype=torch.float, device=device)
                 for i in tqdm(range(len(dataparser_outputs.train_set.cameras)), desc="Calculating Importance Score"):
                     camera = dataparser_outputs.train_set.cameras[i].to_device(device)
                     trans = renderer(
@@ -99,19 +94,17 @@ class Quantization():
                 self.importance = torch.stack(top_list, dim=-1).mean(-1).cpu().numpy()
                 
                 
-            # tile = torch.quantile(contribution, self.prune_ratio)
-
-        model = model.to_ply_structure()
+        # tile = torch.quantile(contribution, self.prune_ratio)
         self.feats = np.concatenate([
-            model.xyz,
-            np.zeros_like(model.xyz),
-            model.features_dc.reshape((model.features_dc.shape[0], -1)),
-            model.features_rest.reshape((model.features_rest.shape[0], -1)),
-            model.opacities,
-            model.scales,
-            model.rotations
+            structred_model.xyz,
+            np.zeros_like(structred_model.xyz),
+            structred_model.features_dc.reshape((structred_model.features_dc.shape[0], -1)),
+            structred_model.features_rest.reshape((structred_model.features_rest.shape[0], -1)),
+            structred_model.opacities,
+            structred_model.scales,
+            structred_model.rotations
         ], axis=-1)
-        del model, dataparser_outputs
+        del model, structred_model, dataparser_outputs
         self.feats = torch.tensor(self.feats)
         self.feats_bak = self.feats.clone()
         self.feats = self.feats[:, 6:6+self.sh_dim]
@@ -276,7 +269,7 @@ class Quantization():
                 self.model_vq._codebook.embed[:,replace_index,:] = vq_feature[most_important_index,:]
 
         #=================== Apply vector quantization ====================
-        all_feat, all_indices = self.fully_vq_reformat()
+        # all_feat, all_indices = self.fully_vq_reformat()
 
     def dequantize(self):
         print("\n==================== Load saved data & Dequantize ==================== ")
@@ -284,16 +277,16 @@ class Quantization():
 
         if self.no_save_ply == False:
             os.makedirs(f'{self.ply_path}/', exist_ok=True)
-            write_ply_data(dequantized_feats.cpu().numpy(), self.ply_path, self.sh_dim)
+            write_ply_data(dequantized_feats.cpu().numpy(), self.ply_path, self.sh_dim, self.gs_dim)
         else:
-            checkpoint = torch.load(self.input_path)
-            checkpoint["state_dict"]["gaussian_model._xyz"] = dequantized_feats[:, :3]
-            checkpoint["state_dict"]["gaussian_model._features_dc"] = dequantized_feats[:, 6:9].reshape(dequantized_feats.shape[0], 3, 1).permute(0, 2, 1)
-            checkpoint["state_dict"]["gaussian_model._features_rest"] = dequantized_feats[:, 9:6+self.sh_dim].reshape(dequantized_feats.shape[0], 3, -1).permute(0, 2, 1)
-            checkpoint["state_dict"]["gaussian_model._opacity"] = dequantized_feats[:, -8:-7]
-            checkpoint["state_dict"]["gaussian_model._scaling"] = dequantized_feats[:, -7:-4]
-            checkpoint["state_dict"]["gaussian_model._rotation"] = dequantized_feats[:, -4:]
-            torch.save(checkpoint, self.input_path.replace('.ckpt', '_vq.ckpt'))
+            checkpoint = torch.load(self.model_path)
+            checkpoint["state_dict"]["gaussian_model.gaussians.means"] = dequantized_feats[:, :3]
+            checkpoint["state_dict"]["gaussian_model.gaussians.shs_dc"] = dequantized_feats[:, 6:9].reshape(dequantized_feats.shape[0], 3, 1).permute(0, 2, 1)
+            checkpoint["state_dict"]["gaussian_model.gaussians.shs_rest"] = dequantized_feats[:, 9:6+self.sh_dim].reshape(dequantized_feats.shape[0], 3, -1).permute(0, 2, 1)
+            checkpoint["state_dict"]["gaussian_model.gaussians.opacities"] = dequantized_feats[:, 6+self.sh_dim:7+self.sh_dim]
+            checkpoint["state_dict"]["gaussian_model.gaussians.scales"] = dequantized_feats[:, 7+self.sh_dim:-4]
+            checkpoint["state_dict"]["gaussian_model.gaussians.rotations"] = dequantized_feats[:, -4:]
+            torch.save(checkpoint, self.model_path.replace('.ckpt', '_vq.ckpt'))
 
 if __name__=='__main__':
     opt = parse_args()

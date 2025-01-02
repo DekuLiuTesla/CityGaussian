@@ -80,7 +80,7 @@ def read_ply_data(input_file):
     return data
 
 
-def write_ply_data(feats, save_ply_path, sh_dim):
+def write_ply_data(feats, save_ply_path, sh_dim, gs_dim):
     def construct_list_of_attributes():
         l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
         # All channels except the 3 DC
@@ -89,7 +89,7 @@ def write_ply_data(feats, save_ply_path, sh_dim):
         for i in range(sh_dim-3-8 if sh_dim==24+3+8 else sh_dim-3):
             l.append('f_rest_{}'.format(i))
         l.append('opacity')
-        for i in range(3):
+        for i in range(gs_dim):
             l.append('scale_{}'.format(i))
         for i in range(4):
             l.append('rot_{}'.format(i))
