@@ -96,7 +96,7 @@ ln -s /path/to/output /path/to/LargeLightGaussian/output
 cd ..
 ```
 ### Prepare Config Files
-If you use your own dataset, please follow instruction in [Custom Dataset Instructions](doc/custom_dataset.md) to prepare. We also prepared templates in `./config` and `LargeLightGaussian/scripts`.
+If you use your own dataset, please follow instruction in [Custom Dataset Instructions](./custom_dataset.md) to prepare. We also prepared templates in `./config` and `LargeLightGaussian/scripts`.
 
 ### Training and Vanilla Rendering
 To train a scene, config the hyperparameters of pretraining and finetuning stage with your yaml file, then replace the `COARSE_CONFIG` and `CONFIG` in `run_citygs.sh`. The `max_block_id`, `out_name`, and `TEST_PATH` in `run_citygs.sh` should be set according to your dataset as well. Then you can train your scene by simply using:
