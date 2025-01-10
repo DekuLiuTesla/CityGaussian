@@ -128,6 +128,8 @@ class CLI(LightningCLI):
             wandb_name = config.name
             if config.version is not None:
                 wandb_name = "{}_{}".format(wandb_name, config.version)
+            if config.data.parser.init_args.block_id is not None:
+                wandb_name = "{}_block_{}".format(wandb_name, config.data.parser.init_args.block_id)
             setattr(logger_config.init_args, "name", wandb_name)
             setattr(logger_config.init_args, "project", config.project)
         elif config.logger == "none" or config.logger == "None" or config.logger == "false" or config.logger == "False":
