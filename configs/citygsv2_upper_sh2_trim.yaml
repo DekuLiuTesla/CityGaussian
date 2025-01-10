@@ -25,7 +25,10 @@ model:
     init_args:
       depth_ratio: 1.0
       prune_ratio: 0.05
-  density: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
+  density: 
+    class_path: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
+    init_args:
+      axis_ratio_threshold: 0.05
 trainer:
   check_val_every_n_epoch: 20
   max_steps: 30000
