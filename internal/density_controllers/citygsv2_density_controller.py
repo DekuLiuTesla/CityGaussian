@@ -5,7 +5,6 @@ import torch
 @dataclass
 class CityGSV2DensityController(VanillaDensityController):
     densify_grad_scaler: float = 0.
-
     axis_ratio_threshold: float = 0.01
     
     def instantiate(self, *args, **kwargs) -> "CityGSV2DensityControllerModule":
@@ -39,7 +38,7 @@ class CityGSV2DensityControllerModule(VanillaDensityControllerImpl):
         )
 
         axis_ratio = scales.min(dim=1).values / scales.max(dim=1).values
-        selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > self.axis_ratio_threshold)
+        selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > self.config.axis_ratio_threshold)
 
         # Split
         new_properties = self._split_properties(gaussian_model, selected_pts_mask, N)
@@ -72,7 +71,7 @@ class CityGSV2DensityControllerModule(VanillaDensityControllerImpl):
         )
 
         axis_ratio = gaussian_model.get_scales().min(dim=1).values / gaussian_model.get_scales().max(dim=1).values
-        selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > self.axis_ratio_threshold)  # hard coded threshold
+        selected_pts_mask = torch.logical_and(selected_pts_mask, axis_ratio > self.config.axis_ratio_threshold)  # hard coded threshold
 
         # Copy selected Gaussians
         new_properties = {}
