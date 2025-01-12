@@ -126,8 +126,7 @@ CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
 # gpu_id=$(get_available_gpu)
 # echo "GPU $gpu_id is available."
 # CUDA_VISIBLE_DEVICES=$gpu_id python tools/vectree_lightning.py \
-#                                     --coarse_config outputs/$COARSE_NAME/config.yaml \
-#                                     --input_path outputs/$NAME/checkpoints/epoch=48-step=30000.ckpt \
+#                                     --model_path outputs/$NAME \
 #                                     --save_path outputs/$NAME/vectree \
 #                                     --sh_degree 2 \
 #                                     --skip_quantize \

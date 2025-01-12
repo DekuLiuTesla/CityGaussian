@@ -1,32 +1,53 @@
-trainer:
-  check_val_every_n_epoch: 20
-  max_steps: 30000
 model:
-  init_from: outputs/citygsv2_mc_aerial_coarse_sh2/checkpoints/epoch=6-step=30000.ckpt
+  initialize_from: outputs/citygsv2_mc_aerial_coarse_sh2/checkpoints/epoch=6-step=30000.ckpt
+  overwrite_config: False
   gaussian:
-    sh_degree: 2
-    optimization:
-      position_lr_init: 0.000064
-      position_lr_final: 0.00000064
-      scaling_lr: 0.004
+    class_path: internal.models.gaussian_2d.Gaussian2D
+    init_args:
+      sh_degree: 2
+      optimization:
+        means_lr_init: 0.000064
+        means_lr_scheduler:
+          lr_final: 0.00000064
+          max_steps: 60_000
+        scales_lr: 0.004
+  metric:
+    class_path: internal.metrics.citygsv2_metrics.CityGSV2Metrics
+    init_args:
+      lambda_normal: 0.0125
+      normal_regularization_from_iter: 0
+      depth_loss_type: l1+ssim
+      depth_loss_ssim_weight: 1.0
+      depth_loss_weight:
+        init: 0.5
+        final_factor: 0.05
+        max_steps: 60_000
   renderer: 
     class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
     init_args:
-        lambda_normal: 0.0125
-        depth_ratio: 1.0
-        normal_regularization_from_iter: 0
-        init: 0.5
-        final_factor: 0.005
-        depth_loss_type: ssim
+      depth_ratio: 1.0
+  density: 
+    class_path: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
+    init_args:
+      densification_interval: 200
+      opacity_reset_interval: 6000
+      densify_from_iter: 1000
+      densify_until_iter: 30_000
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 60000
 data:
-  type: estimated_depth_colmap_block
   path: data/matrix_city/aerial/train/block_all
-  params:
-    estimated_depth_colmap_block:
-      image_list: data/matrix_city/aerial/train/block_all/partition/6_6_1_even_sh2
+  parser:
+    class_path: EstimatedDepthBlockColmap
+    init_args:
+      image_list: data/matrix_city/aerial/train/block_all/partition/4_4_1_even_sh2
       down_sample_factor: 1.2
       content_threshold: 0.05
       block_dim:
-      - 6
-      - 6
+      - 4
+      - 4
       - 1
+save_iterations:
+- 30000
+- 60000

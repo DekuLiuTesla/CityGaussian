@@ -24,32 +24,32 @@ max_block_id=7
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
---config configs/$COARSE_NAME.yaml \
--n $COARSE_NAME \
---logger wandb \
---project JointGS \
+                                    --config configs/$COARSE_NAME.yaml \
+                                    -n $COARSE_NAME \
+                                    --logger wandb \
+                                    --project JointGS \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
---config outputs/$COARSE_NAME/config.yaml \
---save_val \
+                            --config outputs/$COARSE_NAME/config.yaml \
+                            --save_val \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
-outputs/$COARSE_NAME \
---voxel_size 0.01 \
---sdf_trunc 0.04 \
---depth_trunc 2.0
+                            outputs/$COARSE_NAME \
+                            --voxel_size 0.01 \
+                            --sdf_trunc 0.04 \
+                            --depth_trunc 2.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
---scene LFLS_ds_35 \
---dataset-dir data/GauU_Scene/LFLS \
---transform-path data/GauU_Scene/Downsampled/LFLS/transformation.txt \
---ply-path "outputs/$COARSE_NAME/fuse_post.ply"
+                            --scene LFLS_ds_35 \
+                            --dataset-dir data/GauU_Scene/LFLS \
+                            --transform-path data/GauU_Scene/Downsampled/LFLS/transformation.txt \
+                            --ply-path "outputs/$COARSE_NAME/fuse_post.ply"
 
 
 # ============================================= generate partition =============================================

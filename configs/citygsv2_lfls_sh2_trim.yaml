@@ -1,30 +1,42 @@
-trainer:
-  check_val_every_n_epoch: 20
-  max_steps: 30000
 model:
-  init_from: outputs/citygsv2_lfls_coarse_sh2/checkpoints/epoch=32-step=30000.ckpt
+  initialize_from: outputs/citygsv2_lfls_coarse_sh2/checkpoints/epoch=32-step=30000.ckpt
+  overwrite_config: False
   gaussian:
-    sh_degree: 2
-    optimization:
-      position_lr_init: 0.000064
-      position_lr_final: 0.00000064
-      scaling_lr: 0.004
-      densify_grad_threshold: 0.0003
+    class_path: internal.models.gaussian_2d.Gaussian2D
+    init_args:
+      sh_degree: 2
+      optimization:
+        means_lr_init: 0.000064
+        means_lr_scheduler:
+          lr_final: 0.00000064
+        scales_lr: 0.004
+  metric:
+    class_path: internal.metrics.citygsv2_metrics.CityGSV2Metrics
+    init_args:
+      lambda_normal: 0.0125
+      normal_regularization_from_iter: 0
+      depth_loss_type: l1+ssim
+      depth_loss_ssim_weight: 1.0
+      depth_loss_weight:
+        init: 0.5
+        final_factor: 0.05
   renderer: 
     class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
     init_args:
-        lambda_normal: 0.0125
-        depth_ratio: 1.0
-        normal_regularization_from_iter: 0
-        init: 0.5
-        final_factor: 0.005
-        prune_ratio: 0.05
-        depth_loss_type: ssim
+      depth_ratio: 1.0
+      prune_ratio: 0.05
+  density: 
+    class_path: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
+    init_args:
+      densify_grad_threshold: 0.0003
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 30000
 data:
-  type: estimated_depth_colmap_block
   path: data/GauU_Scene/LFLS
-  params:
-    estimated_depth_colmap_block:
+  parser:
+    class_path: EstimatedDepthBlockColmap
+    init_args:
       image_list: data/GauU_Scene/LFLS/partition/4_2_1_even_sh2
       down_sample_factor: 3.4175
       content_threshold: 0.05

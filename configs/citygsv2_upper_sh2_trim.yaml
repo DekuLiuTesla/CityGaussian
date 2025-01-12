@@ -25,10 +25,7 @@ model:
     init_args:
       depth_ratio: 1.0
       prune_ratio: 0.05
-  density: 
-    class_path: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
-    init_args:
-      axis_ratio_threshold: 0.05
+  density: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
 trainer:
   check_val_every_n_epoch: 20
   max_steps: 30000
@@ -37,7 +34,7 @@ data:
   parser:
     class_path: EstimatedDepthBlockColmap
     init_args:
-      image_list: data/GauU_Scene/CUHK_UPPER_COLMAP/partition/3_3_1_even_sh2_t
+      image_list: data/GauU_Scene/CUHK_UPPER_COLMAP/partition/3_3_1_even_sh2
       down_sample_factor: 3.4175
       content_threshold: 0.05
       block_dim:

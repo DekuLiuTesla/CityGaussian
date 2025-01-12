@@ -1,39 +1,49 @@
-# trim too much, can be lower
-trainer:
-  check_val_every_n_epoch: 20
-  max_steps: 60_000
 model:
-  init_from: outputs/citygsv2_mc_street_coarse_sh2/checkpoints/epoch=8-step=30000.ckpt
+  initialize_from: outputs/citygsv2_mc_street_coarse_sh2/checkpoints/epoch=8-step=30000.ckpt
+  overwrite_config: False
   gaussian:
-    sh_degree: 2
-    optimization:
-      feature_extra_lr_max_steps: 60_000
-      position_lr_max_steps: 60_000
-      position_lr_init: 0.8e-5
-      position_lr_final: 0.8e-6
-      scaling_lr: 0.0025
+    class_path: internal.models.gaussian_2d.Gaussian2D
+    init_args:
+      sh_degree: 2
+      optimization:
+        means_lr_init: 0.8e-5
+        means_lr_scheduler:
+          lr_final: 0.8e-6
+          max_steps: 60_000
+        scales_lr: 0.0025
+  metric:
+    class_path: internal.metrics.citygsv2_metrics.CityGSV2Metrics
+    init_args:
+      lambda_normal: 0.0125
+      normal_regularization_from_iter: 0
+      depth_normalized: true
+      depth_loss_type: l1+ssim
+      depth_loss_ssim_weight: 1.0
+      depth_loss_weight:
+        init: 0.5
+        final_factor: 0.05
+        max_steps: 60_000
+  renderer: 
+    class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
+    init_args:
+      depth_ratio: 1.0
+      diable_trimming: true
+  density: 
+    class_path: internal.density_controllers.citygsv2_density_controller.CityGSV2DensityController
+    init_args:
       densification_interval: 1000
       opacity_reset_interval: 30_000
       densify_from_iter: 500
       densify_until_iter: 30_000
       densify_grad_threshold: 0.000075
-  renderer: 
-    class_path: internal.renderers.sep_depth_trim_2dgs_renderer.SepDepthTrim2DGSRenderer
-    init_args:
-        max_steps: 60_000
-        lambda_normal: 0.0125
-        depth_ratio: 1.0
-        normal_regularization_from_iter: 0
-        init: 0.5
-        final_factor: 0.05
-        diable_trimming: true
-        depth_loss_type: ssim
-        depth_norm: true
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 60000
 data:
-  type: estimated_depth_colmap_block
   path: data/matrix_city/street/train/block_A
-  params:
-    estimated_depth_colmap_block:
+  parser:
+    class_path: EstimatedDepthBlockColmap
+    init_args:
       image_list: data/matrix_city/street/train/block_A/partition/5_4_1_sh2
       down_sample_factor: 1
       depth_scale_lower_bound: 0.01
