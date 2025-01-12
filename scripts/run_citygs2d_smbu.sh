@@ -6,8 +6,8 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygsv2_smbu_coarse_sh2_t1
-NAME=citygsv2_smbu_sh2_trim_t1
+COARSE_NAME=citygsv2_smbu_coarse_sh2
+NAME=citygsv2_smbu_sh2_trim
 DATA_PATH=data/GauU_Scene/SMBU
 max_block_id=8
 
