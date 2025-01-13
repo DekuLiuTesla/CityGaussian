@@ -38,6 +38,9 @@
 !gsplat-absgrad-experiment.yaml
 !vanilla_2dgs.yaml
 
+!citygs_lfls_coarse_sh2.yaml
+!citygs_lfls_sh2_trim.yaml
+
 !citygsv2_smbu_coarse.yaml
 !citygsv2_smbu.yaml
 !citygsv2_smbu_coarse_sh2.yaml

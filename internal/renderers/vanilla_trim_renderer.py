@@ -1,36 +1,51 @@
-#
-# Copyright (C) 2023, Inria
-# GRAPHDECO research group, https://team.inria.fr/graphdeco
-# All rights reserved.
-#
-# This software is free for non-commercial, research and evaluation use
-# under the terms of the LICENSE.md file.
-#
-# For inquiries contact  george.drettakis@inria.fr
-#
+from typing import Dict, Tuple, Union, Callable, Optional, List
 
+import lightning
+import torch
 import math
 from .renderer import *
-from diff_trim_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
+
+from .vanilla_renderer import VanillaRenderer
+from ..cameras import Camera
+from ..models.gaussian import GaussianModel
 from internal.utils.sh_utils import eval_sh
-from internal.models.flatten_gaussian_model import FlattenGaussianModel
+from diff_trim_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
+class VanillaTrimRenderer(VanillaRenderer):
+    def __init__(
+            self, 
+            compute_cov3D_python: bool = False, 
+            convert_SHs_python: bool = False,
+            K: int = 5,
+            v_pow: float = 0.1,
+            prune_ratio: float = 0.1,
+            contribution_prune_from_iter : int = 1000,
+            contribution_prune_interval: int = 500,
+            diable_trimming: bool = False,
+            ):
+        super().__init__(
+            compute_cov3D_python=compute_cov3D_python,
+            convert_SHs_python=convert_SHs_python,
+        )
 
-class VanillaTrimRenderer(Renderer):
-    def __init__(self, compute_cov3D_python: bool = False, convert_SHs_python: bool = False):
-        super().__init__()
-
-        self.compute_cov3D_python = compute_cov3D_python
-        self.convert_SHs_python = convert_SHs_python
+        # hyper-parameters for trimming
+        self.K = K
+        self.v_pow = v_pow
+        self.prune_ratio = prune_ratio
+        self.contribution_prune_from_iter = contribution_prune_from_iter
+        self.contribution_prune_interval = contribution_prune_interval
+        self.diable_trimming = diable_trimming
 
     def forward(
             self,
             viewpoint_camera: Camera,
-            pc: FlattenGaussianModel,
+            pc: GaussianModel,
             bg_color: torch.Tensor,
             scaling_modifier=1.0,
             override_color=None,
             render_types: list = None,
+            record_transmittance=False,
+            **kwargs,
     ):
         """
         Render the scene.
@@ -76,7 +91,7 @@ class VanillaTrimRenderer(Renderer):
             sh_degree=pc.active_sh_degree,
             campos=viewpoint_camera.camera_center,
             prefiltered=False,
-            record_transmittance=False,
+            record_transmittance=record_transmittance,
             debug=False
         )
 
@@ -114,7 +129,7 @@ class VanillaTrimRenderer(Renderer):
             colors_precomp = override_color
 
         # Rasterize visible Gaussians to image, obtain their radii (on screen).
-        rendered_image, rendered_extra_feats, median_depth, radii = rasterizer(
+        output = rasterizer(
             means3D=means3D,
             means2D=means2D,
             shs=shs,
@@ -126,6 +141,13 @@ class VanillaTrimRenderer(Renderer):
             cov3D_precomp=cov3D_precomp,
         )
 
+        if record_transmittance:
+            transmittance_sum, num_covered_pixels, radii = output
+            transmittance = transmittance_sum / (num_covered_pixels + 1e-6)
+            return transmittance
+        else:
+            rendered_image, _, median_depth, radii = output
+
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.
         return {
@@ -133,7 +155,8 @@ class VanillaTrimRenderer(Renderer):
             "viewspace_points": screenspace_points,
             "visibility_filter": radii > 0,
             "radii": radii,
-            "median_depth": median_depth,
+            "surf_depth": median_depth,
+            "inverse_depth": (1 / median_depth + 1e-8),
         }
 
     @staticmethod
@@ -207,7 +230,7 @@ class VanillaTrimRenderer(Renderer):
             rendered_image, radii = rasterize_result
             depth_image = None
         else:
-            rendered_image, radii, depth_image = rasterize_result
+            rendered_image, _, radii, depth_image = rasterize_result
 
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.
@@ -219,11 +242,89 @@ class VanillaTrimRenderer(Renderer):
             "radii": radii,
         }
 
-    def get_available_output_types(self) -> Dict:
+    def get_available_outputs(self) -> Dict:
         return {
-            "rgb": "render",
-            "depth": "depth",
+            "rgb": RendererOutputInfo("render"),
+            "depth": RendererOutputInfo("depth", RendererOutputTypes.GRAY),
         }
 
     def is_type_depth_map(self, t: str) -> bool:
         return t == "depth"
+    
+    def before_training_step(
+            self,
+            step: int,
+            module,
+    ):
+        if step != 1 or self.diable_trimming:
+            return
+        cameras = module.trainer.datamodule.dataparser_outputs.train_set.cameras
+        device =  module.gaussian_model.get_xyz.device
+        top_list = [None, ] * self.K
+        with torch.no_grad():
+            print("Trimming...")
+            for i in range(len(cameras)):
+                camera = cameras[i].to_device(device)
+                trans = self(
+                    camera,
+                    module.gaussian_model,
+                    bg_color=module._fixed_background_color().to(device),
+                    record_transmittance=True
+                )
+                if top_list[0] is not None:
+                    m = trans > top_list[0]
+                    if m.any():
+                        for i in range(self.K - 1):
+                            top_list[self.K - 1 - i][m] = top_list[self.K - 2 - i][m]
+                            top_list[0][m] = trans[m]
+                else:
+                    top_list = [trans.clone() for _ in range(self.K)]
+
+            contribution = torch.stack(top_list, dim=-1).mean(-1)
+            # tile = torch.quantile(contribution, self.prune_ratio)
+            tile = 0  # only prune invisible points at start
+            prune_mask = contribution <= tile
+            module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
+            print("Trimming done.")
+        torch.cuda.empty_cache()
+
+    def after_training_step(
+            self,
+            step: int,
+            module,
+    ):
+        cameras = module.trainer.datamodule.dataparser_outputs.train_set.cameras
+        if self.diable_trimming or (step > module.density_controller.config.densify_until_iter) \
+           or (step < self.contribution_prune_from_iter) \
+           or (step % self.contribution_prune_interval != 0):
+           return
+        
+        device =  module.gaussian_model.get_xyz.device
+
+        top_list = [None, ] * self.K
+        with torch.no_grad():
+            print("Trimming...")
+            for i in range(len(cameras)):
+                camera = cameras[i].to_device(device)
+                trans = self(
+                    camera,
+                    module.gaussian_model,
+                    bg_color=module._fixed_background_color().to(device),
+                    record_transmittance=True
+                )
+                if top_list[0] is not None:
+                    m = trans > top_list[0]
+                    if m.any():
+                        for i in range(self.K - 1):
+                            top_list[self.K - 1 - i][m] = top_list[self.K - 2 - i][m]
+                            top_list[0][m] = trans[m]
+                else:
+                    top_list = [trans.clone() for _ in range(self.K)]
+
+            contribution = torch.stack(top_list, dim=-1).mean(-1)
+
+            tile = torch.quantile(contribution, self.prune_ratio)
+            prune_mask = (contribution <= tile)
+            module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
+            print("Trimming done.")
+        torch.cuda.empty_cache()

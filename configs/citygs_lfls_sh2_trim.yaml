@@ -1,0 +1,27 @@
+model:
+  initialize_from: outputs/citygs_lfls_coarse_sh2/checkpoints/epoch=32-step=30000.ckpt
+  overwrite_config: False
+  gaussian:
+    init_args:
+      sh_degree: 2
+      optimization:
+        means_lr_init: 0.000064
+        means_lr_scheduler:
+          lr_final: 0.00000064
+        scales_lr: 0.004
+  renderer: internal.renderers.vanilla_trim_renderer.VanillaTrimRenderer
+trainer:
+  check_val_every_n_epoch: 20
+  max_steps: 30000
+data:
+  path: data/GauU_Scene/LFLS
+  parser:
+    class_path: EstimatedDepthBlockColmap
+    init_args:
+      image_list: data/GauU_Scene/LFLS/partition/4_2_1_even
+      down_sample_factor: 3.4175
+      content_threshold: 0.05
+      block_dim:
+      - 4
+      - 2
+      - 1

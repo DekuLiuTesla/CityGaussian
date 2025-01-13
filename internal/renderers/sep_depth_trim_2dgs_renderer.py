@@ -17,7 +17,6 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             K: int = 5,
             v_pow: float = 0.1,
             prune_ratio: float = 0.1,
-            trim_epoch_interval: int = 5,
             contribution_prune_from_iter : int = 1000,
             contribution_prune_interval: int = 500,
             diable_trimming: bool = False,
