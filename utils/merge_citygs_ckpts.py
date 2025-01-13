@@ -2,6 +2,7 @@ import os
 import sys
 import add_pypath
 import argparse
+import torch
 import numpy as np
 import logging
 from tqdm import tqdm
@@ -77,12 +78,12 @@ for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
         
     if xyz_quantile is None:
         # in this case, we assume partition under contracted space
+        device=ckpt['state_dict']['gaussian_model.gaussians.means'].device
         if dataparser_config.aabb is None:
-            c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in dataset.cameras])
-            poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
+            dataparser_config.aabb = torch.load(os.path.join(dataparser_config.image_list, "aabb.pt"), device=device)
         else:
             assert len(dataparser_config.aabb) == 6, "Unknown aabb format!"
-            dataparser_config.aabb = torch.tensor(dataparser_config.aabb, dtype=torch.float32, device=ckpt['state_dict']['gaussian_model.gaussians.means'].device)
+            dataparser_config.aabb = torch.tensor(dataparser_config.aabb, dtype=torch.float32, device=device)
         
         min_x, max_x = float(block_id_x) / dataparser_config.block_dim[0], float(block_id_x + 1) / dataparser_config.block_dim[0]
         min_y, max_y = float(block_id_y) / dataparser_config.block_dim[1], float(block_id_y + 1) / dataparser_config.block_dim[1]

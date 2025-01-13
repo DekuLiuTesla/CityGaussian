@@ -72,6 +72,8 @@ def block_filtering(gaussians,
                 aabb = torch.zeros(6, device=xyz_org.device)
                 aabb[:3] = center - radius
                 aabb[3:] = center + radius
+                print(f"Auto generated aabb: {aabb}")
+                torch.save(aabb, os.path.join(save_dir, "aabb.pt"))
             else:
                 assert len(args.aabb) == 6, "Unknown aabb format!"
                 aabb = torch.tensor(args.aabb, dtype=torch.float32, device=xyz_org.device)
