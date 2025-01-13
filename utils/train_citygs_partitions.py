@@ -7,7 +7,11 @@ import subprocess
 import traceback
 import time
 import selectors
+import py3nvml
+import numpy as np
+import functools
 from tqdm.auto import tqdm
+from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
 from auto_hyper_parameter import auto_hyper_parameter, to_command_args
 from argparser_utils import split_stoppable_args, parser_stoppable_args
@@ -45,6 +49,7 @@ def train_a_partition(
         extra_training_args,
         srun_args,
         partition_idx,
+        gpu_id,
     ):
     config_file = os.path.join(config_args.config_dir, f"{config_args.config_name}.yaml")
     project_name = config_args.project_name
@@ -70,7 +75,7 @@ def train_a_partition(
     ]
 
     print_func = print
-    run_func = subprocess.call
+    run_func = functools.partial(subprocess.run, env=dict(**os.environ, CUDA_VISIBLE_DEVICES=str(gpu_id)))
     if len(srun_args) > 0:
         def tqdm_write(i):
             tqdm.write("[{}] #{}: {}".format(
@@ -122,12 +127,28 @@ if __name__ == "__main__":
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
 
     assert os.path.exists(config.data.parser.init_args.image_list), "Image list not found, please generate it with utils/partition_citygs.py"
-    num_blocks = len(os.listdir(config.data.parser.init_args.image_list))
+    num_blocks = len([file_name for file_name in os.listdir(config.data.parser.init_args.image_list) if file_name.endswith(".txt")])
 
     if len(srun_args) == 0:
-        with tqdm(range(num_blocks)) as t:
-            for block_idx in t:
-                train_a_partition(args, training_args, srun_args, block_idx)
+        with ProcessPoolExecutor(max_workers=num_blocks) as executor:
+            for block_id in range(num_blocks):
+                gpu_available = False
+                fail_cnt = 0
+                while not gpu_available:
+                    free_gpus = py3nvml.get_free_gpus()
+                    if sum(free_gpus) > 0:
+                        gpu_available = True
+                    elif fail_cnt > 30:
+                        print("No free GPUs available in 1 hour, exiting.")
+                        exit()
+                    else:
+                        fail_cnt += 1
+                        print("No free GPUs available, wait for 2 minutes.")
+                        subprocess.run(["sleep", "120"])
+
+                executor.submit(train_a_partition, args, training_args, srun_args, block_id, np.argmax(free_gpus))
+
+                subprocess.run(["sleep", "60"])
     else:
         print("SLURM mode enabled")
         trainable_partition_idx_list = list(range(num_blocks))

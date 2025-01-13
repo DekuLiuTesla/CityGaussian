@@ -6,40 +6,112 @@ get_available_gpu() {
   '
 }
 
-COARSE_NAME=citygs_mc_aerial_coarse
-NAME=citygs_mc_aerial_light_56_vq
-TEST_PATH=data/matrix_city/aerial/test/block_all_test
-max_block_id=35
+COARSE_NAME=citygsv2_mc_aerial_coarse_sh2
+NAME=citygsv2_mc_aerial_sh2_trim
+PROJECT=YOUR_PROJECT_NAME  # Change to your project name
+TEST_PATH=data/matrix_city/aerial/test/block_all_test  # required is train and test sets are separate
 
-# python utils/ply2ckpt.py outputs/$NAME/point_cloud.ply \
-#                          -r "outputs/$COARSE_NAME/checkpoints/epoch=6-step=30000.ckpt" \
-#                          -s 2
+# ============================================= downsample images =============================================
+# python utils/image_downsample.py data/matrix_city/aerial/train/block_all/images --factor 1.2
+# python utils/image_downsample.py data/matrix_city/aerial/test/block_all_test/images --factor 1.2
+
+# ===================================== generate depth with depth-anything-V2 =================================
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     data/matrix_city/aerial/train/block_all \
+#                                     -d 1.2 \
+
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python utils/estimate_dataset_depths.py \
+#                                     $TEST_PATH \
+#                                     -d 1.2 \
+
+# ============================================= train&eval coarse model =============================================
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python main.py fit \
+                                    --config configs/$COARSE_NAME.yaml \
+                                    -n $COARSE_NAME \
+                                    --logger wandb \
+                                    --project $PROJECT \
+                                    --data.train_max_num_images_to_cache 1024
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
-    --config configs/$NAME.yaml \
-    -n $NAME \
+    --config outputs/$COARSE_NAME/config.yaml \
     --data.path $TEST_PATH \
-    --data.params.estimated_depth_colmap_block.eval_image_select_mode ratio \
-    --data.params.estimated_depth_colmap_block.eval_ratio 1.0 \
-    --test_speed \
-    --save_val \
+    --data.parser.eval_image_select_mode ratio \
+    --data.parser.eval_ratio 1.0 \
+    --save_val
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python mesh.py \
-                                    --model_path outputs/$NAME \
-                                    --config_path outputs/$COARSE_NAME/config.yaml \
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
+                                      outputs/$COARSE_NAME \
                                     --voxel_size 0.01 \
                                     --sdf_trunc 0.04 \
-                                    --depth_trunc 5.0 \
-                                    --use_trim_renderer \
+                                    --depth_trunc 5.0
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
                                     --scene Block_all_ds \
                                     --dataset-dir data/matrix_city/point_cloud_ds20/aerial \
-                                    --ply-path "outputs/$NAME/mesh/epoch=6-step=30000/fuse_post.ply"
+                                    --ply-path "outputs/$COARSE_NAME/fuse_post.ply"
 
+# ============================================= generate partition =============================================
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --force
+
+# =========================================== train&eval tuned model ===========================================
+python utils/train_citygs_partitions.py -n $NAME -p $PROJECT
+
+# merge blocks
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/merge_citygs_ckpts.py outputs/$NAME \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python main.py test \
+    --config outputs/$COARSE_NAME/config.yaml \
+    -n $NAME \
+    --data.path $TEST_PATH \
+    --data.parser.eval_image_select_mode ratio \
+    --data.parser.eval_ratio 1.0 \
+    --save_val \
+    --test_speed \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
+                                      outputs/$NAME \
+                                    --voxel_size 0.01 \
+                                    --sdf_trunc 0.04 \
+                                    --depth_trunc 5.0 \
+
+gpu_id=$(get_available_gpu)
+echo "GPU $gpu_id is available."
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
+                                    --scene Block_all_ds \
+                                    --dataset-dir data/matrix_city/point_cloud_ds20/aerial \
+                                    --ply-path "outputs/$NAME/fuse_post.ply"
+
+# python tools/block_wandb_sync.py --output_path outputs/$NAME  # Synchronize results to wandb if needed
+
+# ================================= remove block results (if you find result OK) ================================
+# rm -rf outputs/$NAME/blocks/block_*/checkpoints
+
+# ============================================= vector quantization =============================================
+# gpu_id=$(get_available_gpu)
+# echo "GPU $gpu_id is available."
+# CUDA_VISIBLE_DEVICES=$gpu_id python tools/vectree_lightning.py \
+#                                     --model_path outputs/$NAME \
+#                                     --save_path outputs/$NAME/vectree \
+#                                     --sh_degree 2 \
+                                    # --skip_quantize \
+                                    # --no_save_ply \
