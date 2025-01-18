@@ -136,8 +136,8 @@ if __name__ == "__main__":
                     free_gpus = py3nvml.get_free_gpus()
                     if sum(free_gpus) > 0:
                         gpu_available = True
-                    elif fail_cnt > 30:
-                        print("No free GPUs available in 1 hour, exiting.")
+                    elif fail_cnt > 90:
+                        print("No free GPUs available in 3 hour, exiting.")
                         exit()
                     else:
                         fail_cnt += 1
