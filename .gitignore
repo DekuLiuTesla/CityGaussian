@@ -15,9 +15,13 @@ internal/dataparsers/colmap_cluster_dataparser.py
 internal/utils/data_sampler.py
 tools/merge_new_img.py
 tools/render_clip.py
+tools/gkd
 scripts/run.sh
 scripts/run1.sh
 scripts/run2.sh
+scripts/run_citygs2d_building.sh
+scripts/run_citygs2d_rubble.sh
+notebooks_gkd
 clusters
 segments
 **/__pycache__
