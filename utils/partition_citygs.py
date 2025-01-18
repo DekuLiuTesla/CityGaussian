@@ -37,7 +37,6 @@ if __name__ == "__main__":
         args.content_threshold = params.content_threshold if hasattr(params, "content_threshold") else args.content
         if args.contract:
             args.aabb = params.aabb if hasattr(params, "aabb") else args.aabb
-            args.num_threshold = params.num_threshold if hasattr(params, "num_threshold") else args.num_threshold
         
         ckpt_path = config.model.initialize_from
         if "point_cloud" in config.model.initialize_from:
@@ -110,13 +109,14 @@ if __name__ == "__main__":
     print(f"Projection based partition assignment: {scene.projection_based_partition_assignment(model, renderer, dataset.cameras, bkgd_color).sum(-1)}")
 
     output_path = os.path.join(dataset_path, scene.build_output_dirname())
-    try:
-        assert os.path.exists(os.path.join(output_path, "partitions.pt")) is False
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-    except:
-        del output_path
-        raise
+    if not args.force and os.path.exists(output_path):
+        try:
+            assert os.path.exists(os.path.join(output_path, "partitions.pt")) is False, "Partition data already exists, please use --force to overwrite"
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+        except:
+            del output_path
+            raise
     print(f"Output path: {output_path}")
 
     scene.save(
@@ -127,8 +127,13 @@ if __name__ == "__main__":
         }
     )
 
+    scene.save_plot(scene.plot_partitions, os.path.join(output_path, "partitions.png"), notebook=False)
+
     is_images_assigned_to_partitions = torch.logical_or(scene.is_camera_in_partition, scene.is_partitions_visible_to_cameras)
     print(f"Overall images assigned to partitions: {is_images_assigned_to_partitions.sum(-1)}")
+
+    max_plot_points = 51_200
+    plot_point_sparsify = max(reoriented_point_cloud_xyz.shape[0] // max_plot_points, 1)
 
     written_idx_list = []
     for partition_idx in tqdm(list(range(is_images_assigned_to_partitions.shape[0]))):
@@ -166,6 +171,16 @@ if __name__ == "__main__":
                 f"cameras-{scene.partition_coordinates.get_str_id(partition_idx)}.json",
         ), "w") as f:
             json.dump(camera_list, f, indent=4, ensure_ascii=False)
+        
+        scene.save_plot(
+            scene.plot_partition_assigned_cameras,
+            os.path.join(output_path, "{}.png".format(scene.partition_coordinates.get_str_id(partition_idx))),
+            False,
+            partition_idx,
+            reoriented_point_cloud_xyz,
+            point_rgbs,
+            point_sparsify=plot_point_sparsify,
+        )
 
     max_store_points = 512_000
     store_point_step = max(point_rgbs.shape[0] // max_store_points, 1)

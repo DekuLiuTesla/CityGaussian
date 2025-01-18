@@ -289,12 +289,15 @@ class CityGSPartitionableScene(PartitionableScene):
         func(ax, *args, **kwargs)
         plt.show(fig)
 
-    def save_plot(self, func: Callable, path: str, *args, **kwargs):
+    def save_plot(self, func: Callable, path: str, notebook=True, *args, **kwargs):
         plt.close()
         fig, ax = plt.subplots()
         func(ax, *args, **kwargs)
         plt.savefig(path, dpi=600)
-        plt.show(fig)
+        if notebook:
+            plt.show(fig)
+        else:
+            plt.show()
 
 
 class CityGSPartitioning(Partitioning):
@@ -615,27 +618,28 @@ class CityGSPartitioning(Partitioning):
         return "{:03d}_{:03d}".format(x, y)
     
     @classmethod
-    def contract(x):
+    def contract(cls, x):
         mag = torch.linalg.norm(x, ord=2, dim=-1)[..., None]
         out = torch.where(mag < 1, x, (2 - (1 / mag)) * (x / mag)) # [-inf, inf] is at [-2, 2]
         out = out / 4 + 0.5  # [-2, 2] is at [0, 1]
         return out
 
     @classmethod
-    def uncontract(y):
+    def uncontract(cls, y):
         y = y * 4 - 2  # [0, 1] is at [-2, 2]
         mag = torch.linalg.norm(y, ord=2, dim=-1)[..., None]
         return torch.where(mag < 1, y, (1 / (2-mag) * (y/mag)))
     
     @classmethod
     def contract_to_unisphere(
+        cls,
         x: torch.Tensor,
         aabb: torch.Tensor,
         ord: float = 2,
         eps: float = 1e-6,
         derivative: bool = False,
     ):
-        aabb_min, aabb_max = torch.split(aabb, 3, dim=-1)
+        aabb_min, aabb_max = torch.split(aabb, aabb.shape[0] // 2, dim=-1)
         x = (x - aabb_min) / (aabb_max - aabb_min)
         x = x * 2 - 1  # aabb is at [-1, 1]
         mag = torch.linalg.norm(x, ord=ord, dim=-1, keepdim=True)
