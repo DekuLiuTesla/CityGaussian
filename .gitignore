@@ -21,7 +21,6 @@ scripts/run1.sh
 scripts/run2.sh
 scripts/run_citygs2d_building.sh
 scripts/run_citygs2d_rubble.sh
-notebooks_gkd
 clusters
 segments
 **/__pycache__
