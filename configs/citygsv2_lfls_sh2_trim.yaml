@@ -37,10 +37,8 @@ data:
   parser:
     class_path: EstimatedDepthBlockColmap
     init_args:
-      image_list: data/GauU_Scene/LFLS/partition/4_2_1_even_sh2
       down_sample_factor: 3.4175
       content_threshold: 0.05
-      block_dim:
+      block_dim:  # removed z dimension
       - 4
       - 2
-      - 1

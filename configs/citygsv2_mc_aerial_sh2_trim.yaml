@@ -41,13 +41,11 @@ data:
   parser:
     class_path: EstimatedDepthBlockColmap
     init_args:
-      image_list: data/matrix_city/aerial/train/block_all/partition/4_4_1_even_sh2
       down_sample_factor: 1.2
       content_threshold: 0.05
       block_dim:
       - 4
       - 4
-      - 1
 save_iterations:
 - 30000
 - 60000

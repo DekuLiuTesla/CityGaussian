@@ -34,10 +34,8 @@ data:
   parser:
     class_path: EstimatedDepthBlockColmap
     init_args:
-      image_list: data/GauU_Scene/SMBU/partition/3_3_1_even_sh2_t
       down_sample_factor: 3.4175
       content_threshold: 0.05
-      block_dim:
+      block_dim:  # removed z dimension
       - 3
       - 3
-      - 1
