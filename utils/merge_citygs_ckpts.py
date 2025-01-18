@@ -7,7 +7,7 @@ import numpy as np
 import logging
 from tqdm import tqdm
 from internal.utils.gaussian_model_loader import GaussianModelLoader
-from internal.utils.blocking import contract_to_unisphere
+from internal.utils.citygs_partitioning_utils import CityGSPartitioning, PartitionCoordinates
 
 parser = argparse.ArgumentParser()
 parser.add_argument("path", help="Path to the model output directory")
@@ -64,48 +64,30 @@ optimizer_state_exp_avg_list_key_by_index = {}
 optimizer_state_exp_avg_sq_list_key_by_index = {}
 density_controller_state_list_key_by_name = {}
 number_of_gaussians = []
-xyz_quantile = None
+
+ckpt = torch.load(checkpoint_files[0], map_location="cpu")
+dataparser_config = ckpt["datamodule_hyper_parameters"]["parser"]
+partitions = torch.load(os.path.join(os.path.dirname(dataparser_config.image_list), "partitions.pt"))
+partition_coordinates = PartitionCoordinates(
+    id=partitions['partition_coordinates']['id'],
+    xy=partitions['partition_coordinates']['xy'],
+)
+partition_bounding_boxes = partition_coordinates.get_bounding_boxes(partitions['scene_config']['partition_size'], enlarge=0.)
+
+del ckpt, dataparser_config
+
 for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
     ckpt = torch.load(i, map_location="cpu")
     dataparser_config = ckpt["datamodule_hyper_parameters"]["parser"]
-    block_num = dataparser_config.block_dim[0] * dataparser_config.block_dim[1] * dataparser_config.block_dim[2]
-    block_id_z = dataparser_config.block_id // (dataparser_config.block_dim[0] * dataparser_config.block_dim[1])
-    block_id_y = (dataparser_config.block_id % (dataparser_config.block_dim[0] * dataparser_config.block_dim[1])) // dataparser_config.block_dim[0]
-    block_id_x = (dataparser_config.block_id % (dataparser_config.block_dim[0] * dataparser_config.block_dim[1])) % dataparser_config.block_dim[0]
-    
-    if xyz_quantile is None and os.path.exists(os.path.join(os.path.dirname(dataparser_config.image_list), "quantiles.pt")):
-        xyz_quantile = torch.load(os.path.join(os.path.dirname(dataparser_config.image_list), "quantiles.pt"))
-        
-    if xyz_quantile is None:
-        # in this case, we assume partition under contracted space
-        device=ckpt['state_dict']['gaussian_model.gaussians.means'].device
-        if dataparser_config.aabb is None:
-            dataparser_config.aabb = torch.load(os.path.join(dataparser_config.image_list, "aabb.pt"), device=device)
-        else:
-            assert len(dataparser_config.aabb) == 6, "Unknown aabb format!"
-            dataparser_config.aabb = torch.tensor(dataparser_config.aabb, dtype=torch.float32, device=device)
-        
-        min_x, max_x = float(block_id_x) / dataparser_config.block_dim[0], float(block_id_x + 1) / dataparser_config.block_dim[0]
-        min_y, max_y = float(block_id_y) / dataparser_config.block_dim[1], float(block_id_y + 1) / dataparser_config.block_dim[1]
-        min_z, max_z = float(block_id_z) / dataparser_config.block_dim[2], float(block_id_z + 1) / dataparser_config.block_dim[2]
+    xyz_gs = ckpt['state_dict']['gaussian_model.gaussians.means'] @ partitions['extra_data']['rotation_transform'][:3, :3].T
 
-        xyz_gs = contract_to_unisphere(ckpt['state_dict']['gaussian_model.gaussians.means'], dataparser_config.aabb, ord=torch.inf)
-        mask_preserved = (xyz_gs[:, 0] >= min_x) & (xyz_gs[:, 0] < max_x)  \
-                        & (xyz_gs[:, 1] >= min_y) & (xyz_gs[:, 1] < max_y) \
-                        & (xyz_gs[:, 2] >= min_z) & (xyz_gs[:, 2] < max_z)
-    else:
-        x_quantile = xyz_quantile["x"]
-        y_quantile = xyz_quantile["y"]
-        z_quantile = xyz_quantile["z"]
+    if partitions['scene_config']['contract']:
+        xyz_gs = CityGSPartitioning.contract_to_unisphere(xyz_gs, partitions['scene_config']['aabb'], ord=torch.inf)
 
-        min_x, max_x = x_quantile[block_id_x].item(), x_quantile[block_id_x + 1].item()
-        min_y, max_y = y_quantile[block_id_y].item(), y_quantile[block_id_y + 1].item()
-        min_z, max_z = z_quantile[block_id_z].item(), z_quantile[block_id_z + 1].item()
-
-        xyz_gs = ckpt['state_dict']['gaussian_model.gaussians.means']
-        mask_preserved = (xyz_gs[:, 0] >= min_x) & (xyz_gs[:, 0] < max_x)  \
-                        & (xyz_gs[:, 1] >= min_y) & (xyz_gs[:, 1] < max_y) \
-                        & (xyz_gs[:, 2] >= min_z) & (xyz_gs[:, 2] < max_z)
+    mask_preserved = CityGSPartitioning.is_in_bounding_boxes(
+        bounding_boxes=partition_bounding_boxes,
+        coordinates=xyz_gs[:, :2],
+    )[dataparser_config.block_id]
     
     property_names = []
     gaussian_property_dict_key_prefix = "gaussian_model.gaussians."

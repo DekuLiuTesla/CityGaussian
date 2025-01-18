@@ -19,6 +19,8 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             prune_ratio: float = 0.1,
             contribution_prune_from_iter : int = 1000,
             contribution_prune_interval: int = 500,
+            start_prune_ratio: float = 0.0,
+            diable_start_trimming: bool = False,
             diable_trimming: bool = False,
     ):
         super().__init__(depth_ratio=depth_ratio)
@@ -29,6 +31,8 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
         self.prune_ratio = prune_ratio
         self.contribution_prune_from_iter = contribution_prune_from_iter
         self.contribution_prune_interval = contribution_prune_interval
+        self.start_prune_ratio = start_prune_ratio
+        self.diable_start_trimming = diable_start_trimming
         self.diable_trimming = diable_trimming
 
     def forward(
@@ -166,7 +170,7 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             step: int,
             module,
     ):
-        if step != 1 or self.diable_trimming:
+        if step != 1 or self.diable_trimming or self.diable_start_trimming:
             return
         cameras = module.trainer.datamodule.dataparser_outputs.train_set.cameras
         device =  module.gaussian_model.get_xyz.device
@@ -191,8 +195,7 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
                     top_list = [trans.clone() for _ in range(self.K)]
 
             contribution = torch.stack(top_list, dim=-1).mean(-1)
-            # tile = torch.quantile(contribution, self.prune_ratio)
-            tile = 0  # only prune invisible points at start
+            tile = torch.quantile(contribution, self.start_prune_ratio)
             prune_mask = contribution <= tile
             module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
             print("Trimming done.")

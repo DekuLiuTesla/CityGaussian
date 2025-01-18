@@ -125,9 +125,7 @@ if __name__ == "__main__":
     config_path = os.path.join(args.config_dir, f"{args.config_name}.yaml")
     with open(config_path, 'r') as f:
         config = parse(yaml.load(f, Loader=yaml.FullLoader))
-
-    assert os.path.exists(config.data.parser.init_args.image_list), "Image list not found, please generate it with utils/partition_citygs.py"
-    num_blocks = len([file_name for file_name in os.listdir(config.data.parser.init_args.image_list) if file_name.endswith(".txt")])
+    num_blocks = config.data.parser.init_args.block_dim[0] * config.data.parser.init_args.block_dim[1]
 
     if len(srun_args) == 0:
         with ProcessPoolExecutor(max_workers=num_blocks) as executor:
