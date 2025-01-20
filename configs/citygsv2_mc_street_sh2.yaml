@@ -44,23 +44,18 @@ data:
   parser:
     class_path: EstimatedDepthBlockColmap
     init_args:
-      image_list: data/matrix_city/street/train/block_A/partition/5_4_1_sh2
       down_sample_factor: 1
       depth_scale_lower_bound: 0.01
       depth_scale_upper_bound: 50.0
-      num_threshold: 25000
       content_threshold: 0.01
       block_dim:
       - 5
       - 4
-      - 1
       aabb:
       - -600
       - -400
-      - -10
       - -300
       - -200
-      - 500
 save_iterations:
 - 30000
 - 60000
