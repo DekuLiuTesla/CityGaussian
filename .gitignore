@@ -24,3 +24,4 @@ scripts/run_citygs2d_rubble.sh
 clusters
 segments
 **/__pycache__
+scripts/post_proc.sh
