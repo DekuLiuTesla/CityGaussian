@@ -82,7 +82,7 @@ for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
     xyz_gs = ckpt['state_dict']['gaussian_model.gaussians.means'] @ partitions['extra_data']['rotation_transform'][:3, :3].T
 
     if partitions['scene_config']['contract']:
-        xyz_gs = CityGSPartitioning.contract_to_unisphere(xyz_gs, partitions['scene_config']['aabb'], ord=torch.inf)
+        xyz_gs = CityGSPartitioning.contract_to_unisphere(xyz_gs[:, :2], partitions['scene_config']['aabb'], ord=torch.inf)
 
     mask_preserved = CityGSPartitioning.is_in_bounding_boxes(
         bounding_boxes=partition_bounding_boxes,

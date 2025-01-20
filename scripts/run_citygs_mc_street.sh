@@ -52,20 +52,19 @@ CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run.py \
                                     --scene Block_A_ds \
-                                    --dataset-dir data/matrix_city/point_cloud_ds20/street \
+                                    --dataset-dir data/geometry_gt/MC_Street \
                                     --ply-path "outputs/$COARSE_NAME/fuse_post.ply"
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --contract --force
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --force  # --reorient
 
 # =========================================== train&eval tuned model ===========================================
 python utils/train_citygs_partitions.py -n $NAME -p $PROJECT
 
-# merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python utils/merge_citygs_ckpts.py outputs/$NAME \
@@ -91,9 +90,9 @@ CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_mc.py \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run.py \
                                     --scene Block_A_ds \
-                                    --dataset-dir data/matrix_city/point_cloud_ds20/street \
+                                    --dataset-dir data/geometry_gt/MC_Street \
                                     --ply-path "outputs/$NAME/fuse_post.ply"
 
 # python tools/block_wandb_sync.py --output_path outputs/$NAME  # Synchronize results to wandb if needed

@@ -55,34 +55,23 @@ from util import make_dir
 from plot import plot_graph
 
 
-def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
-    scene = os.path.basename(os.path.normpath(dataset_dir))
-
-    if scene not in scenes_tau_dict:
-        print(dataset_dir, scene)
-        raise Exception("invalid dataset-dir, not in scenes_tau_dict")
+def run_evaluation(scene, dataset_dir, ply_path, transform_path, out_dir, view_crop):
 
     print("")
     print("===========================")
     print("Evaluating %s" % scene)
     print("===========================")
 
-    dTau = scenes_tau_dict[scene]
-    # put the crop-file, the GT file, the COLMAP SfM log file and
-    # the alignment of the according scene in a folder of
-    # the same scene name in the dataset_dir
-    colmap_ref_logfile = os.path.join(dataset_dir, scene + "_COLMAP_SfM.log")
+    # assume that the prediction and GT have been aligned
+    trajectory_transform = np.identity(4)
 
     # this is for groundtruth pointcloud, we can use it
-    alignment = os.path.join(dataset_dir, scene + "_trans.txt")
+    # TODO: change file name for GT point cloud
     gt_filen = os.path.join(dataset_dir, scene + ".ply")
     # this crop file is also w.r.t the groundtruth pointcloud, we can use it. 
     # Otherwise we have to crop the estimated pointcloud by ourself
     cropfile = os.path.join(dataset_dir, scene + ".json")
     # this is not so necessary
-    map_file = os.path.join(dataset_dir, scene + "_mapping_reference.txt")
-    if not os.path.isfile(map_file):
-        map_file = None
     map_file = None
 
     make_dir(out_dir)
@@ -94,7 +83,7 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     import trimesh
     mesh = trimesh.load_mesh(ply_path)
     # add center points
-    sampled_vertices = mesh.vertices[mesh.faces].mean(axis=1)
+    # sampled_vertices = mesh.vertices[mesh.faces].mean(axis=1)
     # add 4 points based on the face vertices
     # face_vertices = mesh.vertices[mesh.faces]# .mean(axis=1)
     # weights = np.array([[3, 3, 3],
@@ -103,7 +92,8 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     #                     [1, 4, 4]],dtype=np.float32) / 9.0
     # sampled_vertices = np.sum(face_vertices.reshape(-1, 1, 3, 3) * weights.reshape(1, 4, 3, 1), axis=2).reshape(-1, 3)
     
-    vertices = np.concatenate([mesh.vertices, sampled_vertices], axis=0)
+    # vertices = np.concatenate([mesh.vertices, sampled_vertices], axis=0)
+    vertices = trimesh.sample.sample_surface_even(mesh, mesh.vertices.shape[0]+mesh.faces.shape[0])[0]
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(vertices)
     ### end add center points
@@ -111,41 +101,14 @@ def run_evaluation(dataset_dir, traj_path, ply_path, out_dir, view_crop):
     print(gt_filen)
     gt_pcd = o3d.io.read_point_cloud(gt_filen)
 
-    gt_trans = np.loadtxt(alignment)
-    print(traj_path)
-    traj_to_register = []
-    if traj_path.endswith('.npy'):
-        ld = np.load(traj_path)
-        for i in range(len(ld)):
-            traj_to_register.append(CameraPose(meta=None, mat=ld[i]))
-    elif traj_path.endswith('.json'): # instant-npg or sdfstudio format
-        import json
-        with open(traj_path, encoding='UTF-8') as f:
-            meta = json.load(f)
-        poses_dict = {}
-        for i, frame in enumerate(meta['frames']):
-            filepath = frame['file_path']
-            new_i = int(filepath[13:18]) - 1
-            poses_dict[new_i] = np.array(frame['transform_matrix'])
-        poses = []
-        for i in range(len(poses_dict)):
-            poses.append(poses_dict[i])
-        poses = torch.from_numpy(np.array(poses).astype(np.float32))
-        poses, _ = auto_orient_and_center_poses(poses, method='up', center_poses=True)
-        scale_factor = 1.0 / float(torch.max(torch.abs(poses[:, :3, 3])))
-        poses[:, :3, 3] *= scale_factor
-        poses = poses.numpy()
-        for i in range(len(poses)):
-            traj_to_register.append(CameraPose(meta=None, mat=poses[i]))
+    if transform_path is not None:
+        with open(transform_path, 'r') as f:
+            coord_transform = np.loadtxt(f)
+        # Rotate pcd and gt_pcd with coord_transform
+        pcd.transform(np.linalg.inv(coord_transform))
+        gt_pcd.transform(np.linalg.inv(coord_transform))
 
-    else:
-        traj_to_register = read_trajectory(traj_path)
-    print(colmap_ref_logfile)
-    gt_traj_col = read_trajectory(colmap_ref_logfile)
-
-    trajectory_transform = trajectory_alignment(map_file, traj_to_register,
-                                                gt_traj_col, gt_trans, scene)
-
+    dTau = np.mean(gt_pcd.compute_nearest_neighbor_distance()) * 1.5  # around 5e-4 of scene size
     
     # big pointclouds will be downlsampled to this number to speed up alignment
     dist_threshold = dTau
@@ -215,17 +178,22 @@ if __name__ == "__main__":
         help="path to a dataset/scene directory containing X.json, X.ply, ...",
     )
     parser.add_argument(
-        "--traj-path",
+        "--scene",
         type=str,
         required=True,
-        help=
-        "path to trajectory file. See `convert_to_logfile.py` to create this file.",
+        help="name of the scene, use Block_all by default",
     )
     parser.add_argument(
         "--ply-path",
         type=str,
         required=True,
         help="path to reconstruction ply file",
+    )
+    parser.add_argument(
+        "--transform-path",
+        type=str,
+        default=None,
+        help="path to transformation txt file",
     )
     parser.add_argument(
         "--out-dir",
@@ -248,9 +216,12 @@ if __name__ == "__main__":
                                     "evaluation")
 
     run_evaluation(
+        scene=args.scene,
         dataset_dir=args.dataset_dir,
-        traj_path=args.traj_path,
         ply_path=args.ply_path,
+        transform_path=args.transform_path,
         out_dir=args.out_dir,
         view_crop=args.view_crop
     )
+
+    print(f"Evaluation for {args.ply_path} is done.")

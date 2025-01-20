@@ -1,4 +1,0 @@
-open3d==0.18.0
-scikit-image==0.24.0
-trimesh==4.4.3
-submodules/diff-trim-surfel-rasterization

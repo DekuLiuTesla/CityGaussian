@@ -45,21 +45,20 @@ CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene CUHK_UPPER_COLMAP_ds_35 \
-                                    --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run.py \
+                                    --scene CUHK_UPPER_ds \
+                                    --dataset-dir data/geometry_gt/CUHK_UPPER \
+                                    --transform-path data/geometry_gt/CUHK_UPPER/transform.txt \
                                     --ply-path "outputs/$COARSE_NAME/fuse_post.ply"
 
 # ============================================= generate partition =============================================
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --force
+CUDA_VISIBLE_DEVICES=$gpu_id python utils/partition_citygs.py --config_path configs/$NAME.yaml --force  # --reorient
 
 # =========================================== train&eval tuned model ===========================================
 python utils/train_citygs_partitions.py -n $NAME -p $PROJECT
 
-# merge blocks
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
 CUDA_VISIBLE_DEVICES=$gpu_id python utils/merge_citygs_ckpts.py outputs/$NAME \
@@ -85,10 +84,10 @@ CUDA_VISIBLE_DEVICES=$gpu_id python utils/gs2d_mesh_extraction.py \
 
 gpu_id=$(get_available_gpu)
 echo "GPU $gpu_id is available."
-CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run_gauu.py \
-                                    --scene CUHK_UPPER_COLMAP_ds_35 \
-                                    --dataset-dir data/GauU_Scene/CUHK_UPPER_COLMAP \
-                                    --transform-path data/GauU_Scene/Downsampled/CUHK_UPPER/transform.txt \
+CUDA_VISIBLE_DEVICES=$gpu_id python tools/eval_tnt/run.py \
+                                    --scene CUHK_UPPER_ds \
+                                    --dataset-dir data/geometry_gt/CUHK_UPPER \
+                                    --transform-path data/geometry_gt/CUHK_UPPER/transform.txt \
                                     --ply-path "outputs/$NAME/fuse_post.ply"
 
 # python tools/block_wandb_sync.py --output_path outputs/$NAME  # Synchronize results to wandb if needed
