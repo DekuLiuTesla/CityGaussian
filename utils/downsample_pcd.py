@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+import add_pypath
 
 import numpy as np
 import open3d as o3d
@@ -19,8 +19,8 @@ if __name__ == "__main__":
 
     ds_pcd = pcd.voxel_down_sample(voxel_size=args.vox_size).scale(args.scaling_factor, center=(0, 0, 0))
     print("Downsampled has", len(ds_pcd.points), "points")
-    print(np.mean(ds_pcd.compute_nearest_neighbor_distance()))
+    print("Average distance of downsampled point cloud: ", np.mean(ds_pcd.compute_nearest_neighbor_distance()))
 
     save_dir = args.file_dir.replace(".ply", "_ds.ply")
-    print(save_dir)
+    print("Downsampled point cloud is saved to ", save_dir)
     o3d.io.write_point_cloud(save_dir, ds_pcd)

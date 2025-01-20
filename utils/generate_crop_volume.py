@@ -6,23 +6,22 @@ import numpy as np
 import pandas as pd
 import alphashape
 import json
+import add_pypath
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch import nn
-from plyfile import PlyData
 from argparse import ArgumentParser, Namespace
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from internal.utils.general_utils import parse
-from internal.models.gaussian_model import GaussianModel
+from internal.models.vanilla_gaussian import VanillaGaussian
 from internal.renderers.vanilla_renderer import VanillaRenderer
-from internal.dataparsers.colmap_dataparser import ColmapParams, ColmapDataParser
+from internal.dataparsers.colmap_dataparser import Colmap, ColmapDataParser
 from internal.utils.graphics_utils import fetch_ply
 from internal.utils.general_utils import inverse_sigmoid
 
 if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
-    parser.add_argument('--ply_path', type=str, help='path of config', default='data/GauU_Scene/LFLS/LFLS_ds_35.ply')
+    parser.add_argument('--ply_path', type=str, help='path of config', default='data/GauU_Scene/LFLS/LFLS_ds.ply')
     parser.add_argument('--transform_path', type=str, help='path of transformation matrix (txt)', default=None)
     parser.add_argument('--data_path', type=str, help='path of colmap data', default='data/GauU_Scene/LFLS')
     parser.add_argument('--split_mode', type=str, help='split mode of dataset', default='reconstruction')
@@ -34,21 +33,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args(sys.argv[1:])
 
-    # load groundtruth point cloud and dataset
-    model = GaussianModel(sh_degree=3)
-    model.create_from_pcd(fetch_ply(args.ply_path), device='cuda')
-    model._opacity = nn.Parameter(inverse_sigmoid(torch.ones((model.get_xyz.shape[0], 1), 
-                                                             dtype=torch.float, device="cuda") * 0.3))
-
-    renderer = VanillaRenderer()
-    renderer.setup(stage="val")
-    renderer = renderer.to("cuda")
-
     dataparser_outputs = ColmapDataParser(
         os.path.expanduser(args.data_path),
         os.path.abspath(""),
         global_rank=0,
-        params=ColmapParams(
+        params=Colmap(
             split_mode=args.split_mode,
             eval_image_select_mode=args.eval_image_select_mode,
             eval_step=args.eval_step,
@@ -56,6 +45,20 @@ if __name__ == "__main__":
             down_sample_factor=args.down_sample_factor,
         ),
     ).get_outputs()
+
+    # load groundtruth point cloud and dataset
+    model = VanillaGaussian(
+        sh_degree=3,
+    ).instantiate()
+    pcd = fetch_ply(args.ply_path)
+    model.setup_from_pcd(xyz=pcd.points, rgb=pcd.colors)
+    model = model.to("cuda")
+    model._opacity = nn.Parameter(inverse_sigmoid(torch.ones((model.get_xyz.shape[0], 1), 
+                                                             dtype=torch.float, device="cuda") * 0.3))
+
+    renderer = VanillaRenderer()
+    renderer.setup(stage="val")
+    renderer = renderer.to("cuda")
 
     # count visibility frequency
     dataset = dataparser_outputs.train_set
@@ -85,6 +88,17 @@ if __name__ == "__main__":
     x = np.array(x)
     y = np.array(y)
     bounding_polygon = np.stack([x, y, np.zeros_like(x)], axis=-1)
+
+    img_save_path = args.ply_path.replace('.ply', '.png')
+    fig, ax = plt.subplots()
+    plt.figure()
+    plt.scatter(xyz[::100, 0], xyz[::100, 1], s=0.05, c=pcd.colors[::100])
+    plt.plot(x, y, 'b-')
+    # plt.grid()
+    plt.axis('equal')
+    plt.show()
+    plt.savefig(img_save_path, dpi=600)
+    print(f'Crop Volume visualization has been written to {img_save_path}')
 
     # write json file
     content = {
