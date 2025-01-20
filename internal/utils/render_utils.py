@@ -179,7 +179,7 @@ def generate_ellipse_path(poses: np.ndarray,
   return np.stack([viewmatrix(lookdir[i], up, positions[i]) for i in range(positions.shape[0])])
 
 
-def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90, shift=0, pitch=None, filter=False):
+def generate_path(viewpoint_cameras, traj_dir=None, n_frames=480, scale_percentile=90, shift=[0, 0], pitch=None, filter=False):
   c2ws = np.array([np.linalg.inv(np.asarray((cam.world_to_camera.T).cpu().numpy())) for cam in viewpoint_cameras])
   pose = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
   pose_recenter, colmap_to_world_transform = transform_poses_pca(pose)
