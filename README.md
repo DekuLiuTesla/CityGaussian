@@ -24,9 +24,8 @@ The links above points to the papers. The main branch now has been rebased to [G
 ## 👏 Features
 * CityGaussian-style multi-gpu Gaussian Splatting training with controllable memory cost and no limit on GPU amount
 * Analysis of model partition and data assignment
-* Floater removement and 2DGS-style mesh extraction
-* Large-scale scene geometric performance evaluation
-* Trajectory aligned rendering & mesh video generation
+* 2DGS-style mesh extraction &Large-scale scene geometric performance evaluation
+* Trajectory aligned rendering & mesh video generation with floater removement
 * Features of [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning), including web viewer, MipSplatting, AbsGS, StopThePop, etc.
 
 
@@ -43,7 +42,7 @@ The links above points to the papers. The main branch now has been rebased to [G
 - [Installation](doc/installation.md)
 - [Data Preparation](doc/data_preparation.md)
 - [Run and Eval](doc/run&eval.md)
-- [Video Rendering on GS and Mesh](doc/run&eval.md)
+- [Video Rendering on GS and Mesh](doc/render_video.md)
 
 
 ## 📝 TODO List
