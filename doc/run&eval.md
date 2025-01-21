@@ -1,5 +1,6 @@
 ## Run & Evaluate
-The detailed setting of each step on GauU-Scene and MatrixCity Dataset can be found in `./scripts/run_citygs_SCENE.sh`. If applying 3DGS, please change model and renderer as done in `configs/citygs_lfls_sh2_trim.yaml` over `configs/citygsv2_lfls_sh2_trim.yaml`.
+The detailed setting of each step on GauU-Scene and MatrixCity Dataset can be found in `./scripts/run_citygs_SCENE.sh`. If applying 3DGS, please change model and renderer as done in `configs/citygs_lfls_sh2_trim.yaml` over `configs/citygsv2_lfls_sh2_trim.yaml`. You can also run on Mill19 or UrbanScene3D dataset by setting configs according to that of branch [V1-Original](https://github.com/DekuLiuTesla/CityGaussian/tree/V1-original).
+
 ### A. Train coarse model
 ```bash
 # $COARSE_NAME is the name of coarse model training config file.
@@ -15,7 +16,7 @@ python main.py fit \
 python utils/partition_citygs.py --config_path configs/$NAME.yaml --force
 ```
 The command also visualizes block division and data partitioning, as like below:
-![partition](assets/analysis.png)
+![partition](../assets/analysis.png)
 
 ### C. Finetune model parallelly and merge
 ```bash

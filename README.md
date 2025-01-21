@@ -14,6 +14,9 @@
 ![GitHub Repo stars](https://img.shields.io/github/stars/DekuLiuTesla/CityGaussian)
 
 </div>
+<p align="center">
+  <img width="460" height="300" src="assets/demo.gif">
+</p>
 
 This repo contains official implementations of our series of work in large-scale scene reconstruction with Gaussian Splatting, Star ⭐ us if you like it!
 - [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://arxiv.org/pdf/2411.00771)
