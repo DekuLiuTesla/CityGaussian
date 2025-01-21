@@ -4,13 +4,13 @@ import lightning
 import torch
 import math
 from .renderer import Renderer
-from .vanilla_2dgs_renderer import Vanilla2DGSRenderer
+from .renderer import RendererOutputTypes, RendererOutputInfo, Renderer
 from ..cameras import Camera
 from ..models.gaussian import GaussianModel
 
 from diff_trim_surfel_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
-class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
+class SepDepthTrim2DGSRenderer(Renderer):
     def __init__(
             self,
             depth_ratio: float = 0.,
@@ -23,9 +23,11 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             diable_start_trimming: bool = False,
             diable_trimming: bool = False,
     ):
-        super().__init__(depth_ratio=depth_ratio)
+        super().__init__()
 
         # hyper-parameters for trimming
+        self.depth_ratio = depth_ratio
+
         self.K = K
         self.v_pow = v_pow
         self.prune_ratio = prune_ratio
@@ -241,3 +243,47 @@ class SepDepthTrim2DGSRenderer(Vanilla2DGSRenderer):
             module.density_controller._prune_points(prune_mask, module.gaussian_model, module.gaussian_optimizers)
             print("Trimming done.")
         torch.cuda.empty_cache()
+
+    @staticmethod
+    def depths_to_points(view, depthmap):
+        device = view.world_to_camera.device
+        c2w = (view.world_to_camera.T).inverse()
+        W, H = view.width, view.height
+        ndc2pix = torch.tensor([
+            [W / 2, 0, 0, W / 2],
+            [0, H / 2, 0, H / 2],
+            [0, 0, 0, 1]]).float().cuda().T
+        projection_matrix = c2w.T @ view.full_projection
+        intrins = (projection_matrix @ ndc2pix)[:3, :3].T
+
+        grid_x, grid_y = torch.meshgrid(torch.arange(W, device='cuda').float(), torch.arange(H, device='cuda').float(), indexing='xy')
+        points = torch.stack([grid_x, grid_y, torch.ones_like(grid_x)], dim=-1).reshape(-1, 3)
+        rays_d = points @ intrins.inverse().T @ c2w[:3, :3].T
+        rays_o = c2w[:3, 3]
+        points = depthmap.reshape(-1, 1) * rays_d + rays_o
+        return points
+
+    @classmethod
+    def depth_to_normal(cls, view, depth):
+        """
+            view: view camera
+            depth: depthmap
+        """
+        points = cls.depths_to_points(view, depth).reshape(*depth.shape[1:], 3)
+        output = torch.zeros_like(points)
+        dx = torch.cat([points[2:, 1:-1] - points[:-2, 1:-1]], dim=0)
+        dy = torch.cat([points[1:-1, 2:] - points[1:-1, :-2]], dim=1)
+        normal_map = torch.nn.functional.normalize(torch.cross(dx, dy, dim=-1), dim=-1)
+        output[1:-1, 1:-1, :] = normal_map
+        return output
+
+    def get_available_outputs(self) -> Dict:
+        return {
+            "rgb": RendererOutputInfo("render"),
+            'render_alpha': RendererOutputInfo("rend_alpha", type=RendererOutputTypes.GRAY),
+            'render_normal': RendererOutputInfo("rend_normal", type=RendererOutputTypes.NORMAL_MAP),
+            'view_normal': RendererOutputInfo("view_normal", type=RendererOutputTypes.NORMAL_MAP),
+            'render_dist': RendererOutputInfo("rend_dist", type=RendererOutputTypes.GRAY),
+            'surf_depth': RendererOutputInfo("surf_depth", type=RendererOutputTypes.GRAY),
+            'surf_normal': RendererOutputInfo("surf_normal", type=RendererOutputTypes.NORMAL_MAP),
+        }
