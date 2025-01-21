@@ -25,3 +25,4 @@ clusters
 segments
 **/__pycache__
 scripts/post_proc.sh
+notebooks_dumped
