@@ -27,10 +27,24 @@ The links above points to the papers. The main branch now has been rebased to [G
 ## 👏 Features
 * CityGaussian-style multi-gpu Gaussian Splatting training with controllable memory cost and no limit on GPU amount
 * Analysis of model partition and data assignment
-* 2DGS-style mesh extraction &Large-scale scene geometric performance evaluation
+* 2DGS-style mesh extraction & Large-scale scene geometric performance evaluation
 * Trajectory aligned rendering & mesh video generation with floater removement
 * Features of [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning), including web viewer, MipSplatting, AbsGS, StopThePop, etc.
 
+<details>
+<summary><span style="font-weight: bold;">Table Results</span></summary>
+
+| Scene | SSIM↑ | PSNR↑ | LPIPS↓ | Precision↑ | Recall↑ | F1-Score↑ | #GS(M) |
+| :---: | :---: | :---: | :---: | :---:|:---:| :---: | :---: |
+| LFLS | 0.744 | 23.44 | 0.246 | 0.556 | 0.400 | 0.466 | 8.19 |
+| SMBU | 0.794 | 24.00 | 0.185 | 0.559 | 0.523 | 0.541 | 5.33 |
+| Upper Campus | 0.779 | 25.78 | 0.186 | 0.654 | 0.394 | 0.491 | 7.87 |
+| MatrixCity Aerial | 0.859 | 27.26 | 0.175 | 0.432 | 0.790 | 0.559 | 8.57 |
+| MatrixCity Street | 0.791 | 22.32 | 0.344 | 0.325 | 0.797 | 0.461 | 7.40 |
+
+Note for street view, the F1-Score is lower than that reported in paper, since we sacrifice precision for a better recall and more complete road surface. If unbroken road is prefered, you can adjust `depth_ratio` to 0.0, but surface reconstruction performance will be worse.
+
+</details>
 
 ## 📰 News
 **[2025.01.22]** Code of CityGaussian V2 is now released. Welcome to try it out!
