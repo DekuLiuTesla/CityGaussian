@@ -3,6 +3,7 @@ scikit-image==0.24.0
 trimesh==4.4.3
 imageio==2.36.0
 imageio-ffmpeg==0.5.1
+py3nvml
 torch_scatter
 submodules/diff-trim-surfel-rasterization
 submodules/diff-trim-gaussian-rasterization  # if V1 is required
