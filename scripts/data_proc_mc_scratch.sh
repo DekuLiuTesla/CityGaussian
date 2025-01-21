@@ -21,5 +21,5 @@ cp data/matrix_city/street/pose/block_A/transforms_test.json data/matrix_city/st
 
 python tools/transform_json2txt_mc_street.py --source_path data/matrix_city/street/train/block_A --intrinsic_path data/matrix_city/street/pose/block_A/transforms_train.json
 python tools/transform_json2txt_mc_street.py --source_path data/matrix_city/street/test/block_A_test --intrinsic_path data/matrix_city/street/pose/block_A/transforms_test.json
-python convert_cam.py -s data/matrix_city/street/train/block_A
-python convert_cam.py -s data/matrix_city/street/test/block_A_test
+python tools/convert_cam.py -s data/matrix_city/street/train/block_A
+python tools/convert_cam.py -s data/matrix_city/street/test/block_A_test

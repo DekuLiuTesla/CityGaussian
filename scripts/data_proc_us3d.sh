@@ -1,6 +1,6 @@
 # UrbanScene3D, Residence, Sci-Art
-python copy_images.py --image_path data/urban_scene_3d/Residence/photos --dataset_path data/urban_scene_3d/residence-pixsfm
-python copy_images.py --image_path data/urban_scene_3d/Sci-Art/photos --dataset_path data/urban_scene_3d/sci-art-pixsfm
+python tools/copy_images.py --image_path data/urban_scene_3d/Residence/photos --dataset_path data/urban_scene_3d/residence-pixsfm
+python tools/copy_images.py --image_path data/urban_scene_3d/Sci-Art/photos --dataset_path data/urban_scene_3d/sci-art-pixsfm
 
 mv data/colmap_results/residence/train/sparse data/mill19/residence-pixsfm/train
 mv data/colmap_results/residence/val/sparse data/mill19/residence-pixsfm/val
