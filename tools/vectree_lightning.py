@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument("--no_save_ply", action='store_true', help="if true, save as .ckpt")
     parser.add_argument("--skip_quantize", action='store_true')
     parser.add_argument("--sh_degree", type=int, default=3)
-    parser.add_argument("--gs_dim", type=int, default=3, help="3 for 3DGS, 2 for 2DGS")
+    parser.add_argument("--gs_dim", type=int, default=2, help="3 for 3DGS, 2 for 2DGS")
 
     parser.add_argument("--iteration_num", type=float, default=1000)
     parser.add_argument("--vq_ratio", type=float, default=0.4)
@@ -269,7 +269,7 @@ class Quantization():
                 self.model_vq._codebook.embed[:,replace_index,:] = vq_feature[most_important_index,:]
 
         #=================== Apply vector quantization ====================
-        # all_feat, all_indices = self.fully_vq_reformat()
+        all_feat, all_indices = self.fully_vq_reformat()
 
     def dequantize(self):
         print("\n==================== Load saved data & Dequantize ==================== ")

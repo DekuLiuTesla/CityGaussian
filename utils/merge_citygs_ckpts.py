@@ -119,7 +119,7 @@ for i in tqdm(checkpoint_files, desc="Loading checkpoints"):
     number_of_gaussians.append(mask_preserved.sum().item())
 
 logger.info("Merging Gaussians and density controller states...")
-ckpt["datamodule_hyper_parameters"]["parser"].block_id = None
+ckpt["datamodule_hyper_parameters"]["parser"] = torch.load(ckpt['hyper_parameters']['initialize_from'], map_location="cpu")["datamodule_hyper_parameters"]["parser"]
 for i in param_list_key_by_name:
     ckpt["state_dict"][i] = torch.concat(param_list_key_by_name[i], dim=0)
 if is_new_model is True:
