@@ -1,2 +1,0 @@
-global-include *.pyi
-global-include *.typed

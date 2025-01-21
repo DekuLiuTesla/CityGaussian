@@ -5,5 +5,5 @@ imageio==2.36.0
 imageio-ffmpeg==0.5.1
 py3nvml
 torch_scatter
-submodules/diff-trim-surfel-rasterization
-submodules/diff-trim-gaussian-rasterization  # if V1 is required
+git+https://github.com/DekuLiuTesla/diff-surfel-rasterization.git@9eefc03858a30bb3e5f98eccc56f077420ee2aaf
+git+https://github.com/DekuLiuTesla/diff-gaussian-rasterization.git@82c31d7ad780f7ef74c4f9485985895e9da2c93a
