@@ -21,8 +21,9 @@ scripts/run1.sh
 scripts/run2.sh
 scripts/run_citygs2d_building.sh
 scripts/run_citygs2d_rubble.sh
+scripts/post_proc.sh
+scripts/lod_citygs_mc_aerial.sh
+notebooks_dumped
 clusters
 segments
 **/__pycache__
-scripts/post_proc.sh
-notebooks_dumped

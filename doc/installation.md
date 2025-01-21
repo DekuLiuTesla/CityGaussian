@@ -34,4 +34,5 @@ pip install -r requirements.txt
 
 ```bash
 pip install -r requirements/CityGS.txt
-```             
+```
+Note that here we use modified version of Trim2DGS rasterizer, so as to resolve [impulse noise problem](https://github.com/hbb1/2d-gaussian-splatting/issues/174) under street views. This version also avoids interference from out-of-view surfels.
