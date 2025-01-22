@@ -25,7 +25,7 @@ This repo contains official implementations of our series of work in large-scale
 The links above points to the papers. The main branch now has been rebased to [Gaussian Lightning v0.10.1](https://github.com/yzslab/gaussian-splatting-lightning). Feel free to explore the repository!
 
 ## 👏 Features
-* CityGaussian-style multi-gpu Gaussian Splatting training with controllable memory cost and no limit on GPU amount
+* CityGaussian-style multi-gpu reconstruction with controllable memory cost and no limit on GPU amount
 * Analysis of model partition and data assignment
 * 2DGS-style mesh extraction & Large-scale scene geometric performance evaluation
 * Trajectory aligned rendering & mesh video generation with floater removement
