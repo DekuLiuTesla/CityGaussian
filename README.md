@@ -19,7 +19,7 @@
 </p>
 
 This repo contains official implementations of our series of work in large-scale scene reconstruction with Gaussian Splatting, Star ⭐ us if you like it!
-- [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://arxiv.org/pdf/2411.00771)
+- [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://arxiv.org/pdf/2411.00771) (ICLR 2025)
 - [CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians](https://arxiv.org/pdf/2404.01133) (ECCV 2024)
 
 The links above points to the papers. The main branch now has been rebased to [Gaussian Lightning v0.10.1](https://github.com/yzslab/gaussian-splatting-lightning). Feel free to explore the repository!
@@ -47,6 +47,8 @@ Note for street view, the F1-Score is lower than that reported in paper, since w
 </details>
 
 ## 📰 News
+**[2025.01.22]** CityGaussian V2 has been accepted by ICLR 2025!
+
 **[2025.01.22]** Code of CityGaussian V2 is now released. Welcome to try it out!
 
 **[2024.11.04]** Announcement of our [CityGaussianV2](https://dekuliutesla.github.io/CityGaussianV2/)!
