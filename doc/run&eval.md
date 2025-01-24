@@ -1,5 +1,8 @@
 ## Run & Evaluate
-The detailed setting of each step on GauU-Scene and MatrixCity Dataset can be found in `./scripts/run_citygs_SCENE.sh`. If applying 3DGS, please change model and renderer as done in `configs/citygs_lfls_sh2_trim.yaml` over `configs/citygsv2_lfls_sh2_trim.yaml`. You can also run on Mill19 or UrbanScene3D dataset by setting configs according to that of branch [V1-Original](https://github.com/DekuLiuTesla/CityGaussian/tree/V1-original).
+The detailed setting of each step on GauU-Scene and MatrixCity Dataset can be found in `./scripts/run_citygs_SCENE.sh`. 
+- If applying 3DGS, please change model and renderer as done in `configs/citygs_lfls_sh2_trim.yaml` over `configs/citygsv2_lfls_sh2_trim.yaml`.
+- To obtain full model, adjust SH degree to 3 and enable `diable_trimming` in renderer.
+- You can also run on Mill19 or UrbanScene3D dataset by setting configs according to that of branch [V1-Original](https://github.com/DekuLiuTesla/CityGaussian/tree/V1-original).
 
 ### A. Train coarse model
 ```bash
