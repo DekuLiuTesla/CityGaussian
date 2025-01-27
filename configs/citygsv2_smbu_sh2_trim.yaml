@@ -1,5 +1,5 @@
 model:
-  initialize_from: outputs/citygsv2_smbu_coarse_sh2_t1/checkpoints/epoch=60-step=30000.ckpt
+  initialize_from: outputs/citygsv2_smbu_coarse_sh2/checkpoints/epoch=60-step=30000.ckpt
   overwrite_config: False
   gaussian:
     class_path: internal.models.gaussian_2d.Gaussian2D
