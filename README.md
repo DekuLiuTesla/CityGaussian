@@ -9,8 +9,9 @@
 <div id="top" align="center">
 
 [![](https://img.shields.io/badge/%F0%9F%9A%80%20Project-V1-green)](https://dekuliutesla.github.io/citygs/)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-green)](https://huggingface.co/TeslaYang123/CityGaussian)
 [![](https://img.shields.io/badge/%F0%9F%9A%80%20Project-V2-blue)](https://dekuliutesla.github.io/CityGaussianV2/)
-[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-orange)](https://huggingface.co/TeslaYang123/CityGaussian)
+[![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-blue)](https://huggingface.co/TeslaYang123/CityGaussianV2)
 ![GitHub Repo stars](https://img.shields.io/github/stars/DekuLiuTesla/CityGaussian)
 
 </div>
@@ -32,7 +33,7 @@ The links above points to the papers. The main branch now has been rebased to [G
 * Features of [Gaussian Lightning](https://github.com/yzslab/gaussian-splatting-lightning), including web viewer, MipSplatting, AbsGS, StopThePop, etc.
 
 <details>
-<summary><span style="font-weight: bold;">Table Results</span></summary>
+<summary><span style="font-weight: bold;">Table Results & Checkpoints </span></summary>
 
 | Scene | SSIM↑ | PSNR↑ | LPIPS↓ | Precision↑ | Recall↑ | F1-Score↑ | #GS(M) |
 | :---: | :---: | :---: | :---: | :---:|:---:| :---: | :---: |
@@ -42,11 +43,16 @@ The links above points to the papers. The main branch now has been rebased to [G
 | MatrixCity Aerial | 0.859 | 27.26 | 0.175 | 0.432 | 0.790 | 0.559 | 8.57 |
 | MatrixCity Street | 0.791 | 22.32 | 0.344 | 0.325 | 0.797 | 0.461 | 7.40 |
 
-Note for street view, the F1-Score is lower than that reported in paper, since we sacrifice precision for a better recall and more complete road surface. If unbroken road is prefered, you can adjust `depth_ratio` to 0.0, but surface reconstruction performance will be worse.
+Note for street view, the F1-Score is lower than that reported in paper, since we sacrifice precision for a better recall and more complete road surface. If unbroken road is prefered, you can adjust `depth_ratio` to 0.0, but surface reconstruction performance will be worse. The checkpoints of CityGSV2 can be found here:
+
+- Baidu Netdisk: https://pan.baidu.com/s/1tRKiJzMLk2-zoyvoa9bkqA?pwd=1b4r
+- Hugging Face: https://huggingface.co/TeslaYang123/CityGaussianV2
 
 </details>
 
 ## 📰 News
+**[2025.01.31]** Checkpoints of CityGaussian V2 has been released!
+
 **[2025.01.22]** CityGaussian V2 has been accepted by ICLR 2025!
 
 **[2025.01.22]** Code of CityGaussian V2 is now released. Welcome to try it out!
@@ -68,7 +74,7 @@ Note for street view, the F1-Score is lower than that reported in paper, since w
 
 - \[ \] Official Implementation of Appearance Embedding.
 - \[ \] Support of V1 style LoD.
-- \[ \] Release the checkpoint of CityGaussian V2.
+- \[x\] Release the checkpoint of CityGaussian V2.
 - \[x\] Release the V2 of CityGaussian.
 - \[x\] Release code and checkpoints of CityGaussian.
 - \[x\] Release ColMap results of main datasets.
