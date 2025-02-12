@@ -44,7 +44,7 @@ To evaluate surface reconstruction accuracy, please first down load the ground t
 - **Google Drive**: https://drive.google.com/file/d/18L9AEJS2SNva7JgL2-DmqhoNtfDPSSY5/view?usp=sharing
 - **Baidu Netdisk**: https://pan.baidu.com/s/1WBJkj42AOsgrNb7YBmcbGg?pwd=in4i
 
-**Note that Mill19 and UrbanScene3D doesn't provide ground-truth point cloud, thus they are not included.** In `./scripts/gt_generate.sh`, we provide the script about how we downsample the ground truth point cloud and generate the crop volume. If you need to process the custom dataset, please refer to the script.
+**Note that Mill19 and UrbanScene3D doesn't provide ground-truth point cloud, thus they are not included.** In `./scripts/gt_generate.sh`, we provide the script about how we downsample the ground truth point cloud and generate the crop volume. If you need to process the custom dataset, please refer to the script. For **custom dataset**, you can also refer to this script to generate your crop volume file (.json).
 
 ## Prepare GauU-Scene dataset
 For GauU-Scene dataset, please follow instruction [here](https://saliteta.github.io/CUHKSZ_SMBU/) to download. The data includes RGB images and COLMAP results.
