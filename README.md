@@ -27,7 +27,7 @@ This repo contains official implementations of our series of work in large-scale
 - [CityGaussianV2: Efficient and Geometrically Accurate Reconstruction for Large-Scale Scenes](https://arxiv.org/pdf/2411.00771) (ICLR 2025)
 - [CityGaussian: Real-time High-quality Large-Scale Scene Rendering with Gaussians](https://arxiv.org/pdf/2404.01133) (ECCV 2024)
 
-The links above points to the papers. The main branch now has been rebased to [Gaussian Lightning v0.10.1](https://github.com/yzslab/gaussian-splatting-lightning). Feel free to explore the repository!
+The links above point to the papers. The main branch now has been rebased to [Gaussian Lightning v0.10.1](https://github.com/yzslab/gaussian-splatting-lightning). If you need to visit the original V1 code, please turn to the `V1-Original` branch. Feel free to explore the repository!
 
 ## 👏 Features
 * CityGaussian-style multi-gpu reconstruction with controllable memory cost and no limit on GPU amount
