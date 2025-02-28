@@ -10,10 +10,9 @@
 
 [![](https://img.shields.io/badge/%F0%9F%9A%80%20Project-V1-green)](https://dekuliutesla.github.io/citygs/)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-green)](https://huggingface.co/TeslaYang123/CityGaussian)
-[![](https://img.shields.io/badge/📄中文解读-V1-green)](https://www.techbeat.net/article-info?id=6082)
 [![](https://img.shields.io/badge/%F0%9F%9A%80%20Project-V2-blue)](https://dekuliutesla.github.io/CityGaussianV2/)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-blue)](https://huggingface.co/TeslaYang123/CityGaussianV2)
-[![](https://img.shields.io/badge/📄中文解读-V2-blue)](https://www.jiqizhixin.com/articles/2025-02-05-5)
+[![](https://img.shields.io/badge/📄-中文解读-red)](https://zhuanlan.zhihu.com/p/26862925999)
 ![GitHub Repo stars](https://img.shields.io/github/stars/DekuLiuTesla/CityGaussian)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
