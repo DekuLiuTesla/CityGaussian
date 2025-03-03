@@ -82,6 +82,9 @@ Note for street view, the F1-Score is lower than that reported in paper, since w
 - \[x\] Release code and checkpoints of CityGaussian.
 - \[x\] Release ColMap results of main datasets.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=DekuLiuTesla/CityGaussian&type=Date)](https://star-history.com/#DekuLiuTesla/CityGaussian&Date)
 
 ## 📄 License
 
