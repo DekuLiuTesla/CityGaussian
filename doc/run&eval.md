@@ -11,6 +11,8 @@ python main.py fit \
         --config configs/$COARSE_NAME.yaml \
         -n $COARSE_NAME \
 ```
+**Tips**: If you want to accelerate this part, you can use 7K iteration or lower resolution (Remember to adjust the resolution of estimated depth accordingly). But the overall performance may drop, as validated in our CityGaussianV2 paper and issue https://github.com/DekuLiuTesla/CityGaussian/issues/124.
+
 ### B. Model Partition and Data Assignment
 ```bash
 # $NAME is the name of parallel tuning config file.
