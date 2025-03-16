@@ -7,8 +7,8 @@ cp data/matrix_city/aerial/pose/block_all/transforms_train.json data/matrix_city
 cp data/matrix_city/aerial/pose/block_all/transforms_test.json data/matrix_city/aerial/test/block_all_test/transforms.json
 
 # Gather images and initialize sparse folder
-python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/train/block_all
-python tools/transform_json2txt_mc_all.py --source_path data/matrix_city/aerial/test/block_all_test
+python tools/transform_json2txt_mc_aerial.py --source_path data/matrix_city/aerial/train/block_all
+python tools/transform_json2txt_mc_aerial.py --source_path data/matrix_city/aerial/test/block_all_test
 
 # Remove the old sparse folder and use the downloaded one
 rm -rf data/matrix_city/aerial/train/block_all/sparse
