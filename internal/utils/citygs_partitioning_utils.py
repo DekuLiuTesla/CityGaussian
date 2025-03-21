@@ -328,8 +328,8 @@ class CityGSPartitioning(Partitioning):
     @classmethod
     def align_bounding_box(cls, bounding_box: MinMaxBoundingBox, origin: torch.Tensor, block_dim: list, contract: bool):
         # TODO: if center out of bounding box, incorrect result will be produced
-        assert torch.all(origin >= bounding_box.min), "center {} out-of-min-bound {}".format(origin, bounding_box.min)
-        assert torch.all(origin <= bounding_box.max), "center {} out-of-max-bound {}".format(origin, bounding_box.max)
+        assert torch.all(origin >= bounding_box.min), "center {} out-of-min-bound {}. try --origin auto".format(origin, bounding_box.min)
+        assert torch.all(origin <= bounding_box.max), "center {} out-of-max-bound {}. try --origin auto".format(origin, bounding_box.max)
 
         return SceneBoundingBox(
             bounding_box=bounding_box,
