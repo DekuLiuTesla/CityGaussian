@@ -25,6 +25,11 @@ if __name__ == "__main__":
     parser.add_argument("--aabb", type=float, nargs="+", default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument(
+        '--origin',
+        type=lambda v: "auto" if v.lower() == "auto" else [float(x) for x in v.split(',')],
+        help="origin tensor. enter numbers separated by comma or \"auto\""
+    )
     args = parser.parse_args(sys.argv[1:])
 
     if args.config_path is not None:
@@ -103,6 +108,11 @@ if __name__ == "__main__":
     scene = CityGSPartitionableScene(scene_config, reoriented_camera_centers[..., :2], reoriented_points=reoriented_point_cloud_xyz[..., :2])
     
     scene.get_bounding_box_by_points()
+    if args.origin:
+        if args.origin == 'auto':
+            scene_config.origin = (scene.point_based_bounding_box.min + scene.point_based_bounding_box.max) / 2
+        else:
+            scene_config.origin = torch.tensor(args.origin)
     scene.get_scene_bounding_box()
     scene.build_partition_coordinates()
     print(f"Camera center based partition assignment: {scene.camera_center_based_partition_assignment().sum(-1)}")
