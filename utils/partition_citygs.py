@@ -127,7 +127,7 @@ if __name__ == "__main__":
         }
     )
 
-    scene.save_plot(scene.plot_partitions, os.path.join(output_path, "partitions.png"), notebook=False)
+    scene.save_plot(scene.plot_partitions, os.path.join(output_path, "partitions.png"), notebook=False, show=not args.quite)
 
     is_images_assigned_to_partitions = torch.logical_or(scene.is_camera_in_partition, scene.is_partitions_visible_to_cameras)
     print(f"Overall images assigned to partitions: {is_images_assigned_to_partitions.sum(-1)}")
@@ -176,6 +176,7 @@ if __name__ == "__main__":
             scene.plot_partition_assigned_cameras,
             os.path.join(output_path, "{}.png".format(scene.partition_coordinates.get_str_id(partition_idx))),
             False,
+            not args.quite,
             partition_idx,
             reoriented_point_cloud_xyz,
             point_rgbs,
