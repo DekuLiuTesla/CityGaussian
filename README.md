@@ -54,6 +54,8 @@ Note for street view, the F1-Score is lower than that reported in paper, since w
 </details>
 
 ## 📰 News
+**[2025.03.26]** The repo now belongs to the research organization Linketic](https://github.com/Linketic). A [Discord](https://github.com/Linketic/CityGaussian/pull/139#issuecomment-2753354951) is coming soon for in-time communication.
+
 **[2025.01.31]** Checkpoints of CityGaussian V2 has been released!
 
 **[2025.01.22]** CityGaussian V2 has been accepted by ICLR 2025!
