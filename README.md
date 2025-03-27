@@ -13,7 +13,7 @@
 [![](https://img.shields.io/badge/%F0%9F%9A%80%20Project-V2-blue)](https://dekuliutesla.github.io/CityGaussianV2/)
 [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97-Hugging%20Face-blue)](https://huggingface.co/TeslaYang123/CityGaussianV2)
 [![](https://img.shields.io/badge/📄-中文解读-red)](https://zhuanlan.zhihu.com/p/26862925999)
-![GitHub Repo stars](https://img.shields.io/github/stars/DekuLiuTesla/CityGaussian)
+![GitHub Repo stars](https://img.shields.io/github/stars/Linketic/CityGaussian)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
 
@@ -86,7 +86,7 @@ Note for street view, the F1-Score is lower than that reported in paper, since w
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=DekuLiuTesla/CityGaussian&type=Date)](https://star-history.com/#DekuLiuTesla/CityGaussian&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Linketic/CityGaussian&type=Date)](https://www.star-history.com/#Linketic/CityGaussian&Date)
 
 ## 📄 License
 
